@@ -5,3 +5,7 @@ coverage
 pnpm-lock.yaml
 tasks/status.json
 *.md
+
+# Generated from the zod contracts by `pnpm specs:generate`; reformatting them would
+# break the drift check in tests/architecture/specs.test.ts.
+specs/generation-schemas

@@ -1,0 +1,107 @@
+{
+  "$id": "https://gapos.dev/generation-schemas/verification_report/1.0.0",
+  "title": "verification_report",
+  "description": "Structured response contract for the \"verification_report\" model call, version 1.0.0. Generated from packages/ai-contracts; do not edit by hand.",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "artefactId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "independentSolutions": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "questionId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "answer": {
+            "type": "string",
+            "minLength": 1
+          },
+          "agrees": {
+            "type": "boolean"
+          },
+          "reasoningSummary": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "questionId",
+          "answer",
+          "agrees",
+          "reasoningSummary"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "findings": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": [
+              "independent_solution",
+              "distractor_validity",
+              "rubric_tolerance",
+              "answer_leakage",
+              "difficulty_match",
+              "logical_consistency",
+              "source_support",
+              "spoken_clarity",
+              "duration_estimate",
+              "objective_coverage",
+              "prompt_injection"
+            ]
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "critical",
+              "high",
+              "medium",
+              "low"
+            ]
+          },
+          "targetId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "finding": {
+            "type": "string",
+            "minLength": 1
+          },
+          "suggestedRepair": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "category",
+          "severity",
+          "targetId",
+          "finding"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "artefactId",
+    "independentSolutions",
+    "findings"
+  ],
+  "additionalProperties": false
+}

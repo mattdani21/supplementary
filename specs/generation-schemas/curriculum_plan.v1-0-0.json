@@ -1,0 +1,251 @@
+{
+  "$id": "https://gapos.dev/generation-schemas/curriculum_plan/1.0.0",
+  "title": "curriculum_plan",
+  "description": "Structured response contract for the \"curriculum_plan\" model call, version 1.0.0. Generated from packages/ai-contracts; do not edit by hand.",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "gapId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dailyMinutes": {
+      "type": "integer",
+      "minimum": 15,
+      "maximum": 60
+    },
+    "objectives": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "capabilityStatement": {
+            "type": "string",
+            "minLength": 1
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "prerequisiteObjectiveIds": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "externalPrerequisites": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "evidence": {
+            "type": "object",
+            "properties": {
+              "basis": {
+                "type": "string",
+                "enum": [
+                  "source",
+                  "general_knowledge"
+                ]
+              },
+              "locators": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "sourceId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "chunkId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "locator": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "sourceId",
+                    "chunkId",
+                    "locator"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "basis",
+              "locators"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "capabilityStatement",
+          "required",
+          "prerequisiteObjectiveIds",
+          "externalPrerequisites",
+          "evidence"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "days": {
+      "minItems": 1,
+      "maxItems": 7,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "day": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 7
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "objectiveIds": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "activities": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "audio_lesson",
+                    "retrieval",
+                    "application",
+                    "review"
+                  ]
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "estimatedMinutes": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 60
+                }
+              },
+              "required": [
+                "kind",
+                "description",
+                "estimatedMinutes"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "day",
+          "title",
+          "objectiveIds",
+          "activities"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "glossary": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "term": {
+            "type": "string",
+            "minLength": 1
+          },
+          "definition": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "term",
+          "definition"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "exclusions": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "assessmentBlueprint": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "objectiveId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "retrievalItems": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "applicationItems": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "targetDifficulty": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          }
+        },
+        "required": [
+          "objectiveId",
+          "retrievalItems",
+          "applicationItems",
+          "targetDifficulty"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "gapId",
+    "dailyMinutes",
+    "objectives",
+    "days",
+    "glossary",
+    "exclusions",
+    "assessmentBlueprint"
+  ],
+  "additionalProperties": false
+}

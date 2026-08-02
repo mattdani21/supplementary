@@ -1,0 +1,101 @@
+{
+  "$id": "https://gapos.dev/generation-schemas/gap_normalisation/1.0.0",
+  "title": "gap_normalisation",
+  "description": "Structured response contract for the \"gap_normalisation\" model call, version 1.0.0. Generated from packages/ai-contracts; do not edit by hand.",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "topic": {
+      "type": "string",
+      "minLength": 1
+    },
+    "currentState": {
+      "type": "string",
+      "minLength": 1
+    },
+    "targetCapability": {
+      "type": "string",
+      "minLength": 1
+    },
+    "observableSuccessCondition": {
+      "type": "string",
+      "minLength": 1
+    },
+    "assumedPrerequisites": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "ambiguities": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string",
+            "minLength": 1
+          },
+          "materiality": {
+            "type": "string",
+            "enum": [
+              "blocking",
+              "recorded_assumption"
+            ]
+          },
+          "assumptionIfUnanswered": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "question",
+          "materiality",
+          "assumptionIfUnanswered"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "recommendedDiagnostic": {
+      "type": "object",
+      "properties": {
+        "questionCount": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 10
+        },
+        "focusAreas": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "questionCount",
+        "focusAreas"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "topic",
+    "currentState",
+    "targetCapability",
+    "observableSuccessCondition",
+    "assumedPrerequisites",
+    "ambiguities",
+    "recommendedDiagnostic"
+  ],
+  "additionalProperties": false
+}

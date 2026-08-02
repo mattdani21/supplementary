@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-02T05:05:00.000Z",
+  "updatedAt": "2026-08-02T05:11:00.000Z",
   "controller": "gapos-controller",
   "tasks": {
     "GAP-000": {
@@ -232,6 +232,30 @@
         }
       ],
       "notes": "Writing the gate found two real defects. (1) The scorer measured objective coverage over the plan's promises as well as the lessons, so dropping a whole day still scored 1.0 \u2014 coverage now means taught, over lesson titles, summaries and scripts only. (2) The reference lesson scripts claimed twelve to fourteen minutes of audio and ran about one; they are now ~750 words each, matching a five-minute audio activity, with the plan's day budgets adjusted to keep 35 minutes. The nine fixtures that need a live provider are tracked as GAP-014b, blocked on a human approval gate rather than skipped."
+    },
+    "GAP-016": {
+      "status": "done",
+      "completedAt": "2026-08-02T05:11:00.000Z",
+      "evidence": [
+        {
+          "command": "pnpm test tests/architecture/specs.test.ts",
+          "result": "pass",
+          "note": "11 tests. Every contract has a published JSON Schema; the checked-in files must match what the zod contracts generate byte for byte, so changing a contract without regenerating fails the build; a deleted contract cannot leave a published schema behind; every published schema carries its version as a const and sets additionalProperties:false. The OpenAPI document declares all 14 essential routes, requires an idempotency key on both writes that need one, lists every DomainErrorCode and every gap and generation status, and is asserted never to expose prompts or reasoning"
+        }
+      ],
+      "notes": "Added outside the original backlog: specs/openapi.yaml and specs/generation-schemas/ were Phase 0 deliverables that had not been written. The schemas are generated from the zod contracts rather than hand-written, so the published form cannot drift from the code."
+    },
+    "GAP-017": {
+      "status": "done",
+      "completedAt": "2026-08-02T05:11:00.000Z",
+      "evidence": [
+        {
+          "command": "pnpm test tests/end-to-end/security.test.ts",
+          "result": "pass",
+          "note": "13 tests. A source carrying an injection payload still compiles (reading untrusted input safely is the requirement, not refusing it); the attempt is recorded as an audit finding and counted in telemetry; the payload never enters a published lesson; a wrong answer is still wrong despite the payload asking for every answer to be marked correct; a forged evidence fence is redacted; a generator that DID obey the injection is caught structurally by the transcript mismatch. Plus tenant isolation across curricula, lessons, questions, artefacts, runs and findings; storage refuses a known key to a non-owner; signed URLs expire; deletion removes owned rows and storage objects; no source text, instruction or lesson content reaches the logs"
+        }
+      ],
+      "notes": "Found a real defect: injection detection ran over the RETRIEVED evidence, and retrieval selects chunks by relevance to the learner's question \u2014 a hostile paragraph is typically about nothing, so it scored zero and was never scanned. The payload would have gone unreported on this run and could have reached a model on a later query that happened to match it. The scan now runs over every ingested chunk."
     }
   },
   "blockers": []

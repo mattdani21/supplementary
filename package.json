@@ -18,7 +18,8 @@
     "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test",
     "db:migrate": "tsx packages/database/src/migrate-cli.ts",
     "local:up": "docker compose -f infra/local/docker-compose.yml up -d",
-    "local:down": "docker compose -f infra/local/docker-compose.yml down"
+    "local:down": "docker compose -f infra/local/docker-compose.yml down",
+    "specs:generate": "tsx scripts/generate-specs.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

@@ -28,6 +28,7 @@ import {
   type EvidenceItem,
   type LessonPackage,
 } from '@gapos/ai-contracts';
+import { detectInjectionAttempts } from '@gapos/ai-contracts';
 import type { ObjectStore, OwnerId, UnitOfWork } from '@gapos/database';
 import { textOf } from '@gapos/database';
 import {
@@ -157,6 +158,32 @@ export const compileGap = async (
     await advance('ingesting');
     await ingestSources({ owner, gapId: gap.id, step, deps });
     const evidence = await gatherEvidence(owner, gap.id, gap.rawStatement, deps);
+
+    // Instruction-like text inside a source is reported, never followed (docs/SECURITY.md).
+    //
+    // Scanned over every ingested chunk rather than over the retrieved evidence. Retrieval
+    // selects chunks by relevance to the learner's question, and a hostile paragraph is
+    // typically about nothing — so scanning only what was retrieved silently misses the payload
+    // on this run and lets it through on a later query that happens to match it.
+    for (const signal of detectInjectionAttempts(await allChunks(owner, gap.id, deps))) {
+      await uow.generation.addFinding(owner, {
+        id: newId('finding'),
+        runId: run.id,
+        targetId: signal.chunkId,
+        category: 'prompt_injection',
+        severity: 'high',
+        finding:
+          `Source chunk ${signal.chunkId} contains instruction-like text, which was treated as ` +
+          'evidence and not followed.',
+        repairStatus: 'accepted',
+        repairAttempts: 0,
+      });
+      metrics.increment('audit_finding_total', { category: 'prompt_injection' });
+      // The chunk id, not the payload: the log must not become a copy of the hostile text.
+      logger.warn('Instruction-like text found in a source; recorded as a finding', {
+        chunkId: signal.chunkId,
+      });
+    }
 
     /* ----------------------------------------------------- stage A: normalise the gap */
     await advance('planning');
@@ -775,6 +802,27 @@ const collectPublishedItems = async (
   for (const day of publishedDays) {
     for (const question of await deps.uow.curricula.listQuestions(owner, day.lessonId)) {
       items.push({ objectiveId: question.objectiveId, role: question.payload.role });
+    }
+  }
+  return items;
+};
+
+/** Every ingested chunk for a gap, across all its sources. Used by the injection scan. */
+const allChunks = async (
+  owner: OwnerId,
+  gapId: string,
+  deps: CompileDeps,
+): Promise<EvidenceItem[]> => {
+  const sources = await deps.uow.sources.listForGap(owner, gapId);
+  const items: EvidenceItem[] = [];
+  for (const source of sources) {
+    for (const chunk of await deps.uow.sources.listChunks(owner, source.id)) {
+      items.push({
+        sourceId: chunk.sourceId,
+        chunkId: chunk.id,
+        locator: chunk.locator,
+        text: chunk.text,
+      });
     }
   }
   return items;

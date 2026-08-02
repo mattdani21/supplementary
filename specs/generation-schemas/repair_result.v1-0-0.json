@@ -1,0 +1,157 @@
+{
+  "$id": "https://gapos.dev/generation-schemas/repair_result/1.0.0",
+  "title": "repair_result",
+  "description": "Structured response contract for the \"repair_result\" model call, version 1.0.0. Generated from packages/ai-contracts; do not edit by hand.",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "targetId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "repairedQuestions": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "objectiveId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "multiple_choice",
+              "short_answer",
+              "worked_problem"
+            ]
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "retrieval",
+              "application",
+              "transfer"
+            ]
+          },
+          "difficulty": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "prompt": {
+            "type": "string",
+            "minLength": 1
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "answer": {
+            "type": "string",
+            "minLength": 1
+          },
+          "rubric": {
+            "type": "string"
+          },
+          "acceptableAlternatives": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "evidence": {
+            "type": "object",
+            "properties": {
+              "basis": {
+                "type": "string",
+                "enum": [
+                  "source",
+                  "general_knowledge"
+                ]
+              },
+              "locators": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "sourceId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "chunkId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "locator": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "sourceId",
+                    "chunkId",
+                    "locator"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "basis",
+              "locators"
+            ],
+            "additionalProperties": false
+          },
+          "hint": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "objectiveId",
+          "type",
+          "role",
+          "difficulty",
+          "prompt",
+          "answer",
+          "acceptableAlternatives",
+          "evidence"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "repairedScript": {
+      "type": "string"
+    },
+    "addressedFindings": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "targetId",
+    "repairedQuestions",
+    "addressedFindings"
+  ],
+  "additionalProperties": false
+}
