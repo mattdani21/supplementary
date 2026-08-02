@@ -307,12 +307,17 @@
         "note": "13 tests. The live backend speaks OpenAI-compatible chat-completions over plain fetch (no SDK): bearer auth, response_format json_object, the contract named in the system prompt, evidence passed through inside the fence, temperature/max_tokens/timeout forwarded. Failures are typed LiveProviderErrors with a retryable flag (429/5xx/network retryable; 400/JSON/usage failures not). Usage is required because the wrapper cannot account for a call whose cost it cannot measure; cost is integer millicents rounded up from an env-overridable price table (defaults track deepseek-chat list prices)."
       },
       {
+        "command": "pnpm vitest run packages/provider-adapters/src/live/speech.test.ts",
+        "result": "pass",
+        "note": "14 tests. The live TTS wrapper computes the transcript-linked checksum (identical to the fake's, so memory/SQL/pipeline integrity checks hold for live runs), estimates duration with the same 14-characters-per-second heuristic the domain segmenter uses, forwards text/voice/locale verbatim, wraps engine failures in LiveSynthesisError naming the segment, and charges 0 by default (free endpoint) with an optional per-thousand-characters price. The Google Translate TTS engine is plain fetch with the gTTS query shape, chunks long segments at word boundaries under the endpoint cap, hard-splits overlong words, maps regional locales to language codes, and throws typed errors on HTTP and network failure."
+      },
+      {
         "command": "pnpm verify",
         "result": "pass",
-        "note": "314 passed + 13 skipped (Postgres block, no GAPOS_TEST_DATABASE_URL). Format, lint, typecheck and the full suite are green with the live backend exported and the factory message updated."
+        "note": "328 passed + 13 skipped (Postgres block, no GAPOS_TEST_DATABASE_URL). Format, lint, typecheck and the full suite are green with both live backends exported."
       }
     ],
-    "notes": "createLiveLanguageModel / createLiveLanguageModelFromEnv implement the LanguageModelBackend boundary and are exported from @gapos/provider-adapters; GAPOS_LLM_API_KEY / BASE_URL / MODEL / price overrides documented in .env.example. createProviders({mode:'live'}) still throws: a provider set must be all-live or all-fake (AGENTS.md §4), and live TTS/STT backends do not exist yet. The nine-fixture live scoring run is still blocked on the human approval gate: an API key and an agreed budget before any paid call (AGENTS.md §5)."
+    "notes": "createLiveLanguageModel / createLiveLanguageModelFromEnv and createLiveTextToSpeech / createGoogleTranslateTtsEngine implement the LLM and TTS boundaries; env config documented in .env.example. The npm edge-tts package was rejected (registry carries only 1.0.1, Bun-era main:index.ts, CC BY-NC-SA 4.0) in favour of a self-contained fetch client for the free Google endpoint behind the SpeechSynthesisEngine interface, so a paid provider slots in later (E17). createProviders({mode:'live'}) still throws: live speech-to-text is the only missing capability, and a provider set must be all-live or all-fake (AGENTS.md §4). The nine-fixture live scoring run is still blocked on the human approval gate: an API key and an agreed budget before any paid call (AGENTS.md §5)."
   },
   "blockers": []
 }
