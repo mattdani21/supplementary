@@ -397,6 +397,39 @@ const questionsForDay = (day: number): Question[] => {
       acceptableAlternatives: ['The classes are disjoint and cover A.'],
       evidence: sourced('chunk_6', '§6 Equivalence relations and classes'),
     },
+    {
+      id: 'q_d3_r4',
+      objectiveId: 'obj_equivalence_classes',
+      type: 'multiple_choice',
+      role: 'retrieval',
+      difficulty: 3,
+      prompt: 'Two equivalence classes of the same relation that share an element must be:',
+      options: ['identical', 'disjoint', 'nested', 'of the same size but distinct'],
+      answer: 'identical',
+      acceptableAlternatives: [],
+      evidence: sourced('chunk_6', '§6 Equivalence relations and classes'),
+    },
+    {
+      // The blueprint promises an application item for this objective as well as recall.
+      id: 'q_d3_a2',
+      objectiveId: 'obj_relation_properties',
+      type: 'worked_problem',
+      role: 'application',
+      difficulty: 3,
+      prompt:
+        'On the set {1, 2, 3} let R = {(1,1), (2,2), (1,2), (2,1)}. State which of reflexivity, ' +
+        'symmetry and transitivity R has, with a reason for each.',
+      answer:
+        'Not reflexive: (3,3) is missing. Symmetric: the only off-diagonal pairs are (1,2) and ' +
+        '(2,1), which come as a pair. Transitive: every composable pair of related elements is ' +
+        'already related.',
+      rubric:
+        'Full marks require a verdict and a reason for all three properties. A verdict without ' +
+        'a reason scores zero for that property. The reflexivity answer must name the missing pair.',
+      acceptableAlternatives: [],
+      evidence: sourced('chunk_5', '§5 Relations'),
+      hint: 'Check reflexivity element by element before looking at the other two.',
+    },
   ];
 };
 

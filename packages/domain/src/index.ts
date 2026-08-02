@@ -7,3 +7,4 @@ export * from './mastery/review-schedule.js';
 export * from './curriculum/plan-validation.js';
 export * from './sources/chunking.js';
 export * from './verification/verifier.js';
+export * from './audio/segmentation.js';

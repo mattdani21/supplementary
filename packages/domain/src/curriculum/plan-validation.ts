@@ -234,6 +234,58 @@ export const findPlanViolations = (
   return violations;
 };
 
+/* ------------------------------------------------- blueprint conformance (post-generation) */
+
+export interface PublishedItem {
+  readonly objectiveId: string;
+  readonly role: 'retrieval' | 'application' | 'transfer';
+}
+
+/**
+ * Check what was actually published against what the blueprint promised.
+ *
+ * Plan validation happens before generation and can only check the *plan*. This runs after, on
+ * the questions that really exist, and catches the case the plan cannot: a lesson that was
+ * generated with fewer items than its objective was supposed to receive. Without it, an
+ * objective can be taught, assessed by one recall item, and then be permanently unmasterable —
+ * the learner practises forever and the mastery rule never fires, with nothing to point at.
+ *
+ * `transfer` counts towards the application requirement: it is a harder form of the same demand.
+ */
+export const findAssessmentGaps = (
+  plan: PlanToValidate,
+  published: readonly PublishedItem[],
+): PlanViolation[] => {
+  const violations: PlanViolation[] = [];
+
+  for (const entry of plan.assessmentBlueprint) {
+    const items = published.filter((item) => item.objectiveId === entry.objectiveId);
+    const retrieval = items.filter((item) => item.role === 'retrieval').length;
+    const application = items.filter(
+      (item) => item.role === 'application' || item.role === 'transfer',
+    ).length;
+
+    if (retrieval < entry.retrievalItems || application < entry.applicationItems) {
+      violations.push({
+        code: 'objective_not_assessed',
+        message:
+          `Objective "${entry.objectiveId}" was published with ${retrieval} retrieval and ` +
+          `${application} application items, but the blueprint promised ${entry.retrievalItems} ` +
+          `and ${entry.applicationItems}.`,
+        details: {
+          objectiveId: entry.objectiveId,
+          publishedRetrieval: retrieval,
+          publishedApplication: application,
+          requiredRetrieval: entry.retrievalItems,
+          requiredApplication: entry.applicationItems,
+        },
+      });
+    }
+  }
+
+  return violations;
+};
+
 export class PlanRejected extends DomainError {
   constructor(readonly violations: readonly PlanViolation[]) {
     super(

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-02T04:48:00.000Z",
+  "updatedAt": "2026-08-02T04:58:00.000Z",
   "controller": "gapos-controller",
   "tasks": {
     "GAP-000": {
@@ -151,6 +151,68 @@
           "command": "pnpm test packages/domain/src/mastery",
           "result": "pass",
           "note": "31 tests. Each of the five mastery clauses is broken individually and shown to block; consumption with no evidence cannot master; a failed application item does not satisfy the application clause; optional objectives never block filling; a prerequisite cycle blocks rather than hangs; decayed prior mastery stops satisfying a prerequisite; wrong answers schedule a same-session correction plus a next-day check; the ladder is 0\u21921\u21923\u21927 then graduate; a failed review drops back to the bottom"
+        }
+      ]
+    },
+    "GAP-005": {
+      "status": "done",
+      "completedAt": "2026-08-02T04:57:00.000Z",
+      "evidence": [
+        {
+          "command": "pnpm test tests/end-to-end",
+          "result": "pass",
+          "note": "22 tests covering the whole \u00a716.1 journey on deterministic fakes: create account, define gap, upload the reference source, skip the diagnostic, compile, Day 1 published first, playable audio artefact with a signed expiring URL, practice submission, corrective feedback, mastery check, capability search"
+        },
+        {
+          "command": "pnpm test",
+          "result": "pass",
+          "note": "219 tests across 13 files, no network and no API key"
+        }
+      ],
+      "notes": "Two real defects were found by writing this test and fixed in the code, not the test. (1) Day 1 did not publish first: with bounded concurrency the publication order of concurrent days was arbitrary, so Day 1 now runs to completion before the rest fan out. (2) The published questions did not satisfy the plan's own assessment blueprint, which would have left obj_relation_properties permanently unmasterable with nothing to point at; findAssessmentGaps now checks published items against the blueprint and marks the run partial."
+    },
+    "GAP-007": {
+      "status": "done",
+      "completedAt": "2026-08-02T04:57:00.000Z",
+      "evidence": [
+        {
+          "command": "pnpm test tests/end-to-end",
+          "result": "pass",
+          "note": "A blocking ambiguity stops the run for clarification instead of guessing; a skipped diagnostic records a labelled assumption on the gap and lowers the starting difficulty; normalisation output is contract-validated before it is persisted"
+        }
+      ],
+      "notes": "Stages A and C are wired through the guarded adapter, so an invalid normalisation cannot reach the database."
+    },
+    "GAP-009": {
+      "status": "done",
+      "completedAt": "2026-08-02T04:57:00.000Z",
+      "evidence": [
+        {
+          "command": "pnpm test tests/end-to-end",
+          "result": "pass",
+          "note": "Lessons generate against the frozen plan with bounded concurrency; the plan, glossary and objective ids are immutable inputs; artefacts are versioned and frozen once an attempt references them"
+        }
+      ]
+    },
+    "GAP-011": {
+      "status": "done",
+      "completedAt": "2026-08-02T04:57:00.000Z",
+      "evidence": [
+        {
+          "command": "pnpm test tests/end-to-end",
+          "result": "pass",
+          "note": "Day 1 publishes before later days; audio failure falls back to transcript and the curriculum survives with every objective intact; segment checksums are verified against the spoken text before publication"
+        }
+      ]
+    },
+    "GAP-015": {
+      "status": "partial",
+      "notes": "Budget enforcement and step idempotency are done and covered end to end. The durable job queue table exists in the schema but the worker loop that leases from it is not yet written.",
+      "evidence": [
+        {
+          "command": "pnpm test tests/end-to-end",
+          "result": "pass",
+          "note": "An exhausted budget fails the run before any provider call rather than overspending, and increments budget_degradation_total; a provider failure fails the run cleanly and a retry compiles the identical course"
         }
       ]
     }
