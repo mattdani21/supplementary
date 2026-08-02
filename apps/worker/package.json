@@ -1,0 +1,17 @@
+{
+  "name": "@gapos/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "start": "tsx src/main.ts"
+  },
+  "dependencies": {
+    "@gapos/ai-contracts": "workspace:*",
+    "@gapos/database": "workspace:*",
+    "@gapos/domain": "workspace:*",
+    "@gapos/observability": "workspace:*",
+    "@gapos/provider-adapters": "workspace:*"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "incremental": false,
+    "types": ["node"],
+    "paths": {
+      "@gapos/ai-contracts": ["./packages/ai-contracts/src/index.ts"],
+      "@gapos/database": ["./packages/database/src/index.ts"],
+      "@gapos/domain": ["./packages/domain/src/index.ts"],
+      "@gapos/evaluation": ["./packages/evaluation/src/index.ts"],
+      "@gapos/observability": ["./packages/observability/src/index.ts"],
+      "@gapos/provider-adapters": ["./packages/provider-adapters/src/index.ts"],
+      "@gapos/test-fixtures": ["./packages/test-fixtures/src/index.ts"]
+    }
+  },
+  "include": ["packages/*/src/**/*", "apps/*/src/**/*", "tests/**/*", "*.config.ts"]
+}
