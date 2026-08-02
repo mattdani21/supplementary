@@ -56,8 +56,13 @@ jobs:
           POSTGRES_DB: gapos_test
         ports:
           - 5432:5432
+        # The healthcheck names the database explicitly. pg_isready defaults to a database
+        # matching the user, which does not exist here, so every probe logged
+        # `FATAL: database "gapos" does not exist`. The check still passed — but a service log
+        # full of benign FATALs is how a real one goes unread, which is exactly how the audio
+        # constraint bug survived a green build. See tasks/decisions.md.
         options: >-
-          --health-cmd "pg_isready -U gapos"
+          --health-cmd "pg_isready -U gapos -d gapos_test"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
