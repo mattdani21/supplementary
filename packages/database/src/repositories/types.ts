@@ -97,6 +97,12 @@ export interface Artefact {
   readonly checksum: string;
   readonly durationSeconds?: number;
   readonly version: number;
+  /**
+   * Position within the lesson. Audio is synthesised as several segments, so a lesson has many
+   * artefacts of kind `audio`; a transcript is a single artefact at 0. Migration 002 exists
+   * because the original schema assumed one artefact per kind.
+   */
+  readonly segmentOrdinal: number;
   readonly frozen: boolean;
 }
 

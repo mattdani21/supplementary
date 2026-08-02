@@ -22,3 +22,16 @@ boundary.
 `GAPOS_PROVIDER_MODE` defaults to `fake`. A real provider must be opted into explicitly. This
 means no test run and no accidental local script can spend money, and it makes the whole suite
 deterministic and offline by default.
+
+## 2026-08-02 — A green build is not evidence that nothing failed
+
+Migration 002 exists because a passing CI run's Postgres server log contained
+`duplicate key value violates unique constraint "artefacts_lesson_id_kind_version_key"`.
+The suite was green: the failing insert was swallowed by the pipeline's audio fallback, which
+exists for a failing provider and cannot tell that apart from a schema that rejects the write.
+Every lesson shipped transcript-only on Postgres.
+
+Two habits come out of this. Read the service logs of a green run, not only a red one. And
+assert on the artefact the feature is supposed to produce — `textOnly === false` and a count of
+audio segments — rather than on the status code of the operation that was supposed to produce
+it, because a fallback path will happily report success.

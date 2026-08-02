@@ -487,7 +487,7 @@ tasks:
     title: Implement the Postgres repositories behind the existing interfaces
     epic: E1
     priority: P0
-    status: ready
+    status: done
     goal: Run the same repository suite against Postgres, not only the in-memory implementation.
     scope:
       - Postgres implementation of every repository interface in packages/database
@@ -505,10 +505,10 @@ tasks:
     risk: medium
     human_gate: false
     notes: >
-      The schema, the forward-only migration runner and the drift check are in place and exercised
-      by CI. The in-memory implementation is the one the application uses today; it enforces the
-      same ownership rule and is a real implementation rather than a mock, but the SQL path is not
-      yet written. Recorded rather than stubbed, per AGENTS.md failure policy.
+      Done. The contract suite in shared-suite.ts runs against both implementations, so a test
+      that passes for one and fails for the other is a bug in one of them. The full end-to-end
+      journey also runs against Postgres in CI. Vector retrieval is still lexical (full-text
+      ranking); the vector index is GAP-018.
 
   - id: GAP-014b
     title: Score the nine live-provider evaluation fixtures
@@ -538,3 +538,30 @@ tasks:
       objectives, prohibited content, failure traps and rubrics so they are ready to run rather
       than being invented later under time pressure. Adding a live provider creates paid external
       resources, which is a human approval gate (AGENTS.md §5).
+
+  - id: GAP-018
+    title: Replace lexical chunk retrieval with the vector index
+    epic: E3
+    priority: P1
+    status: ready
+    goal: Retrieve source evidence by meaning rather than by shared words.
+    scope:
+      - an embedding column on source_chunks behind a new forward-only migration
+      - embedding generation through the provider adapter
+      - SourceRepository.searchChunks backed by the vector index
+    out_of_scope:
+      - reranking
+      - hybrid scoring weights
+    dependencies: [GAP-004b]
+    acceptance:
+      - a chunk that answers the query but shares no words with it is retrieved
+      - retrieval still cannot cross an owner or a gap boundary
+      - the contract suite passes unchanged against both implementations
+    verification:
+      - GAPOS_TEST_DATABASE_URL=... pnpm test packages/database
+    risk: medium
+    human_gate: false
+    notes: >
+      Both implementations currently retrieve on lexical overlap - term matching in memory,
+      to_tsvector ranking in Postgres. That is enough to prove the ownership and gap boundaries,
+      which is what the contract suite asserts, but it will miss a paraphrase.

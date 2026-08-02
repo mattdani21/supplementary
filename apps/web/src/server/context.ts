@@ -44,6 +44,15 @@ export interface ContextOptions {
   readonly budget?: Budget;
   readonly fake?: FakeLanguageModelOptions;
   readonly logLevel?: 'debug' | 'info' | 'warn' | 'error';
+  /**
+   * Persistence. Defaults to the in-memory implementations.
+   *
+   * Injectable so the same application code can be exercised against Postgres — an end-to-end
+   * journey that only ever runs on memory proves the SQL implementation compiles, not that the
+   * product works on it.
+   */
+  readonly uow?: UnitOfWork;
+  readonly storage?: ObjectStore;
 }
 
 export const createServerContext = (options: ContextOptions = {}): ServerContext => {
@@ -52,8 +61,8 @@ export const createServerContext = (options: ContextOptions = {}): ServerContext
   const logger = createLogger({}, { level: options.logLevel ?? 'warn' });
 
   return {
-    uow: createMemoryUnitOfWork(),
-    storage: createMemoryObjectStore(options.now),
+    uow: options.uow ?? createMemoryUnitOfWork(),
+    storage: options.storage ?? createMemoryObjectStore(options.now),
     providers: createProviders({
       costAccountant,
       metrics,
