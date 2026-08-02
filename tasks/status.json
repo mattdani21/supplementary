@@ -1,0 +1,262 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-08-02T05:11:00.000Z",
+  "controller": "gapos-controller",
+  "tasks": {
+    "GAP-000": {
+      "status": "done",
+      "startedAt": "2026-08-02T04:12:00.000Z",
+      "completedAt": "2026-08-02T04:23:00.000Z",
+      "evidence": [
+        {
+          "command": "pnpm install",
+          "result": "pass",
+          "note": "273 packages resolved, clean checkout"
+        },
+        {
+          "command": "pnpm typecheck",
+          "result": "pass"
+        },
+        {
+          "command": "pnpm lint",
+          "result": "pass"
+        },
+        {
+          "command": "pnpm format:check",
+          "result": "pass"
+        },
+        {
+          "command": "pnpm test tests/architecture",
+          "result": "pass",
+          "note": "7 tests: the domain-purity and provider-boundary lint rules are asserted through the real ESLint config, so the constraint fails the build rather than living in prose"
+        }
+      ],
+      "notes": "Monorepo, quality gate, AGENTS.md, PRODUCT/ARCHITECTURE/SECURITY/OPERATIONS, ADRs 0001-0003, backlog schema, CI with a separate Postgres migration job."
+    },
+    "GAP-001": {
+      "status": "done",
+      "startedAt": "2026-08-02T04:19:00.000Z",
+      "completedAt": "2026-08-02T04:22:00.000Z",
+      "evidence": [
+        {
+          "command": "pnpm test:domain",
+          "result": "pass",
+          "note": "18 tests. Full transition matrix asserted against the declared table; every status proven reachable from draft; filled unreachable from any status except mastery_check and review_due; mastery_confirmed refused when a required objective is unmastered or when there are no required objectives at all"
+        },
+        {
+          "command": "pnpm typecheck",
+          "result": "pass"
+        }
+      ],
+      "notes": "Acceptance 'consumption cannot directly set filled' is covered by the test that iterates every status and asserts the mastery_confirmed transition is refused."
+    },
+    "GAP-002": {
+      "status": "done",
+      "startedAt": "2026-08-02T04:22:00.000Z",
+      "completedAt": "2026-08-02T04:23:00.000Z",
+      "evidence": [
+        {
+          "command": "pnpm test:domain",
+          "result": "pass",
+          "note": "18 tests. Terminal statuses reject all transitions; partial is reachable only from repairing, synthesising_audio and publishing; decideStep reuses recorded output rather than recomputing, re-runs an expired lease, and abandons after 3 attempts carrying the last error"
+        }
+      ],
+      "notes": "Step identity is (run, step, subject, inputVersion). The subject field separates concurrent instances of the same step, which is what makes per-day lesson generation safe to retry independently."
+    },
+    "GAP-003": {
+      "status": "done",
+      "startedAt": "2026-08-02T04:24:00.000Z",
+      "completedAt": "2026-08-02T04:33:00.000Z",
+      "evidence": [
+        {
+          "command": "pnpm test packages/ai-contracts",
+          "result": "pass",
+          "note": "22 tests. Wrong schemaVersion rejected; unknown fields rejected rather than dropped; multiple-choice answer must be among distinct options; free response must ship a rubric; a source-grounded item must cite a locator; the evidence fence cannot be forged by a document"
+        },
+        {
+          "command": "pnpm test packages/provider-adapters",
+          "result": "pass",
+          "note": "17 tests. A structurally invalid response is rejected at the boundary and never returned; the failing field names are reported so a repair can be targeted; a rejected response is still charged for; source text never enters the instruction or the log; the budget check happens before the provider is reached (backend.calls is empty)"
+        },
+        {
+          "command": "pnpm test packages/observability",
+          "result": "pass",
+          "note": "13 tests. Budgets refuse pre-call at both run and per-user-daily scope; spend does not cross users or days; cost is integer millicents so 300 sub-cent calls do not drift"
+        }
+      ],
+      "notes": "GAPOS_PROVIDER_MODE defaults to fake, and mode=live throws pointing at the human approval gate rather than silently falling back \u2014 a staging run cannot quietly be a fake run."
+    },
+    "GAP-004": {
+      "status": "done",
+      "startedAt": "2026-08-02T04:34:00.000Z",
+      "completedAt": "2026-08-02T04:38:00.000Z",
+      "evidence": [
+        {
+          "command": "pnpm test packages/database",
+          "result": "pass",
+          "note": "16 tests. Owner A cannot read, list, update or re-status a row owned by B; retrieval is bounded by owner AND gap; account deletion removes every owned row and leaves the other learner intact; a repeated compile or attempt idempotency key returns the original row instead of creating a second"
+        },
+        {
+          "command": "pnpm test packages/database -t 'no repository method that reads without an owner'",
+          "result": "pass",
+          "note": "Structural guard: reflects over every repository method and asserts the first parameter is the owner, so a future findById(id) fails here rather than shipping"
+        },
+        {
+          "command": "pnpm test packages/database -t migrations",
+          "result": "pass",
+          "note": "Migration drift check refuses to run when a shipped migration file has been edited; applying twice is a no-op; every learner-owned table in the schema is asserted to carry owner_id"
+        }
+      ],
+      "notes": "The schema, the forward-only runner with checksum drift detection, and the in-memory UnitOfWork are complete and are what the application uses today. The Postgres implementation of the repository interfaces is NOT yet written and is tracked as GAP-004b (ready, not blocked) with the ownership suite to be parameterised across both implementations. Recorded rather than stubbed."
+    },
+    "GAP-006": {
+      "status": "partial",
+      "notes": "Chunking, locators, screening and the coverage summary are done and tested in packages/domain/src/sources. Upload registration and object storage are not yet wired; the repository interface and schema exist.",
+      "evidence": [
+        {
+          "command": "pnpm test packages/domain/src/sources",
+          "result": "pass",
+          "note": "17 tests. Every chunk carries a locator naming its section; the primer's seven sections are all addressable; an oversized paragraph splits at sentence boundaries rather than mid-sentence; a short section merges forward keeping the earlier locator; chunking is deterministic so extraction is cacheable by checksum; unsupported, oversized, binary and empty uploads are rejected with distinct codes"
+        }
+      ]
+    },
+    "GAP-008": {
+      "status": "done",
+      "completedAt": "2026-08-02T04:42:00.000Z",
+      "notes": "Violations are collected together rather than thrown one at a time, so a planner repair prompt can fix all of them in one round against the ten-minute budget.",
+      "evidence": [
+        {
+          "command": "pnpm test packages/domain/src/curriculum",
+          "result": "pass",
+          "note": "14 tests. Rejects a day over the learner's minutes, an objective never taught, an objective never assessed, an objective assessed by too few items, a prerequisite cycle (naming it), a dependency on an untaught objective, an unmet external prerequisite, and a source claim with no locator. Permits an objective explicitly labelled general knowledge"
+        }
+      ]
+    },
+    "GAP-010": {
+      "status": "partial",
+      "notes": "The verifier and repair decision logic are done. Structural checks run without a model; independent solutions are interpreted here but obtained by the pipeline, which is not yet written.",
+      "evidence": [
+        {
+          "command": "pnpm test packages/domain/src/verification",
+          "result": "pass",
+          "note": "24 tests. All three reference lessons pass; answer leakage caught verbatim and by six-word phrase; a reworded distractor that restates the key is caught by content-sequence comparison; a missing rubric blocks publication; a disagreeing independent solve blocks publication; an injection signal is recorded as a finding without blocking a correct lesson; repair ladder is repair\u2192repair\u2192exclude, never a third attempt; partial when coverage does not survive"
+        }
+      ]
+    },
+    "GAP-012": {
+      "status": "partial",
+      "notes": "The mastery rule, grading and the review ladder are complete in the domain. Persistence wiring through the API is not yet done.",
+      "evidence": [
+        {
+          "command": "pnpm test packages/domain/src/mastery",
+          "result": "pass",
+          "note": "31 tests. Each of the five mastery clauses is broken individually and shown to block; consumption with no evidence cannot master; a failed application item does not satisfy the application clause; optional objectives never block filling; a prerequisite cycle blocks rather than hangs; decayed prior mastery stops satisfying a prerequisite; wrong answers schedule a same-session correction plus a next-day check; the ladder is 0\u21921\u21923\u21927 then graduate; a failed review drops back to the bottom"
+        }
+      ]
+    },
+    "GAP-005": {
+      "status": "done",
+      "completedAt": "2026-08-02T04:57:00.000Z",
+      "evidence": [
+        {
+          "command": "pnpm test tests/end-to-end",
+          "result": "pass",
+          "note": "22 tests covering the whole \u00a716.1 journey on deterministic fakes: create account, define gap, upload the reference source, skip the diagnostic, compile, Day 1 published first, playable audio artefact with a signed expiring URL, practice submission, corrective feedback, mastery check, capability search"
+        },
+        {
+          "command": "pnpm test",
+          "result": "pass",
+          "note": "219 tests across 13 files, no network and no API key"
+        }
+      ],
+      "notes": "Two real defects were found by writing this test and fixed in the code, not the test. (1) Day 1 did not publish first: with bounded concurrency the publication order of concurrent days was arbitrary, so Day 1 now runs to completion before the rest fan out. (2) The published questions did not satisfy the plan's own assessment blueprint, which would have left obj_relation_properties permanently unmasterable with nothing to point at; findAssessmentGaps now checks published items against the blueprint and marks the run partial."
+    },
+    "GAP-007": {
+      "status": "done",
+      "completedAt": "2026-08-02T04:57:00.000Z",
+      "evidence": [
+        {
+          "command": "pnpm test tests/end-to-end",
+          "result": "pass",
+          "note": "A blocking ambiguity stops the run for clarification instead of guessing; a skipped diagnostic records a labelled assumption on the gap and lowers the starting difficulty; normalisation output is contract-validated before it is persisted"
+        }
+      ],
+      "notes": "Stages A and C are wired through the guarded adapter, so an invalid normalisation cannot reach the database."
+    },
+    "GAP-009": {
+      "status": "done",
+      "completedAt": "2026-08-02T04:57:00.000Z",
+      "evidence": [
+        {
+          "command": "pnpm test tests/end-to-end",
+          "result": "pass",
+          "note": "Lessons generate against the frozen plan with bounded concurrency; the plan, glossary and objective ids are immutable inputs; artefacts are versioned and frozen once an attempt references them"
+        }
+      ]
+    },
+    "GAP-011": {
+      "status": "done",
+      "completedAt": "2026-08-02T04:57:00.000Z",
+      "evidence": [
+        {
+          "command": "pnpm test tests/end-to-end",
+          "result": "pass",
+          "note": "Day 1 publishes before later days; audio failure falls back to transcript and the curriculum survives with every objective intact; segment checksums are verified against the spoken text before publication"
+        }
+      ]
+    },
+    "GAP-015": {
+      "status": "partial",
+      "notes": "Budget enforcement and step idempotency are done and covered end to end. The durable job queue table exists in the schema but the worker loop that leases from it is not yet written.",
+      "evidence": [
+        {
+          "command": "pnpm test tests/end-to-end",
+          "result": "pass",
+          "note": "An exhausted budget fails the run before any provider call rather than overspending, and increments budget_degradation_total; a provider failure fails the run cleanly and a retry compiles the identical course"
+        }
+      ]
+    },
+    "GAP-014": {
+      "status": "done",
+      "completedAt": "2026-08-02T05:04:00.000Z",
+      "evidence": [
+        {
+          "command": "pnpm test tests/evaluation",
+          "result": "pass",
+          "note": "42 tests. All ten fixtures declared with expected objectives, prohibited content, sample questions, failure traps, expert rubric and latency class; every declared trap names a dimension that can catch it; the reference curriculum clears all ten floors"
+        },
+        {
+          "command": "pnpm test tests/evaluation -t 'detects poor education'",
+          "result": "pass",
+          "note": "11 degradation tests prove the scorer discriminates: a dropped objective, abandoning the source for general knowledge, prohibited scope, an unanswerable item, a missing rubric, a backwards difficulty ramp, a script written to be read rather than heard, a false duration, a duplicated prompt, a leaked answer, and an invented objective are each caught by the dimension that is supposed to catch them. A merely reworded curriculum still passes"
+        }
+      ],
+      "notes": "Writing the gate found two real defects. (1) The scorer measured objective coverage over the plan's promises as well as the lessons, so dropping a whole day still scored 1.0 \u2014 coverage now means taught, over lesson titles, summaries and scripts only. (2) The reference lesson scripts claimed twelve to fourteen minutes of audio and ran about one; they are now ~750 words each, matching a five-minute audio activity, with the plan's day budgets adjusted to keep 35 minutes. The nine fixtures that need a live provider are tracked as GAP-014b, blocked on a human approval gate rather than skipped."
+    },
+    "GAP-016": {
+      "status": "done",
+      "completedAt": "2026-08-02T05:11:00.000Z",
+      "evidence": [
+        {
+          "command": "pnpm test tests/architecture/specs.test.ts",
+          "result": "pass",
+          "note": "11 tests. Every contract has a published JSON Schema; the checked-in files must match what the zod contracts generate byte for byte, so changing a contract without regenerating fails the build; a deleted contract cannot leave a published schema behind; every published schema carries its version as a const and sets additionalProperties:false. The OpenAPI document declares all 14 essential routes, requires an idempotency key on both writes that need one, lists every DomainErrorCode and every gap and generation status, and is asserted never to expose prompts or reasoning"
+        }
+      ],
+      "notes": "Added outside the original backlog: specs/openapi.yaml and specs/generation-schemas/ were Phase 0 deliverables that had not been written. The schemas are generated from the zod contracts rather than hand-written, so the published form cannot drift from the code."
+    },
+    "GAP-017": {
+      "status": "done",
+      "completedAt": "2026-08-02T05:11:00.000Z",
+      "evidence": [
+        {
+          "command": "pnpm test tests/end-to-end/security.test.ts",
+          "result": "pass",
+          "note": "13 tests. A source carrying an injection payload still compiles (reading untrusted input safely is the requirement, not refusing it); the attempt is recorded as an audit finding and counted in telemetry; the payload never enters a published lesson; a wrong answer is still wrong despite the payload asking for every answer to be marked correct; a forged evidence fence is redacted; a generator that DID obey the injection is caught structurally by the transcript mismatch. Plus tenant isolation across curricula, lessons, questions, artefacts, runs and findings; storage refuses a known key to a non-owner; signed URLs expire; deletion removes owned rows and storage objects; no source text, instruction or lesson content reaches the logs"
+        }
+      ],
+      "notes": "Found a real defect: injection detection ran over the RETRIEVED evidence, and retrieval selects chunks by relevance to the learner's question \u2014 a hostile paragraph is typically about nothing, so it scored zero and was never scanned. The payload would have gone unreported on this run and could have reached a model on a later query that happened to match it. The scan now runs over every ingested chunk."
+    }
+  },
+  "blockers": []
+}

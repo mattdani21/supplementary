@@ -1,0 +1,51 @@
+{
+  "$id": "https://gapos.dev/generation-schemas/diagnostic_interpretation/1.0.0",
+  "title": "diagnostic_interpretation",
+  "description": "Structured response contract for the \"diagnostic_interpretation\" model call, version 1.0.0. Generated from packages/ai-contracts; do not edit by hand.",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "demonstratedCapabilities": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "knowledgeGaps": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "inferred": {
+      "type": "boolean"
+    },
+    "baselineConfidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "recommendedStartingDifficulty": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "demonstratedCapabilities",
+    "knowledgeGaps",
+    "inferred",
+    "baselineConfidence",
+    "recommendedStartingDifficulty"
+  ],
+  "additionalProperties": false
+}

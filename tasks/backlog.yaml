@@ -1,0 +1,540 @@
+# GapOS backlog.
+#
+# This file is the task graph the controller agent selects from. It is the plan.
+# tasks/status.json is the record of what actually happened, with evidence.
+#
+# Rules:
+#   - status is one of: ready | blocked | in_progress | done
+#   - a task may only be selected when every dependency is done
+#   - no task may use "implement feature" as its only acceptance criterion
+#   - acceptance criteria must be checkable by a command in `verification`
+
+version: 1
+
+epics:
+  - id: E0
+    title: Repository and agent protocol
+    priority: P0
+    dependencies: []
+    evidence: Fresh setup and CI pass
+  - id: E1
+    title: Identity and ownership
+    priority: P0
+    dependencies: [E0]
+    evidence: Two users cannot access each other's data
+  - id: E2
+    title: Gap lifecycle
+    priority: P0
+    dependencies: [E1]
+    evidence: State transition test matrix passes
+  - id: E3
+    title: Source ingestion
+    priority: P0
+    dependencies: [E1]
+    evidence: Reference files extract with locators
+  - id: E4
+    title: Curriculum planning
+    priority: P0
+    dependencies: [E2, E3]
+    evidence: Plan schema and coverage gates pass
+  - id: E5
+    title: Lesson generation
+    priority: P0
+    dependencies: [E4]
+    evidence: Seven validated text lesson packages
+  - id: E6
+    title: Assessment verification
+    priority: P0
+    dependencies: [E5]
+    evidence: Independent solution tests pass
+  - id: E7
+    title: Audio generation and playback
+    priority: P0
+    dependencies: [E5]
+    evidence: Day 1 playable with transcript
+  - id: E8
+    title: Practice and attempts
+    priority: P0
+    dependencies: [E2, E6]
+    evidence: Attempts persist and corrections render
+  - id: E9
+    title: Mastery and reviews
+    priority: P0
+    dependencies: [E8]
+    evidence: Evidence rules control the filled state
+  - id: E10
+    title: Capability library
+    priority: P0
+    dependencies: [E9]
+    evidence: Filled gap is searchable and reusable
+  - id: E11
+    title: Operational resilience
+    priority: P0
+    dependencies: [E3, E4, E5, E6, E7, E8, E9, E10]
+    evidence: Retry and restart tests pass
+  - id: E12
+    title: Security and privacy
+    priority: P0
+    dependencies: [E11]
+    evidence: Security gate passes
+  - id: E13
+    title: Evaluation harness
+    priority: P0
+    dependencies: [E4, E5, E6, E7, E8, E9]
+    evidence: Reference pack scores stored and compared
+  - id: E14
+    title: PWA and offline polish
+    priority: P1
+    dependencies: [E7, E8]
+    evidence: Published lesson works in the tested offline case
+  - id: E15
+    title: Knowledge map
+    priority: P1
+    dependencies: [E9, E10]
+    evidence: Prerequisite graph is navigable
+  - id: E16
+    title: Voice gap capture
+    priority: P1
+    dependencies: [E2]
+    evidence: Dictation creates an editable draft
+  - id: E17
+    title: Provider routing
+    priority: P2
+    dependencies: [E11, E13]
+    evidence: Providers can be swapped by policy
+  - id: E18
+    title: Local-model execution
+    priority: P2
+    dependencies: [E17]
+    evidence: One qualified model passes the evaluation threshold
+  - id: E19
+    title: Educator review
+    priority: P2
+    dependencies: [E13]
+    evidence: A reviewer can approve or repair artefacts
+
+tasks:
+  - id: GAP-000
+    title: Establish the monorepo, tooling and agent protocol
+    epic: E0
+    priority: P0
+    status: ready
+    goal: A fresh checkout is productive with one command and a single quality gate.
+    scope:
+      - pnpm workspace, TypeScript, eslint, prettier, vitest
+      - AGENTS.md, PRODUCT.md, ARCHITECTURE.md, SECURITY.md, OPERATIONS.md
+      - ADRs for stack, queue and AI provider boundary
+      - backlog schema and status file
+      - continuous integration workflow
+    out_of_scope:
+      - product features
+      - deployment infrastructure
+    dependencies: []
+    acceptance:
+      - pnpm install succeeds from a clean checkout
+      - pnpm verify runs format, lint, typecheck and tests
+      - lint fails when domain imports a web framework or a provider SDK
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+
+  - id: GAP-001
+    title: Create the gap state machine
+    epic: E2
+    priority: P0
+    status: ready
+    goal: Enforce a valid gap lifecycle so status can never be set arbitrarily.
+    scope:
+      - domain transition function
+      - typed domain errors
+      - unit tests over the full transition matrix
+    out_of_scope:
+      - UI animation
+      - analytics
+    dependencies: [GAP-000]
+    acceptance:
+      - invalid transitions return a typed domain error rather than throwing a string
+      - consumption cannot directly set filled
+      - tests cover every permitted transition and a sample of forbidden ones
+    verification:
+      - pnpm test:domain
+      - pnpm typecheck
+    risk: low
+    human_gate: false
+
+  - id: GAP-002
+    title: Create the generation run state machine and step idempotency keys
+    epic: E0
+    priority: P0
+    status: ready
+    goal: Model the pipeline lifecycle so retries cannot duplicate work.
+    scope:
+      - generation status transitions
+      - step key derivation from run, step name and input version
+      - unit tests for idempotent re-entry
+    out_of_scope:
+      - the actual pipeline stages
+    dependencies: [GAP-000]
+    acceptance:
+      - every terminal status rejects further transitions
+      - re-running a completed step returns the existing output rather than recomputing
+      - partial is reachable only from repairing or publishing
+    verification:
+      - pnpm test:domain
+    risk: low
+    human_gate: false
+
+  - id: GAP-003
+    title: Define the AI contracts and the deterministic fake provider
+    epic: E0
+    priority: P0
+    status: ready
+    goal: Every structured model call has a versioned schema and a deterministic fake.
+    scope:
+      - zod contracts for normalisation, planning, lesson, question and verification
+      - LanguageModel, SpeechToText and TextToSpeech interfaces
+      - fake provider driven by fixtures, including deliberately faulty responses
+    out_of_scope:
+      - real provider implementations
+    dependencies: [GAP-000]
+    acceptance:
+      - an invalid provider response fails validation at the adapter boundary
+      - every contract object carries a schema version
+      - the fake provider is selected by default so no test can spend money
+    verification:
+      - pnpm test packages/ai-contracts packages/provider-adapters
+    risk: low
+    human_gate: false
+
+  - id: GAP-004
+    title: Implement the ownership model and repositories
+    epic: E1
+    priority: P0
+    status: ready
+    goal: No query can return another learner's data.
+    scope:
+      - forward-only migrations for the core entities
+      - repository interfaces taking an owner on every read and write
+      - in-memory implementation for tests, Postgres implementation for runtime
+    out_of_scope:
+      - vector search tuning
+    dependencies: [GAP-000]
+    acceptance:
+      - a repository read for owner A cannot return a row owned by B
+      - there is no repository method that fetches by id without an owner
+      - migrations run from an empty database
+    verification:
+      - pnpm test packages/database
+    risk: medium
+    human_gate: false
+
+  - id: GAP-005
+    title: Build the fixture-based vertical slice
+    epic: E2
+    priority: P0
+    status: ready
+    goal: The whole product journey works end to end on deterministic fixture content.
+    scope:
+      - gap CRUD through the API
+      - mock compiler producing a fixed curriculum
+      - practice submission and basic mastery
+      - capability library read
+    out_of_scope:
+      - real generation
+      - real audio
+    dependencies: [GAP-001, GAP-002, GAP-003, GAP-004]
+    acceptance:
+      - the primary journey passes without any external AI dependency
+      - a compile with a repeated idempotency key produces exactly one run
+      - a gap cannot reach filled without mastery evidence
+    verification:
+      - pnpm test tests/end-to-end
+    risk: medium
+    human_gate: false
+
+  - id: GAP-006
+    title: Implement source ingestion with structural locators
+    epic: E3
+    priority: P0
+    status: ready
+    goal: Lesson claims can be traced back to a page, heading or timestamp in a source.
+    scope:
+      - upload registration and private storage
+      - plain-text and markdown extraction
+      - semantic chunking preserving locators
+      - checksum-addressed extraction cache
+    out_of_scope:
+      - OCR
+      - audio and video transcription
+    dependencies: [GAP-004]
+    acceptance:
+      - chunks carry a locator that identifies their position in the original document
+      - re-ingesting an identical file reuses the cached extraction
+      - an unsupported or encrypted file is rejected with a clear machine-readable code
+    verification:
+      - pnpm test packages/database
+    risk: medium
+    human_gate: false
+
+  - id: GAP-007
+    title: Implement gap normalisation and the diagnostic flow
+    epic: E4
+    priority: P0
+    status: ready
+    goal: Turn a raw learner statement into a structured, checkable specification.
+    scope:
+      - stage A normalisation through the language model adapter
+      - ambiguity handling and labelled assumptions
+      - diagnostic questions with a skip-and-infer path
+    out_of_scope:
+      - adaptive difficulty within the diagnostic
+    dependencies: [GAP-003, GAP-005]
+    acceptance:
+      - a material ambiguity produces a clarification request rather than a silent guess
+      - skipping the diagnostic records a labelled conservative baseline and a Day 1 calibration
+      - normalisation output is schema-valid before persistence
+    verification:
+      - pnpm test packages/domain packages/ai-contracts
+    risk: medium
+    human_gate: false
+
+  - id: GAP-008
+    title: Implement the curriculum planner and plan validation
+    epic: E4
+    priority: P0
+    status: ready
+    goal: Reject a plan that cannot fit, cannot be assessed, or depends on an unmet prerequisite.
+    scope:
+      - stage D planning contract
+      - objective coverage checks
+      - time budget validation
+      - prerequisite graph validation
+    out_of_scope:
+      - lesson prose
+    dependencies: [GAP-006, GAP-007]
+    acceptance:
+      - a plan exceeding the learner's daily minutes is rejected with a typed error
+      - an objective with no assessment item is rejected
+      - a prerequisite cycle is rejected
+      - every objective maps to source evidence or is explicitly labelled general knowledge
+    verification:
+      - pnpm test packages/domain
+    risk: high
+    human_gate: false
+
+  - id: GAP-009
+    title: Generate lessons in bounded parallel with a shared glossary
+    epic: E5
+    priority: P0
+    status: ready
+    goal: Seven lesson packages that agree on terminology and cover the plan.
+    scope:
+      - lesson generation contract
+      - bounded concurrency
+      - immutable plan, glossary and objective identifiers
+      - versioned artefacts
+    out_of_scope:
+      - audio
+    dependencies: [GAP-008]
+    acceptance:
+      - parallel generation cannot introduce a term outside the shared glossary
+      - each lesson package contains a script, transcript, summary, examples, pause prompts and questions
+      - artefact versions are immutable once an attempt references them
+    verification:
+      - pnpm test packages/domain tests/evaluation
+    risk: high
+    human_gate: false
+
+  - id: GAP-010
+    title: Implement the independent verifier and the targeted repair loop
+    epic: E6
+    priority: P0
+    status: ready
+    goal: Nothing is published that the system has not independently checked.
+    scope:
+      - independent solving of each objective question
+      - distractor, leakage, difficulty and source-support checks
+      - repair of only the failed artefact, maximum two attempts
+      - partial publication when coverage survives
+    out_of_scope:
+      - human review workflow
+    dependencies: [GAP-009]
+    acceptance:
+      - a deliberately faulty provider fixture is rejected and then repaired
+      - a question whose answer leaks into the prompt is rejected
+      - a third repair attempt is never made; the run goes partial instead
+      - a verifier cannot approve its own generated output
+    verification:
+      - pnpm test packages/domain tests/evaluation
+    risk: high
+    human_gate: false
+
+  - id: GAP-011
+    title: Synthesise segmented audio and publish incrementally
+    epic: E7
+    priority: P0
+    status: ready
+    goal: Day 1 becomes playable before the rest of the course finishes.
+    scope:
+      - text-to-speech adapter and segmentation
+      - audio and transcript integrity checks
+      - incremental publication
+      - text-only fallback
+    out_of_scope:
+      - voice selection UI
+    dependencies: [GAP-010]
+    acceptance:
+      - Day 1 publishes before later days complete
+      - an audio failure falls back to transcript without losing the curriculum
+      - published audio duration and transcript checksum are verified before publication
+    verification:
+      - pnpm test packages/domain packages/provider-adapters
+    risk: medium
+    human_gate: false
+
+  - id: GAP-012
+    title: Implement attempts, mastery evidence and review scheduling
+    epic: E9
+    priority: P0
+    status: ready
+    goal: A gap fills on evidence, never on consumption.
+    scope:
+      - attempt recording with hints and confidence
+      - objective-level evidence aggregation
+      - fixed review ladder
+      - remediation generation for repeated errors
+    out_of_scope:
+      - adaptive spaced repetition
+    dependencies: [GAP-005]
+    acceptance:
+      - listening to every lesson without practice cannot fill a gap
+      - an objective needs two sessions, one unhinted item and one transfer item to be mastered
+      - a wrong answer schedules a due remediation item
+      - review intervals follow the documented ladder
+    verification:
+      - pnpm test packages/domain
+    risk: high
+    human_gate: false
+
+  - id: GAP-013
+    title: Implement the capability library and prerequisite reuse
+    epic: E10
+    priority: P0
+    status: ready
+    goal: A filled gap becomes a reusable capability.
+    scope:
+      - capability search
+      - knowledge edges between capabilities
+      - prerequisite satisfaction from prior mastery, with decay
+    out_of_scope:
+      - graph visualisation
+    dependencies: [GAP-012]
+    acceptance:
+      - a filled gap is discoverable through search
+      - a prior mastered capability satisfies a prerequisite in a new curriculum
+      - decayed evidence stops satisfying the prerequisite and triggers a diagnostic
+    verification:
+      - pnpm test packages/domain
+    risk: medium
+    human_gate: false
+
+  - id: GAP-014
+    title: Build the reference evaluation pack and scoring harness
+    epic: E13
+    priority: P0
+    status: ready
+    goal: Detect software that works technically but teaches badly.
+    scope:
+      - ten copyright-safe fixtures across the required domains
+      - scoring for coverage, faithfulness, solvability, difficulty, duration and leakage
+      - stored scores and regression comparison
+    out_of_scope:
+      - a hosted dashboard
+    dependencies: [GAP-010, GAP-012]
+    acceptance:
+      - each fixture declares expected objectives, prohibited content and failure traps
+      - the harness fails the build when a score regresses beyond tolerance
+      - the prompt-injection fixture is detected and reported rather than obeyed
+    verification:
+      - pnpm test tests/evaluation
+    risk: high
+    human_gate: false
+
+  - id: GAP-015
+    title: Enforce cost ceilings, rate limits and operational recovery
+    epic: E11
+    priority: P0
+    status: ready
+    goal: A run cannot overspend, and a restart cannot corrupt a run.
+    scope:
+      - per-run and per-user budgets checked before each call
+      - queue leases, retries and dead-letter handling
+      - telemetry for every stage
+    out_of_scope:
+      - a billing integration
+    dependencies: [GAP-011, GAP-012]
+    acceptance:
+      - a run that would exceed its budget degrades to text-only instead of overspending
+      - killing a worker mid-run and restarting produces no duplicate artefacts or charges
+      - a job failing repeatedly is dead-lettered with its last error and reproduction context
+    verification:
+      - pnpm test packages/observability packages/domain
+    risk: high
+    human_gate: false
+
+  - id: GAP-004b
+    title: Implement the Postgres repositories behind the existing interfaces
+    epic: E1
+    priority: P0
+    status: ready
+    goal: Run the same repository suite against Postgres, not only the in-memory implementation.
+    scope:
+      - Postgres implementation of every repository interface in packages/database
+      - the ownership suite parameterised so it runs against both implementations
+      - pgvector-backed chunk retrieval behind SourceRepository.searchChunks
+    out_of_scope:
+      - retrieval quality tuning
+    dependencies: [GAP-004]
+    acceptance:
+      - the identical ownership suite passes against Postgres and against memory
+      - a cross-tenant read returns nothing at the SQL level, not only in application code
+      - searchChunks uses the vector index and still enforces the owner and gap boundary
+    verification:
+      - GAPOS_TEST_DATABASE_URL=... pnpm test packages/database
+    risk: medium
+    human_gate: false
+    notes: >
+      The schema, the forward-only migration runner and the drift check are in place and exercised
+      by CI. The in-memory implementation is the one the application uses today; it enforces the
+      same ownership rule and is a real implementation rather than a mock, but the SQL path is not
+      yet written. Recorded rather than stubbed, per AGENTS.md failure policy.
+
+  - id: GAP-014b
+    title: Score the nine live-provider evaluation fixtures
+    epic: E13
+    priority: P0
+    status: blocked
+    goal: Run the whole reference pack against a real provider, not only fixture 1.
+    scope:
+      - a live LanguageModel backend behind the existing interface
+      - scoring the nine fixtures marked requiresLiveProvider
+      - stored baselines per fixture and per dimension
+    out_of_scope:
+      - provider routing policy
+    dependencies: [GAP-014]
+    acceptance:
+      - every fixture in the pack produces a scorecard, not only eval_01
+      - each fixture meets its floors, or its failure is recorded with the dimension that caught it
+      - the underspecified fixture produces a clarification request rather than a curriculum
+      - the injection fixture is reported as a finding and does not influence the curriculum
+    verification:
+      - GAPOS_PROVIDER_MODE=live pnpm test tests/evaluation
+    risk: high
+    human_gate: true
+    notes: >
+      Blocked, not skipped. The deterministic fake returns the set-theory reference content for
+      every request, so only eval_01 can be scored today; the other nine declare their expected
+      objectives, prohibited content, failure traps and rubrics so they are ready to run rather
+      than being invented later under time pressure. Adding a live provider creates paid external
+      resources, which is a human approval gate (AGENTS.md §5).

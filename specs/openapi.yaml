@@ -1,0 +1,704 @@
+openapi: 3.1.0
+
+info:
+  title: GapOS API
+  version: 1.0.0
+  description: |
+    The API surface from docs/ARCHITECTURE.md.
+
+    Contract rules that apply everywhere and are not repeated per operation:
+
+      * Every request and response is validated at runtime against this document.
+      * Identifiers are opaque strings. Do not parse them; do not assume a format.
+      * `POST /api/gaps/{gapId}/compile` and `POST /api/attempts` require an
+        `Idempotency-Key` header. Replaying a request with the same key returns the original
+        result rather than performing the write a second time.
+      * Errors return a stable machine-readable `code`. Codes are part of the contract: a client
+        may branch on them, and renaming one is a breaking change.
+      * Provider prompts, provider credentials and model reasoning are never returned by any
+        operation, including the generation log.
+
+servers:
+  - url: /api
+    description: Same-origin API served by the web application
+
+security:
+  - sessionCookie: []
+
+tags:
+  - name: gaps
+    description: Capture, define and compile a knowledge gap
+  - name: sources
+    description: Upload and manage the material a curriculum is grounded in
+  - name: generation
+    description: Observe a compilation run
+  - name: learning
+    description: The daily queue, practice and mastery
+  - name: capabilities
+    description: Search and reuse completed learning
+
+paths:
+  /gaps:
+    post:
+      tags: [gaps]
+      operationId: createGap
+      summary: Create and normalise a gap
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateGapRequest' }
+      responses:
+        '201':
+          description: The gap was created in the draft state.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Gap' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorised' }
+    get:
+      tags: [gaps]
+      operationId: listGaps
+      summary: List the learner's gaps
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/GapStatus' }
+      responses:
+        '200':
+          description: The learner's gaps, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Gap' }
+
+  /gaps/{gapId}:
+    parameters:
+      - $ref: '#/components/parameters/GapId'
+    patch:
+      tags: [gaps]
+      operationId: updateGap
+      summary: Confirm or edit the definition
+      description: |
+        Cannot change `status`. Status is owned by the domain state machine and only moves as a
+        side effect of an operation such as compile or the mastery check.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateGapRequest' }
+      responses:
+        '200':
+          description: The updated gap.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Gap' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /gaps/{gapId}/sources:
+    parameters:
+      - $ref: '#/components/parameters/GapId'
+    post:
+      tags: [sources]
+      operationId: registerSource
+      summary: Register an upload
+      description: |
+        Screening happens before storage, so an unsupported or unreadable file never occupies a
+        bucket. A file whose checksum matches one already uploaded to this gap reuses the
+        existing extraction and is returned with `deduplicated: true`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterSourceRequest' }
+      responses:
+        '201':
+          description: The source was accepted.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegisterSourceResponse' }
+        '415':
+          description: The file was rejected by screening.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /gaps/{gapId}/diagnostic:
+    parameters:
+      - $ref: '#/components/parameters/GapId'
+    post:
+      tags: [gaps]
+      operationId: submitDiagnostic
+      summary: Submit diagnostic answers, or skip
+      description: |
+        Skipping is a first-class path: the system infers a conservative baseline, labels the
+        inference on the gap, and includes a Day 1 calibration activity.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DiagnosticRequest' }
+      responses:
+        '200':
+          description: The diagnostic was recorded.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DiagnosticResponse' }
+
+  /gaps/{gapId}/compile:
+    parameters:
+      - $ref: '#/components/parameters/GapId'
+    post:
+      tags: [gaps, generation]
+      operationId: compileGap
+      summary: Start an idempotent compilation
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '202':
+          description: |
+            A run was started, or an existing run for this idempotency key was returned. Check
+            `deduplicated` to tell which.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CompileResponse' }
+        '409':
+          description: The gap is not in a state from which it can be compiled.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /runs/{runId}:
+    parameters:
+      - name: runId
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [generation]
+      operationId: getRun
+      summary: Retrieve pipeline status
+      responses:
+        '200':
+          description: The run and its steps.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GenerationRun' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /runs/{runId}/events:
+    parameters:
+      - name: runId
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [generation]
+      operationId: streamRunEvents
+      summary: Stream stage progress
+      description: |
+        Server-sent events. Each event carries a stage name, a status and a timestamp. The stream
+        is the user-facing generation log: it shows stages and recoverable errors, never model
+        reasoning.
+      responses:
+        '200':
+          description: An event stream.
+          content:
+            text/event-stream:
+              schema: { type: string }
+
+  /gaps/{gapId}/curriculum:
+    parameters:
+      - $ref: '#/components/parameters/GapId'
+    get:
+      tags: [gaps]
+      operationId: getCurriculum
+      summary: Retrieve the current curriculum
+      responses:
+        '200':
+          description: The current curriculum with its published lessons.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Curriculum' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /today:
+    get:
+      tags: [learning]
+      operationId: getToday
+      summary: Retrieve due learning and reviews
+      description: Due reviews come before new material; an overdue retrieval outranks a lesson.
+      responses:
+        '200':
+          description: The Today queue.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TodayQueue' }
+
+  /attempts:
+    post:
+      tags: [learning]
+      operationId: submitAttempt
+      summary: Submit one practice attempt
+      description: |
+        The response carries the correct answer and rubric. They are returned only after the
+        attempt, never before, so the client cannot show them while the learner is answering.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AttemptRequest' }
+      responses:
+        '201':
+          description: The attempt was recorded, or replayed from the same idempotency key.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AttemptResponse' }
+
+  /sessions/{sessionId}/complete:
+    parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      tags: [learning]
+      operationId: completeSession
+      summary: Complete a daily session
+      responses:
+        '200':
+          description: The session was closed and the next review dates returned.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessionSummary' }
+
+  /gaps/{gapId}/mastery-check:
+    parameters:
+      - $ref: '#/components/parameters/GapId'
+    post:
+      tags: [learning]
+      operationId: runMasteryCheck
+      summary: Start or submit the final check
+      description: |
+        Assesses the recorded evidence. A gap becomes `filled` only when every required objective
+        satisfies the mastery rule; otherwise the response says which clause is unmet and the gap
+        returns to `active`.
+      responses:
+        '200':
+          description: The assessment, and whether the gap was filled.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MasteryCheckResponse' }
+
+  /capabilities:
+    get:
+      tags: [capabilities]
+      operationId: searchCapabilities
+      summary: Search filled gaps
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Matching capabilities.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Capability' }
+
+  /capabilities/{gapId}:
+    parameters:
+      - $ref: '#/components/parameters/GapId'
+    get:
+      tags: [capabilities]
+      operationId: getCapability
+      summary: Retrieve retained artefacts and evidence
+      responses:
+        '200':
+          description: The capability with its artefacts, evidence and review schedule.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CapabilityDetail' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: gapos_session
+
+  parameters:
+    GapId:
+      name: gapId
+      in: path
+      required: true
+      schema: { type: string }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Replaying a request with the same key returns the original result.
+      schema: { type: string, minLength: 8 }
+
+  responses:
+    BadRequest:
+      description: The request failed validation.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorised:
+      description: No valid session.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: |
+        No such resource for this learner. Returned identically whether the resource does not
+        exist or belongs to someone else, so the API cannot be used to probe for other learners'
+        identifiers.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: Stable machine-readable code. Clients may branch on this.
+          enum:
+            - invalid_gap_transition
+            - invalid_generation_transition
+            - terminal_state
+            - mastery_evidence_insufficient
+            - plan_exceeds_time_budget
+            - objective_not_assessed
+            - objective_not_taught
+            - prerequisite_cycle
+            - prerequisite_unmet
+            - unsupported_source
+            - artefact_frozen
+            - glossary_violation
+            - answer_leakage
+            - repair_attempts_exhausted
+            - budget_exceeded
+            - not_found
+            - forbidden
+            - unsupported_media_type
+            - file_too_large
+            - encrypted_or_unreadable
+            - empty_document
+        message: { type: string }
+        details:
+          type: object
+          additionalProperties: true
+
+    GapStatus:
+      type: string
+      enum: [draft, ready, compiling, active, mastery_check, filled, review_due, archived, failed]
+
+    GenerationStatus:
+      type: string
+      enum:
+        - queued
+        - ingesting
+        - planning
+        - generating_lessons
+        - generating_assessment
+        - auditing
+        - repairing
+        - synthesising_audio
+        - publishing
+        - complete
+        - partial
+        - failed
+        - cancelled
+
+    Gap:
+      type: object
+      required: [id, title, rawStatement, dailyMinutes, status, createdAt]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        rawStatement: { type: string }
+        currentState: { type: string }
+        targetCapability: { type: string }
+        successCondition: { type: string }
+        deadline: { type: string, format: date }
+        dailyMinutes: { type: integer, minimum: 15, maximum: 60 }
+        sourcePolicy: { type: string, enum: [general_knowledge_allowed, sources_only] }
+        status: { $ref: '#/components/schemas/GapStatus' }
+        assumptions:
+          type: array
+          description: Labelled inferences made when the learner did not answer.
+          items: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    CreateGapRequest:
+      type: object
+      required: [title, rawStatement, dailyMinutes]
+      properties:
+        title: { type: string, minLength: 1 }
+        rawStatement: { type: string, minLength: 1 }
+        dailyMinutes: { type: integer, minimum: 15, maximum: 60 }
+        deadline: { type: string, format: date }
+        sourcePolicy: { type: string, enum: [general_knowledge_allowed, sources_only] }
+
+    UpdateGapRequest:
+      type: object
+      properties:
+        title: { type: string }
+        currentState: { type: string }
+        targetCapability: { type: string }
+        deadline: { type: string, format: date }
+        dailyMinutes: { type: integer, minimum: 15, maximum: 60 }
+
+    RegisterSourceRequest:
+      type: object
+      required: [filename, mediaType]
+      properties:
+        filename: { type: string }
+        mediaType: { type: string, enum: [text/plain, text/markdown, text/x-markdown] }
+        text: { type: string }
+
+    RegisterSourceResponse:
+      type: object
+      required: [id, processingStatus, deduplicated]
+      properties:
+        id: { type: string }
+        filename: { type: string }
+        processingStatus:
+          type: string
+          enum: [pending, extracting, indexed, rejected, failed]
+        deduplicated:
+          type: boolean
+          description: True when an identical file was already uploaded and its extraction reused.
+
+    DiagnosticRequest:
+      type: object
+      required: [skipped]
+      properties:
+        skipped: { type: boolean }
+        answers:
+          type: array
+          items:
+            type: object
+            required: [questionId, response]
+            properties:
+              questionId: { type: string }
+              response: { type: string }
+
+    DiagnosticResponse:
+      type: object
+      properties:
+        inferred:
+          type: boolean
+          description: True when the baseline was inferred rather than measured.
+        demonstratedCapabilities: { type: array, items: { type: string } }
+        recommendedStartingDifficulty: { type: integer, minimum: 1, maximum: 5 }
+
+    CompileResponse:
+      type: object
+      required: [runId, status, deduplicated]
+      properties:
+        runId: { type: string }
+        status: { $ref: '#/components/schemas/GenerationStatus' }
+        deduplicated: { type: boolean }
+
+    GenerationRun:
+      type: object
+      required: [id, gapId, status, startedAt]
+      properties:
+        id: { type: string }
+        gapId: { type: string }
+        pipelineVersion: { type: string }
+        status: { $ref: '#/components/schemas/GenerationStatus' }
+        startedAt: { type: string, format: date-time }
+        finishedAt: { type: string, format: date-time }
+        error: { type: string }
+        steps:
+          type: array
+          description: The user-readable generation log. Stage names and errors only.
+          items:
+            type: object
+            properties:
+              step: { type: string }
+              subject: { type: string }
+              state: { type: string, enum: [pending, running, succeeded, failed] }
+              attempt: { type: integer }
+              error: { type: string }
+
+    Curriculum:
+      type: object
+      required: [id, gapId, version, status, lessons]
+      properties:
+        id: { type: string }
+        gapId: { type: string }
+        version: { type: integer }
+        durationDays: { type: integer, minimum: 1, maximum: 7 }
+        dailyMinutes: { type: integer }
+        status: { type: string, enum: [draft, published, partial, superseded] }
+        objectives:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              capabilityStatement: { type: string }
+              required: { type: boolean }
+        lessons:
+          type: array
+          items: { $ref: '#/components/schemas/Lesson' }
+
+    Lesson:
+      type: object
+      required: [id, day, title, publicationStatus]
+      properties:
+        id: { type: string }
+        day: { type: integer, minimum: 1, maximum: 7 }
+        title: { type: string }
+        estimatedMinutes: { type: integer }
+        objectiveIds: { type: array, items: { type: string } }
+        transcript: { type: string }
+        publicationStatus: { type: string, enum: [draft, verified, published, excluded] }
+        audio:
+          type: array
+          description: |
+            Segment URLs are short-lived signed links. Refetch the lesson when one expires; do
+            not cache the URL itself.
+            When empty, the lesson degraded to text-only and the transcript is authoritative.
+          items:
+            type: object
+            properties:
+              url: { type: string, format: uri }
+              expiresAt: { type: string, format: date-time }
+              durationSeconds: { type: number }
+
+    TodayQueue:
+      type: object
+      required: [reviews, totalItems]
+      properties:
+        reviews:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              objectiveId: { type: string }
+              dueAt: { type: string, format: date-time }
+        lesson:
+          type: object
+          properties:
+            day: { type: integer }
+            lessonId: { type: string }
+            title: { type: string }
+        totalItems: { type: integer }
+
+    AttemptRequest:
+      type: object
+      required: [questionId, sessionId, response]
+      properties:
+        questionId: { type: string }
+        sessionId: { type: string }
+        response: { type: string }
+        hintsUsed: { type: integer, minimum: 0 }
+        confidence: { type: string, enum: [low, medium, high] }
+
+    AttemptResponse:
+      type: object
+      required: [attemptId, correct, feedback]
+      properties:
+        attemptId: { type: string }
+        correct: { type: boolean }
+        score: { type: number, minimum: 0, maximum: 1 }
+        created:
+          type: boolean
+          description: False when this was a replay of an earlier attempt with the same key.
+        feedback:
+          type: object
+          description: Returned only after the attempt.
+          properties:
+            answer: { type: string }
+            rubric: { type: string }
+        scheduledReviews:
+          type: array
+          items:
+            type: object
+            properties:
+              objectiveId: { type: string }
+              dueAt: { type: string, format: date-time }
+              reason: { type: string, enum: [ladder, remediation, confidence_drop] }
+
+    SessionSummary:
+      type: object
+      properties:
+        sessionId: { type: string }
+        attempted: { type: integer }
+        correct: { type: integer }
+        nextReviewAt: { type: string, format: date-time }
+
+    MasteryCheckResponse:
+      type: object
+      required: [filled, objectives]
+      properties:
+        filled: { type: boolean }
+        objectives:
+          type: array
+          items:
+            type: object
+            properties:
+              objectiveId: { type: string }
+              mastered: { type: boolean }
+              score: { type: number }
+              missing:
+                type: array
+                description: Which clauses of the mastery rule are still unmet.
+                items: { type: string }
+        blockedBy:
+          type: array
+          items: { type: string }
+
+    Capability:
+      type: object
+      required: [gapId, title, filledAt]
+      properties:
+        gapId: { type: string }
+        title: { type: string }
+        targetCapability: { type: string }
+        objectiveIds: { type: array, items: { type: string } }
+        filledAt: { type: string, format: date-time }
+
+    CapabilityDetail:
+      allOf:
+        - $ref: '#/components/schemas/Capability'
+        - type: object
+          properties:
+            curriculum: { $ref: '#/components/schemas/Curriculum' }
+            evidence:
+              type: array
+              items:
+                type: object
+                properties:
+                  objectiveId: { type: string }
+                  evidenceType:
+                    type: string
+                    enum: [retrieval, application, transfer, delayed_retrieval, cumulative]
+                  score: { type: number }
+                  recordedAt: { type: string, format: date-time }
+            reviewSchedule:
+              type: array
+              items:
+                type: object
+                properties:
+                  objectiveId: { type: string }
+                  dueAt: { type: string, format: date-time }
+                  intervalDays: { type: integer }

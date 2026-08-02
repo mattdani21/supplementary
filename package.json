@@ -1,0 +1,35 @@
+{
+  "name": "gapos",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "setup": "pnpm install",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:domain": "vitest run packages/domain",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test",
+    "db:migrate": "tsx packages/database/src/migrate-cli.ts",
+    "local:up": "docker compose -f infra/local/docker-compose.yml up -d",
+    "local:down": "docker compose -f infra/local/docker-compose.yml down",
+    "specs:generate": "tsx scripts/generate-specs.ts"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@types/node": "^22.10.2",
+    "eslint": "^9.39.1",
+    "prettier": "^3.4.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.46.1",
+    "vitest": "^3.2.4"
+  },
+  "type": "module"
+}

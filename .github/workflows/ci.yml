@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The quality gate must never reach a real provider.
+  GAPOS_PROVIDER_MODE: fake
+
+jobs:
+  quality-gate:
+    name: Quality gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Format
+        run: pnpm format:check
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+  database:
+    name: Migrations and integration
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: gapos
+          POSTGRES_PASSWORD: gapos
+          POSTGRES_DB: gapos_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gapos"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      GAPOS_TEST_DATABASE_URL: postgres://gapos:gapos@localhost:5432/gapos_test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Migrate from an empty database
+        run: pnpm db:migrate
+
+      - name: Migrate again (idempotency)
+        run: pnpm db:migrate
+
+      - name: Integration tests
+        run: pnpm test packages/database
