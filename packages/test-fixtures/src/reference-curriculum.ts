@@ -127,10 +127,10 @@ export const referencePlan = (gapId = 'gap_reference'): CurriculumPlan => ({
         {
           kind: 'audio_lesson',
           description: 'Why "arbitrary" carries the proof',
-          estimatedMinutes: 12,
+          estimatedMinutes: 5,
         },
-        { kind: 'retrieval', description: 'Recall the subset definition', estimatedMinutes: 8 },
-        { kind: 'application', description: 'Prove a subset claim', estimatedMinutes: 15 },
+        { kind: 'retrieval', description: 'Recall the subset definition', estimatedMinutes: 12 },
+        { kind: 'application', description: 'Prove a subset claim', estimatedMinutes: 18 },
       ],
     },
     {
@@ -142,9 +142,9 @@ export const referencePlan = (gapId = 'gap_reference'): CurriculumPlan => ({
         {
           kind: 'audio_lesson',
           description: 'Both directions, and why each is needed',
-          estimatedMinutes: 13,
+          estimatedMinutes: 5,
         },
-        { kind: 'application', description: 'Prove one distributive law', estimatedMinutes: 17 },
+        { kind: 'application', description: 'Prove one distributive law', estimatedMinutes: 25 },
       ],
     },
     {
@@ -156,9 +156,9 @@ export const referencePlan = (gapId = 'gap_reference'): CurriculumPlan => ({
         {
           kind: 'audio_lesson',
           description: 'The three properties and what they buy',
-          estimatedMinutes: 14,
+          estimatedMinutes: 5,
         },
-        { kind: 'application', description: 'Prove an equivalence relation', estimatedMinutes: 16 },
+        { kind: 'application', description: 'Prove an equivalence relation', estimatedMinutes: 25 },
       ],
     },
   ],
@@ -433,57 +433,185 @@ const questionsForDay = (day: number): Question[] => {
   ];
 };
 
+/**
+ * The spoken scripts.
+ *
+ * Written to be *heard*: no bullets, no headings, no "as shown below", and no sentence that only
+ * works on a page. Each runs about five minutes at 150 words per minute, which is what the plan
+ * budgets — a script that claims twelve minutes and runs one is the exact defect the evaluation
+ * pack's duration dimension exists to catch.
+ */
 const SCRIPTS: Record<number, { title: string; script: string; summary: string }> = {
   1: {
     title: 'Arbitrary elements and the subset argument',
     script:
       'Today we are going to earn one sentence. The sentence is: let x be an arbitrary element ' +
-      'of A. Everything you will prove about subsets rests on it. Here is why it works. When we ' +
-      'say A is a subset of B, we are making a claim about every element of A at once. We cannot ' +
-      'check them one at a time, so instead we pick one element, refuse to learn anything about ' +
-      'it beyond the fact that it lives in A, and show it must also live in B. Because we learned ' +
-      'nothing special about it, the same argument would have worked for any other element. That ' +
-      'is what arbitrary means, and it is doing the work of infinitely many checks. Notice where ' +
-      'this goes wrong. If halfway through the proof you say "and since x is even", you have ' +
-      'stopped talking about an arbitrary element and started talking about a particular kind of ' +
-      'element. The proof now covers the even ones only.',
+      'of A. It looks like throat-clearing. It is not. Almost everything you will ever prove ' +
+      'about subsets rests on that sentence, and if you understand why it works you will stop ' +
+      'writing proofs that feel like guesswork. So let us slow down and take it apart. ' +
+      'When we say that A is a subset of B, we are making a claim about every single element of ' +
+      'A at once. If A has five elements we could, in principle, check them one at a time. But ' +
+      'most of the sets you care about are infinite, and even the finite ones are usually ' +
+      'described by a property rather than a list. So checking one at a time is not available ' +
+      'to us. We need an argument that covers all of them in one go. ' +
+      'Here is the trick, and it is one of the most reliable moves in mathematics. We pick a ' +
+      'single element. We then refuse, deliberately and completely, to learn anything about it ' +
+      'beyond the one fact that it lives in A. And from that single fact we show it must also ' +
+      'live in B. Now here is the part that does the work. Because we never used anything ' +
+      'special about the element we picked, the very same argument would have gone through for ' +
+      'any other element of A. We did not check them all. We showed that checking any one of ' +
+      'them would go the same way. That is what the word arbitrary is carrying, and it is ' +
+      'standing in for infinitely many checks. ' +
+      'Let me show you where this goes wrong, because the failure is instructive. Suppose you ' +
+      'are proving something about a set of numbers, and halfway through you write: and since x ' +
+      'is even, we can write x as two k. Stop. You have just stopped talking about an arbitrary ' +
+      'element and started talking about a particular kind of element. Your proof is now a ' +
+      'proof about the even members of A. If A also contains odd numbers, you have proved ' +
+      'nothing about them. The proof looks complete. It reads fluently. It is wrong, and it is ' +
+      'wrong in a way that is very easy to miss when you are reading your own work. ' +
+      'So when you write a subset proof, hold yourself to a simple discipline. After every line ' +
+      'ask: did I just assume something about x that I was not given? If the answer is yes, you ' +
+      'have either made an error, or you have discovered that your claim needs a case split, ' +
+      'where you handle the even ones and the odd ones separately and both cases land in B. ' +
+      'A case split is perfectly respectable. Quietly assuming one case is not. ' +
+      'One more thing about shape. A subset proof has a standard skeleton, and I want you to be ' +
+      'able to write the skeleton before you know how to fill it in. It goes like this. Let x ' +
+      'be an arbitrary element of the left-hand set. Then, by the definition of that set, ' +
+      'something is true about x. From that, by some reasoning, something else is true about x. ' +
+      'Therefore x belongs to the right-hand set. Since x was arbitrary, every element of the ' +
+      'left-hand set belongs to the right-hand set, which is what we wanted. ' +
+      'Notice that the first line and the last line are always the same. They cost you nothing ' +
+      'to write and they tell your reader exactly what kind of argument is coming. Write them ' +
+      'first, before you have any idea how the middle goes. Very often the middle becomes ' +
+      'obvious once the two ends are pinned down, because you can see precisely what you have ' +
+      'and precisely what you need. ' +
+      'In your practice today you will prove that A intersect B is a subset of A. It is a short ' +
+      'proof and you may find it almost too easy. Do it anyway, and write the skeleton out in ' +
+      'full. The habit is the point, not the difficulty. Tomorrow you will need the same move ' +
+      'twice in a row, and the day after that you will need it inside a much harder argument ' +
+      'about equivalence classes. If the skeleton is automatic by then, all your attention will ' +
+      'be free for the part that is actually hard.',
     summary:
       'A subset proof takes an arbitrary element of the left set and derives membership of the ' +
-      'right set, assuming nothing else about it.',
+      'right set, assuming nothing else about it. The word arbitrary is what turns one check ' +
+      'into infinitely many.',
   },
   2: {
     title: 'Double inclusion and the distributive laws',
     script:
-      'Yesterday you proved one set sits inside another. Today you will prove two sets are the ' +
-      'same, and the move is simply to do yesterday twice. To show A equals B, show A is a ' +
-      'subset of B, then show B is a subset of A. Each direction is its own proof with its own ' +
-      'arbitrary element, and it is worth writing them as two separate paragraphs so you never ' +
-      'lose track of which way you are going. Why is one direction not enough? Because a single ' +
-      'inclusion is compatible with the second set being strictly larger. If you prove only that ' +
-      'A sits inside B, then B might still hold something A never had. The second inclusion is ' +
-      'what rules that out. When the sets involve a union, expect a case split: an element in ' +
-      'B union C is in B or in C, and you handle each case, showing both land where you need.',
+      'Yesterday you proved that one set sits inside another. Today you are going to prove that ' +
+      'two sets are exactly the same, and the good news is that the move is simply to do ' +
+      'yesterday twice. To show that A equals B, you show that A is a subset of B, and then you ' +
+      'show that B is a subset of A. That is the whole method. It is called proof by double ' +
+      'inclusion, and it is the standard way set identities are established. ' +
+      'Let me say a word about why two directions are needed, because this is where people ' +
+      'convince themselves they are finished when they are not. Suppose you have proved only ' +
+      'that A sits inside B. What have you ruled out? You have ruled out A containing anything ' +
+      'that B does not. What have you not ruled out? You have not ruled out B containing ' +
+      'something that A does not. A could be a strict subset, a genuinely smaller collection ' +
+      'sitting inside a larger one, and everything you proved would still hold. The second ' +
+      'inclusion is exactly what closes that gap. One direction gives you at most. Two ' +
+      'directions give you equality. ' +
+      'In practice I want you to write the two directions as two clearly separate paragraphs, ' +
+      'each starting with its own arbitrary element. There is a reason for this beyond ' +
+      'tidiness. When the two arguments are tangled together on the page it becomes very easy ' +
+      'to use a fact you established in the first direction while you are working in the ' +
+      'second, and that fact may not be available to you there. Keeping them apart makes the ' +
+      'mistake visible. Some people even label them: first, the forward inclusion. Second, the ' +
+      'reverse inclusion. Do that if it helps. ' +
+      'Now let us talk about what happens when a union shows up inside the statement, because ' +
+      'that is where today gets interesting. Consider the claim that A intersect the union of B ' +
+      'and C equals the union of A intersect B and A intersect C. This is one of the ' +
+      'distributive laws, and it is the standard exercise for double inclusion. ' +
+      'Take the forward direction. Let x be an arbitrary element of A intersect the union of B ' +
+      'and C. Unpacking the intersection, x is in A, and x is in the union of B and C. Now ' +
+      'unpack that union. It tells you x is in B, or x is in C. Notice that word: or. You do ' +
+      'not know which. You cannot pick one. What you can do is handle both possibilities, and ' +
+      'that is a case split. In the first case, x is in B, and since x is also in A, x lies in ' +
+      'A intersect B, so it lies in the union we are aiming for. In the second case, x is in C, ' +
+      'and by exactly the same reasoning it lies in A intersect C, so again it lies in the ' +
+      'union. Either way we land where we need to be. That is the forward direction finished. ' +
+      'The reverse direction is a little easier, and it is worth noticing why. Let x be an ' +
+      'arbitrary element of the union of A intersect B and A intersect C. Again this is an or, ' +
+      'so again we split. In both cases x is in A, which is half of what we want. And in the ' +
+      'first case x is in B, in the second x is in C, so in both cases x lies in the union of B ' +
+      'and C, which is the other half. So x is in A and in the union of B and C, which is ' +
+      'exactly membership of the left-hand set. Both inclusions hold, so the sets are equal. ' +
+      'Here is the pattern to carry away. An intersection in your hypothesis is a gift: it ' +
+      'gives you two facts for free. A union in your hypothesis is a demand: it forces a case ' +
+      'split, because you learn only that one of two things holds. When you are stuck in a set ' +
+      'proof, it is very often because you have been handed a union and have not yet split on ' +
+      'it. Look for the or. ' +
+      'Your practice today is the other distributive law, the one with union on the outside. ' +
+      'Write both directions, keep them in separate paragraphs, start each with an arbitrary ' +
+      'element, and split whenever you meet a union. If you find yourself writing a sentence ' +
+      'that begins with therefore and you cannot say which earlier line it follows from, go ' +
+      'back. That feeling is almost always a skipped case.',
     summary:
-      'Set equality is proved by two independent subset arguments; unions inside the statement ' +
-      'usually force a case split.',
+      'Set equality is proved by two independent subset arguments, one in each direction. A ' +
+      'union in the hypothesis forces a case split; an intersection hands you two facts.',
   },
   3: {
     title: 'Relations, equivalence and partitions',
     script:
-      'A relation is nothing more mysterious than a set of ordered pairs. What makes relations ' +
-      'useful is the properties they can have. Reflexive means every element relates to itself, ' +
-      'and note that this is a claim about every element, so one missing pair destroys it. ' +
-      'Symmetric and transitive are different in kind: they are conditional. They only say what ' +
-      'must happen when pairs are already related. That is why the empty relation on a non-empty ' +
-      'set is symmetric and transitive but not reflexive, which is a good example to keep in your ' +
-      'pocket. Put all three together and you have an equivalence relation, and something ' +
-      'remarkable follows. The equivalence classes partition the set: every element sits in ' +
-      'exactly one class, and two classes are either identical or share nothing. Reflexivity is ' +
-      'what guarantees nobody is left out. Symmetry and transitivity are what force two ' +
-      'overlapping classes to collapse into one.',
+      'A relation is nothing more mysterious than a set of ordered pairs. That is the whole ' +
+      'definition. A relation on a set A is a subset of A cross A, and when we write a R b we ' +
+      'are just saying that the pair a b is in that subset. If that feels anticlimactic, good. ' +
+      'The definition is not where the content is. The content is in the properties a relation ' +
+      'can have, and in what those properties buy you. ' +
+      'There are three we care about today. Reflexive means every element relates to itself: ' +
+      'for every a in A, a relates to a. Symmetric means that whenever a relates to b, b also ' +
+      'relates to a. Transitive means that whenever a relates to b and b relates to c, a ' +
+      'relates to c. ' +
+      'Now I want you to notice a difference in kind between these, because it explains most of ' +
+      'the mistakes people make. Reflexivity is an unconditional claim about every element. It ' +
+      'says something must be present, for all of them, no exceptions. That means a relation ' +
+      'can fail to be reflexive because of a single missing pair. One element left out and the ' +
+      'property is gone. ' +
+      'Symmetry and transitivity are not like that. They are conditional. They say what must ' +
+      'happen when elements are already related, and they say nothing whatsoever about pairs ' +
+      'that are not related. This has a consequence that catches people out every time, so keep ' +
+      'it in your pocket. Take the empty relation on a non-empty set: no element relates to ' +
+      'anything at all. Is it symmetric? Yes, vacuously, because there is no case where a ' +
+      'relates to b for the condition to fail on. Is it transitive? Yes, for the same reason. ' +
+      'Is it reflexive? No, and badly so, because reflexivity demanded a pair for every element ' +
+      'and we supplied none. So symmetry and transitivity do not give you reflexivity, and any ' +
+      'argument that claims otherwise has a hole in it. ' +
+      'Put all three together and you have an equivalence relation, and now something genuinely ' +
+      'remarkable happens. Define the equivalence class of an element a to be the set of all ' +
+      'elements related to a. The theorem is that these classes partition the set: every ' +
+      'element lies in exactly one class, and two classes are either identical or share nothing ' +
+      'at all. There is no partial overlap. Ever. ' +
+      'I want you to see which property does which job in that proof, because this is the part ' +
+      'worth understanding rather than memorising. Reflexivity is what guarantees nobody is ' +
+      'left out: since a relates to itself, a is in its own class, so every element is in some ' +
+      'class and the classes cover the whole set. Symmetry and transitivity together are what ' +
+      'force overlapping classes to collapse into one. Suppose some element x lies in both the ' +
+      'class of a and the class of b. Then x relates to a and x relates to b. By symmetry, a ' +
+      'relates to x. By transitivity, a relates to b. And from there, a short argument shows ' +
+      'every member of one class is a member of the other, in both directions, which by double ' +
+      'inclusion means the classes are equal. Notice that you just used yesterday. ' +
+      'So the shape of the result is: reflexivity gives coverage, symmetry and transitivity ' +
+      'give disjointness, and together they give a partition. If you can say that sentence and ' +
+      'mean it, you understand equivalence relations. ' +
+      'Let me give you a concrete one to hold on to. Take the numbers one through six, and ' +
+      'relate two numbers when they leave the same remainder on division by three. Reflexive: ' +
+      'every number has the same remainder as itself. Symmetric: sameness of remainder does not ' +
+      'care about order. Transitive: if two numbers match a third, they match each other. So it ' +
+      'is an equivalence relation, and the classes are one and four, two and five, three and ' +
+      'six. Three classes, none empty, none overlapping, covering everything. That is a ' +
+      'partition, and you can see it directly. ' +
+      'Your practice today has two parts. First, take a small explicit relation and decide ' +
+      'which of the three properties it has, giving a reason for each, and naming the missing ' +
+      'pair when reflexivity fails. Second, a transfer problem: the integers, related when ' +
+      'their difference is divisible by five. Prove it is an equivalence relation and describe ' +
+      'the classes. That second one is unfamiliar territory, which is the point. If you can do ' +
+      'it, you are not pattern-matching on examples you have seen. You are using the ' +
+      'definitions.',
     summary:
-      'Reflexivity, symmetry and transitivity together produce an equivalence relation, whose ' +
-      'classes partition the underlying set.',
+      'Reflexivity, symmetry and transitivity together make an equivalence relation, whose ' +
+      'classes partition the set. Reflexivity supplies coverage; symmetry and transitivity ' +
+      'supply disjointness.',
   },
 };
 
@@ -512,7 +640,7 @@ export const referenceLesson = (day: number): LessonPackage => {
       },
     ],
     questions,
-    estimatedMinutes: day === 3 ? 14 : 12,
+    estimatedMinutes: 5,
     evidence: sourced(`chunk_${day + 1}`, `§${day + 1}`),
   };
 };

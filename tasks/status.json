@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-02T04:58:00.000Z",
+  "updatedAt": "2026-08-02T05:05:00.000Z",
   "controller": "gapos-controller",
   "tasks": {
     "GAP-000": {
@@ -215,6 +215,23 @@
           "note": "An exhausted budget fails the run before any provider call rather than overspending, and increments budget_degradation_total; a provider failure fails the run cleanly and a retry compiles the identical course"
         }
       ]
+    },
+    "GAP-014": {
+      "status": "done",
+      "completedAt": "2026-08-02T05:04:00.000Z",
+      "evidence": [
+        {
+          "command": "pnpm test tests/evaluation",
+          "result": "pass",
+          "note": "42 tests. All ten fixtures declared with expected objectives, prohibited content, sample questions, failure traps, expert rubric and latency class; every declared trap names a dimension that can catch it; the reference curriculum clears all ten floors"
+        },
+        {
+          "command": "pnpm test tests/evaluation -t 'detects poor education'",
+          "result": "pass",
+          "note": "11 degradation tests prove the scorer discriminates: a dropped objective, abandoning the source for general knowledge, prohibited scope, an unanswerable item, a missing rubric, a backwards difficulty ramp, a script written to be read rather than heard, a false duration, a duplicated prompt, a leaked answer, and an invented objective are each caught by the dimension that is supposed to catch them. A merely reworded curriculum still passes"
+        }
+      ],
+      "notes": "Writing the gate found two real defects. (1) The scorer measured objective coverage over the plan's promises as well as the lessons, so dropping a whole day still scored 1.0 \u2014 coverage now means taught, over lesson titles, summaries and scripts only. (2) The reference lesson scripts claimed twelve to fourteen minutes of audio and ran about one; they are now ~750 words each, matching a five-minute audio activity, with the plan's day budgets adjusted to keep 35 minutes. The nine fixtures that need a live provider are tracked as GAP-014b, blocked on a human approval gate rather than skipped."
     }
   },
   "blockers": []

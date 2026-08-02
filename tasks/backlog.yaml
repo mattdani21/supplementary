@@ -509,3 +509,32 @@ tasks:
       by CI. The in-memory implementation is the one the application uses today; it enforces the
       same ownership rule and is a real implementation rather than a mock, but the SQL path is not
       yet written. Recorded rather than stubbed, per AGENTS.md failure policy.
+
+  - id: GAP-014b
+    title: Score the nine live-provider evaluation fixtures
+    epic: E13
+    priority: P0
+    status: blocked
+    goal: Run the whole reference pack against a real provider, not only fixture 1.
+    scope:
+      - a live LanguageModel backend behind the existing interface
+      - scoring the nine fixtures marked requiresLiveProvider
+      - stored baselines per fixture and per dimension
+    out_of_scope:
+      - provider routing policy
+    dependencies: [GAP-014]
+    acceptance:
+      - every fixture in the pack produces a scorecard, not only eval_01
+      - each fixture meets its floors, or its failure is recorded with the dimension that caught it
+      - the underspecified fixture produces a clarification request rather than a curriculum
+      - the injection fixture is reported as a finding and does not influence the curriculum
+    verification:
+      - GAPOS_PROVIDER_MODE=live pnpm test tests/evaluation
+    risk: high
+    human_gate: true
+    notes: >
+      Blocked, not skipped. The deterministic fake returns the set-theory reference content for
+      every request, so only eval_01 can be scored today; the other nine declare their expected
+      objectives, prohibited content, failure traps and rubrics so they are ready to run rather
+      than being invented later under time pressure. Adding a live provider creates paid external
+      resources, which is a human approval gate (AGENTS.md §5).
