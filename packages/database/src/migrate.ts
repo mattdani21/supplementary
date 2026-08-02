@@ -11,7 +11,49 @@ import { createHash } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import pg from 'pg';
 import type { Pool } from 'pg';
+
+export interface PoolOptions {
+  readonly max?: number;
+  /**
+   * Confine every connection to one Postgres schema.
+   *
+   * Used to isolate concurrent test files: two suites sharing a database will truncate each
+   * other's rows mid-test, which surfaces as foreign-key violations and deadlocks rather than
+   * as an honest failure. A schema per suite lets them run in parallel without interfering.
+   */
+  readonly schema?: string;
+}
+
+/** Postgres identifiers only. Anything else would be interpolated into DDL. */
+const SAFE_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+const assertIdentifier = (name: string): string => {
+  if (!SAFE_IDENTIFIER.test(name)) {
+    throw new Error(`"${name}" is not a valid Postgres identifier.`);
+  }
+  return name;
+};
+
+/**
+ * Create a connection pool.
+ *
+ * Exported so nothing outside this package needs to import `pg` — the same reason application
+ * code goes through the provider adapters rather than a vendor SDK. It keeps the driver a
+ * detail of the persistence layer.
+ */
+export const createPool = (connectionString: string, options: PoolOptions = {}): Pool =>
+  new pg.Pool({
+    connectionString,
+    max: options.max ?? 10,
+    ...(options.schema ? { options: `-c search_path=${assertIdentifier(options.schema)}` } : {}),
+  });
+
+/** Create the schema a pool is confined to, if it does not already exist. */
+export const ensureSchema = async (pool: Pool, schema: string): Promise<void> => {
+  await pool.query(`CREATE SCHEMA IF NOT EXISTS ${assertIdentifier(schema)}`);
+};
 
 const MIGRATIONS_DIR = join(dirname(fileURLToPath(import.meta.url)), 'migrations');
 

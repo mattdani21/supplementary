@@ -5,8 +5,7 @@
  * Running it twice is a no-op — which is what the CI job asserts.
  */
 
-import pg from 'pg';
-import { migrate } from './migrate.js';
+import { createPool, migrate } from './migrate.js';
 
 const connectionString = process.env.GAPOS_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 
@@ -15,7 +14,7 @@ if (!connectionString) {
   process.exit(1);
 }
 
-const pool = new pg.Pool({ connectionString });
+const pool = createPool(connectionString);
 
 try {
   const { applied, skipped } = await migrate(pool);

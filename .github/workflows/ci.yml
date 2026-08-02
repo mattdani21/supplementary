@@ -84,5 +84,10 @@ jobs:
       - name: Migrate again (idempotency)
         run: pnpm db:migrate
 
-      - name: Integration tests
+      - name: Repository contract against Postgres
         run: pnpm test packages/database
+
+      # The repository suite proves each method in isolation; this proves the product works on
+      # the SQL implementation.
+      - name: End-to-end journey against Postgres
+        run: pnpm test tests/end-to-end/postgres-journey.test.ts
