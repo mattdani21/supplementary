@@ -3,6 +3,16 @@
 Decisions taken during the build that are smaller than an ADR but would otherwise be invisible.
 Newest first. An entry that reverses architecture belongs in `docs/adr/`, not here.
 
+## 2026-08-02 — Live backends land per capability; the factory stays all-or-nothing
+
+`createLiveLanguageModel` / `createLiveLanguageModelFromEnv` implement the `LanguageModelBackend`
+boundary over plain fetch (OpenAI-compatible, DeepSeek by default; no provider SDK imported, so
+the adapter remains the only thing that knows the provider). `createProviders({mode:'live'})`
+still throws: a provider set must be all-live or all-fake, so a partial set can never masquerade
+as a live run. Text-only evaluation (the GAP-014b scoring run) uses the exported backend
+directly. Live pricing defaults track deepseek-chat list prices and are overridable via env; cost
+is rounded up to integer millicents so spend is never undercounted against a budget.
+
 ## 2026-08-02 — Repository interfaces take an owner on every call
 
 `findById(id)` does not exist anywhere in `packages/database`. Every read and write takes an

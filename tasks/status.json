@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-02T11:45:00.000Z",
+  "updatedAt": "2026-08-02T20:01:00.000Z",
   "controller": "gapos-controller",
   "tasks": {
     "GAP-000": {
@@ -296,6 +296,23 @@
       ],
       "notes": "Found by reading a GREEN CI run's Postgres server log. Migration 001 declared UNIQUE (lesson_id, kind, version) on artefacts, encoding the assumption that a lesson has one artefact per kind. True for a transcript, false for audio: a script is synthesised as several segments, all kind='audio' at version 1, so the second insert violated the constraint. The insert threw, the pipeline's audio fallback caught it and degraded the lesson to transcript-only, and the run still reported success \u2014 an audio-first product shipping without audio, with only a warning line. The in-memory store has no constraints, so the memory journey passed throughout. Fixed by forward-only migration 002 adding segment_ordinal and a segment-aware unique constraint; the shared contract suite now stores four audio segments for one lesson so memory and SQL are held to the same behaviour, and both journeys assert audio publishes rather than only that the compile succeeded."
     }
+  },
+  "GAP-014b": {
+    "status": "in_progress",
+    "startedAt": "2026-08-02T19:40:00.000Z",
+    "evidence": [
+      {
+        "command": "pnpm vitest run packages/provider-adapters/src/live/language-model.test.ts",
+        "result": "pass",
+        "note": "13 tests. The live backend speaks OpenAI-compatible chat-completions over plain fetch (no SDK): bearer auth, response_format json_object, the contract named in the system prompt, evidence passed through inside the fence, temperature/max_tokens/timeout forwarded. Failures are typed LiveProviderErrors with a retryable flag (429/5xx/network retryable; 400/JSON/usage failures not). Usage is required because the wrapper cannot account for a call whose cost it cannot measure; cost is integer millicents rounded up from an env-overridable price table (defaults track deepseek-chat list prices)."
+      },
+      {
+        "command": "pnpm verify",
+        "result": "pass",
+        "note": "314 passed + 13 skipped (Postgres block, no GAPOS_TEST_DATABASE_URL). Format, lint, typecheck and the full suite are green with the live backend exported and the factory message updated."
+      }
+    ],
+    "notes": "createLiveLanguageModel / createLiveLanguageModelFromEnv implement the LanguageModelBackend boundary and are exported from @gapos/provider-adapters; GAPOS_LLM_API_KEY / BASE_URL / MODEL / price overrides documented in .env.example. createProviders({mode:'live'}) still throws: a provider set must be all-live or all-fake (AGENTS.md §4), and live TTS/STT backends do not exist yet. The nine-fixture live scoring run is still blocked on the human approval gate: an API key and an agreed budget before any paid call (AGENTS.md §5)."
   },
   "blockers": []
 }
