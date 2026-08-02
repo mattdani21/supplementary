@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-02T04:23:00.000Z",
+  "updatedAt": "2026-08-02T04:33:00.000Z",
   "controller": "gapos-controller",
   "tasks": {
     "GAP-000": {
@@ -8,10 +8,23 @@
       "startedAt": "2026-08-02T04:12:00.000Z",
       "completedAt": "2026-08-02T04:23:00.000Z",
       "evidence": [
-        { "command": "pnpm install", "result": "pass", "note": "273 packages resolved, clean checkout" },
-        { "command": "pnpm typecheck", "result": "pass" },
-        { "command": "pnpm lint", "result": "pass" },
-        { "command": "pnpm format:check", "result": "pass" },
+        {
+          "command": "pnpm install",
+          "result": "pass",
+          "note": "273 packages resolved, clean checkout"
+        },
+        {
+          "command": "pnpm typecheck",
+          "result": "pass"
+        },
+        {
+          "command": "pnpm lint",
+          "result": "pass"
+        },
+        {
+          "command": "pnpm format:check",
+          "result": "pass"
+        },
         {
           "command": "pnpm test tests/architecture",
           "result": "pass",
@@ -30,7 +43,10 @@
           "result": "pass",
           "note": "18 tests. Full transition matrix asserted against the declared table; every status proven reachable from draft; filled unreachable from any status except mastery_check and review_due; mastery_confirmed refused when a required objective is unmastered or when there are no required objectives at all"
         },
-        { "command": "pnpm typecheck", "result": "pass" }
+        {
+          "command": "pnpm typecheck",
+          "result": "pass"
+        }
       ],
       "notes": "Acceptance 'consumption cannot directly set filled' is covered by the test that iterates every status and asserts the mastery_confirmed transition is refused."
     },
@@ -46,6 +62,29 @@
         }
       ],
       "notes": "Step identity is (run, step, subject, inputVersion). The subject field separates concurrent instances of the same step, which is what makes per-day lesson generation safe to retry independently."
+    },
+    "GAP-003": {
+      "status": "done",
+      "startedAt": "2026-08-02T04:24:00.000Z",
+      "completedAt": "2026-08-02T04:33:00.000Z",
+      "evidence": [
+        {
+          "command": "pnpm test packages/ai-contracts",
+          "result": "pass",
+          "note": "22 tests. Wrong schemaVersion rejected; unknown fields rejected rather than dropped; multiple-choice answer must be among distinct options; free response must ship a rubric; a source-grounded item must cite a locator; the evidence fence cannot be forged by a document"
+        },
+        {
+          "command": "pnpm test packages/provider-adapters",
+          "result": "pass",
+          "note": "17 tests. A structurally invalid response is rejected at the boundary and never returned; the failing field names are reported so a repair can be targeted; a rejected response is still charged for; source text never enters the instruction or the log; the budget check happens before the provider is reached (backend.calls is empty)"
+        },
+        {
+          "command": "pnpm test packages/observability",
+          "result": "pass",
+          "note": "13 tests. Budgets refuse pre-call at both run and per-user-daily scope; spend does not cross users or days; cost is integer millicents so 300 sub-cent calls do not drift"
+        }
+      ],
+      "notes": "GAPOS_PROVIDER_MODE defaults to fake, and mode=live throws pointing at the human approval gate rather than silently falling back \u2014 a staging run cannot quietly be a fake run."
     }
   },
   "blockers": []
