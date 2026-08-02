@@ -314,10 +314,15 @@
       {
         "command": "pnpm verify",
         "result": "pass",
-        "note": "328 passed + 13 skipped (Postgres block, no GAPOS_TEST_DATABASE_URL). Format, lint, typecheck and the full suite are green with both live backends exported."
+        "note": "328 passed + 14 skipped (Postgres block and the live-provider pack, both skipping loudly with the missing variable named). Format, lint, typecheck and the full suite are green with the GAP-014b harness in place."
+      },
+      {
+        "command": "GAPOS_PROVIDER_MODE=live GAPOS_LLM_API_KEY=... pnpm tsx scripts/record-eval-baselines.ts",
+        "result": "pending",
+        "note": "The recording run compiles the nine requiresLiveProvider fixtures through the real pipeline (live LLM + live Google TTS, fake STT standing in only because compile never transcribes), scores each against every floor, and writes tasks/evaluation-baselines.json. Blocked on the human approval gate: an API key and an agreed budget before any paid call (AGENTS.md §5)."
       }
     ],
-    "notes": "createLiveLanguageModel / createLiveLanguageModelFromEnv and createLiveTextToSpeech / createGoogleTranslateTtsEngine implement the LLM and TTS boundaries; env config documented in .env.example. The npm edge-tts package was rejected (registry carries only 1.0.1, Bun-era main:index.ts, CC BY-NC-SA 4.0) in favour of a self-contained fetch client for the free Google endpoint behind the SpeechSynthesisEngine interface, so a paid provider slots in later (E17). createProviders({mode:'live'}) still throws: live speech-to-text is the only missing capability, and a provider set must be all-live or all-fake (AGENTS.md §4). The nine-fixture live scoring run is still blocked on the human approval gate: an API key and an agreed budget before any paid call (AGENTS.md §5)."
+    "notes": "Harness complete: apps/web context accepts an explicit providers assembly (never the factory's all-or-nothing refusal), tests/evaluation/live-provider.test.ts gates floors, baseline regression (compareToBaseline against tasks/evaluation-baselines.json), the eval_08 clarification requirement and the eval_07 injection-finding requirement; scripts/record-eval-baselines.ts writes the baselines; scripts/ is now included in the typecheck (the existing generate-specs.ts was clean). The nine-fixture live scoring run itself remains blocked on the human approval gate: DeepSeek API key + agreed budget."
   },
   "blockers": []
 }

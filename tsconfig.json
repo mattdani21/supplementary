@@ -15,5 +15,5 @@
       "@gapos/test-fixtures": ["./packages/test-fixtures/src/index.ts"]
     }
   },
-  "include": ["packages/*/src/**/*", "apps/*/src/**/*", "tests/**/*", "*.config.ts"]
+  "include": ["packages/*/src/**/*", "apps/*/src/**/*", "tests/**/*", "scripts/**/*", "*.config.ts"]
 }

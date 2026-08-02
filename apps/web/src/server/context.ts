@@ -45,6 +45,14 @@ export interface ContextOptions {
   readonly fake?: FakeLanguageModelOptions;
   readonly logLevel?: 'debug' | 'info' | 'warn' | 'error';
   /**
+   * Providers. Defaults to the deterministic fakes via the all-or-nothing factory.
+   *
+   * Injectable so the evaluation harness (GAP-014b) can assemble a live language model and
+   * live text-to-speech without the factory, which refuses partial sets: a provider set here
+   * is an explicit assembly, never a silent fallback.
+   */
+  readonly providers?: Providers;
+  /**
    * Persistence. Defaults to the in-memory implementations.
    *
    * Injectable so the same application code can be exercised against Postgres — an end-to-end
@@ -63,12 +71,14 @@ export const createServerContext = (options: ContextOptions = {}): ServerContext
   return {
     uow: options.uow ?? createMemoryUnitOfWork(),
     storage: options.storage ?? createMemoryObjectStore(options.now),
-    providers: createProviders({
-      costAccountant,
-      metrics,
-      logger,
-      ...(options.fake ? { fake: options.fake } : {}),
-    }),
+    providers:
+      options.providers ??
+      createProviders({
+        costAccountant,
+        metrics,
+        logger,
+        ...(options.fake ? { fake: options.fake } : {}),
+      }),
     metrics,
     costAccountant,
     logger,
