@@ -1,0 +1,101 @@
+/**
+ * Forward-only migrations.
+ *
+ * A migration is applied once, inside a transaction, and recorded with the checksum of the file
+ * that was applied. If a shipped migration is later edited, the checksum no longer matches and
+ * the runner refuses to continue — which is how "never edit a migration that has shipped" stops
+ * being a convention and starts being a check.
+ */
+
+import { createHash } from 'node:crypto';
+import { readdir, readFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import type { Pool } from 'pg';
+
+const MIGRATIONS_DIR = join(dirname(fileURLToPath(import.meta.url)), 'migrations');
+
+export interface Migration {
+  readonly name: string;
+  readonly sql: string;
+  readonly checksum: string;
+}
+
+export const loadMigrations = async (directory = MIGRATIONS_DIR): Promise<Migration[]> => {
+  const files = (await readdir(directory)).filter((f) => f.endsWith('.sql')).sort();
+  return Promise.all(
+    files.map(async (name) => {
+      const sql = await readFile(join(directory, name), 'utf8');
+      return { name, sql, checksum: createHash('sha256').update(sql).digest('hex') };
+    }),
+  );
+};
+
+export class MigrationDriftError extends Error {
+  constructor(
+    readonly migration: string,
+    readonly appliedChecksum: string,
+    readonly currentChecksum: string,
+  ) {
+    super(
+      `Migration ${migration} has changed since it was applied ` +
+        `(recorded ${appliedChecksum.slice(0, 12)}, found ${currentChecksum.slice(0, 12)}). ` +
+        'Migrations are forward-only: add a new migration instead of editing this one.',
+    );
+    this.name = 'MigrationDriftError';
+  }
+}
+
+export interface MigrationResult {
+  readonly applied: readonly string[];
+  readonly skipped: readonly string[];
+}
+
+export const migrate = async (pool: Pool, directory?: string): Promise<MigrationResult> => {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      name       TEXT PRIMARY KEY,
+      checksum   TEXT NOT NULL,
+      applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
+  const migrations = await loadMigrations(directory);
+  const { rows } = await pool.query<{ name: string; checksum: string }>(
+    'SELECT name, checksum FROM schema_migrations',
+  );
+  const applied = new Map(rows.map((row) => [row.name, row.checksum]));
+
+  const appliedNow: string[] = [];
+  const skipped: string[] = [];
+
+  for (const migration of migrations) {
+    const previous = applied.get(migration.name);
+    if (previous) {
+      if (previous !== migration.checksum) {
+        throw new MigrationDriftError(migration.name, previous, migration.checksum);
+      }
+      skipped.push(migration.name);
+      continue;
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(migration.sql);
+      await client.query('INSERT INTO schema_migrations (name, checksum) VALUES ($1, $2)', [
+        migration.name,
+        migration.checksum,
+      ]);
+      await client.query('COMMIT');
+      appliedNow.push(migration.name);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  return { applied: appliedNow, skipped };
+};

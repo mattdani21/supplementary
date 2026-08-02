@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-02T04:33:00.000Z",
+  "updatedAt": "2026-08-02T04:38:00.000Z",
   "controller": "gapos-controller",
   "tasks": {
     "GAP-000": {
@@ -85,6 +85,29 @@
         }
       ],
       "notes": "GAPOS_PROVIDER_MODE defaults to fake, and mode=live throws pointing at the human approval gate rather than silently falling back \u2014 a staging run cannot quietly be a fake run."
+    },
+    "GAP-004": {
+      "status": "done",
+      "startedAt": "2026-08-02T04:34:00.000Z",
+      "completedAt": "2026-08-02T04:38:00.000Z",
+      "evidence": [
+        {
+          "command": "pnpm test packages/database",
+          "result": "pass",
+          "note": "16 tests. Owner A cannot read, list, update or re-status a row owned by B; retrieval is bounded by owner AND gap; account deletion removes every owned row and leaves the other learner intact; a repeated compile or attempt idempotency key returns the original row instead of creating a second"
+        },
+        {
+          "command": "pnpm test packages/database -t 'no repository method that reads without an owner'",
+          "result": "pass",
+          "note": "Structural guard: reflects over every repository method and asserts the first parameter is the owner, so a future findById(id) fails here rather than shipping"
+        },
+        {
+          "command": "pnpm test packages/database -t migrations",
+          "result": "pass",
+          "note": "Migration drift check refuses to run when a shipped migration file has been edited; applying twice is a no-op; every learner-owned table in the schema is asserted to carry owner_id"
+        }
+      ],
+      "notes": "The schema, the forward-only runner with checksum drift detection, and the in-memory UnitOfWork are complete and are what the application uses today. The Postgres implementation of the repository interfaces is NOT yet written and is tracked as GAP-004b (ready, not blocked) with the ownership suite to be parameterised across both implementations. Recorded rather than stubbed."
     }
   },
   "blockers": []
