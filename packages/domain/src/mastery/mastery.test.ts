@@ -139,7 +139,7 @@ describe('curriculum mastery', () => {
   it('is ready to fill when every required objective is mastered', () => {
     const result = assessCurriculum(objectives, [...evidenceFor('a'), ...evidenceFor('b')]);
     expect(result.readyToFill).toBe(true);
-    expect(result.masteredObjectiveIds.sort()).toEqual(['a', 'b']);
+    expect([...result.masteredObjectiveIds].sort()).toEqual(['a', 'b']);
   });
 
   it('does not let an optional objective block completion', () => {
