@@ -151,6 +151,25 @@ describeIfPostgres('the primary journey on Postgres', () => {
     }
   });
 
+  it('actually publishes audio rather than silently degrading to text', async () => {
+    // The audio fallback is meant for a failing provider, not for a schema that rejects the
+    // second segment. Before migration 002 this passed the compile and lost the audio, with
+    // only a warning line to say so — so the assertion is on the artefacts, not on the status.
+    const { outcome } = await compileReference();
+
+    for (const day of outcome.days) {
+      expect(day.textOnly, `day ${day.day} fell back to text`).toBe(false);
+      expect(day.audioSegments, `day ${day.day} audio segments`).toBeGreaterThan(1);
+
+      const artefacts = await context.uow.curricula.listArtefacts(LEARNER, day.lessonId);
+      const audio = artefacts.filter((a) => a.kind === 'audio');
+      expect(audio.length).toBe(day.audioSegments);
+      // Segments must come back in playback order; scrambled segments are a scrambled lesson.
+      expect(audio.map((a) => a.segmentOrdinal)).toEqual(audio.map((_, i) => i));
+      expect(artefacts.some((a) => a.kind === 'transcript')).toBe(true);
+    }
+  });
+
   it('returns exactly one run for a repeated compile idempotency key', async () => {
     const { gap, outcome } = await compileReference(LEARNER, 'pg-dedupe');
     const repeat = await compile(context, LEARNER, {

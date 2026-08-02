@@ -165,6 +165,7 @@ const toArtefact = (row: any): Artefact => ({
   checksum: row.checksum,
   ...(row.duration_seconds === null ? {} : { durationSeconds: Number(row.duration_seconds) }),
   version: row.version,
+  segmentOrdinal: row.segment_ordinal,
   frozen: row.frozen,
 });
 
@@ -682,8 +683,8 @@ export const createPostgresUnitOfWork = (pool: Pool): UnitOfWork => {
     async addArtefact(owner, artefact) {
       const { rows } = await db.query(
         `INSERT INTO artefacts (id, owner_id, lesson_id, kind, storage_key, media_type, checksum,
-                                duration_seconds, version, frozen)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+                                duration_seconds, version, segment_ordinal, frozen)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
         [
           artefact.id,
           owner,
@@ -694,6 +695,7 @@ export const createPostgresUnitOfWork = (pool: Pool): UnitOfWork => {
           artefact.checksum,
           artefact.durationSeconds ?? null,
           artefact.version,
+          artefact.segmentOrdinal,
           artefact.frozen,
         ],
       );
@@ -702,7 +704,8 @@ export const createPostgresUnitOfWork = (pool: Pool): UnitOfWork => {
 
     async listArtefacts(owner, lessonId) {
       const { rows } = await db.query(
-        'SELECT * FROM artefacts WHERE owner_id = $1 AND lesson_id = $2 ORDER BY created_at, id',
+        `SELECT * FROM artefacts WHERE owner_id = $1 AND lesson_id = $2
+          ORDER BY kind, segment_ordinal, id`,
         [owner, lessonId],
       );
       return rows.map(toArtefact);

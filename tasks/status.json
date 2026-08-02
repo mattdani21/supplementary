@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-02T05:30:00.000Z",
+  "updatedAt": "2026-08-02T11:45:00.000Z",
   "controller": "gapos-controller",
   "tasks": {
     "GAP-000": {
@@ -278,6 +278,23 @@
         }
       ],
       "notes": "The contract lives in shared-suite.ts and both implementations are held to it, so a test that passes for one and fails for the other is a bug in one of them rather than two suites drifting apart. A structural test also asserts both expose the same method names. createPool is exported from the database package so nothing outside it imports pg. Retrieval is still lexical in both implementations - full-text ranking in SQL, term overlap in memory - which is enough to prove the owner and gap boundaries; the vector index is tracked as GAP-018."
+    },
+    "GAP-019": {
+      "status": "done",
+      "completedAt": "2026-08-02T11:45:00.000Z",
+      "evidence": [
+        {
+          "command": "GAPOS_TEST_DATABASE_URL=... pnpm test",
+          "result": "pass",
+          "note": "337 tests, stable over three consecutive runs. The Postgres journey now asserts audio actually publishes: every day has more than one audio artefact, segment ordinals come back in playback order, and textOnly is false"
+        },
+        {
+          "command": "psql -c \"SELECT lesson_id, kind, count(*) FROM artefacts GROUP BY 1,2\"",
+          "result": "pass",
+          "note": "6-7 audio rows per lesson where previously exactly 1 persisted before the constraint rejected the rest"
+        }
+      ],
+      "notes": "Found by reading a GREEN CI run's Postgres server log. Migration 001 declared UNIQUE (lesson_id, kind, version) on artefacts, encoding the assumption that a lesson has one artefact per kind. True for a transcript, false for audio: a script is synthesised as several segments, all kind='audio' at version 1, so the second insert violated the constraint. The insert threw, the pipeline's audio fallback caught it and degraded the lesson to transcript-only, and the run still reported success \u2014 an audio-first product shipping without audio, with only a warning line. The in-memory store has no constraints, so the memory journey passed throughout. Fixed by forward-only migration 002 adding segment_ordinal and a segment-aware unique constraint; the shared contract suite now stores four audio segments for one lesson so memory and SQL are held to the same behaviour, and both journeys assert audio publishes rather than only that the compile succeeded."
     }
   },
   "blockers": []

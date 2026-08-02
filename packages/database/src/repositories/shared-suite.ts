@@ -246,6 +246,7 @@ export const describeRepositoryContract = (name: string, harness: SuiteHarness):
         mediaType: 'text/plain',
         checksum: 'abc',
         version: 1,
+        segmentOrdinal: 0,
         frozen: false,
       });
 
@@ -255,6 +256,74 @@ export const describeRepositoryContract = (name: string, harness: SuiteHarness):
       expect(await uow.curricula.listQuestions(BOB, 'lesson_1')).toEqual([]);
       expect(await uow.curricula.getQuestion(BOB, lessonPackage.questions[0]!.id)).toBeUndefined();
       expect(await uow.curricula.listArtefacts(BOB, 'lesson_1')).toEqual([]);
+    });
+
+    it('stores every audio segment of a lesson, in order', async () => {
+      // A lesson is synthesised as several segments, all kind='audio' at the same version. The
+      // original schema assumed one artefact per kind, which silently disabled audio on
+      // Postgres while memory accepted it — the exact divergence this shared suite exists for.
+      await seedGap(uow, ALICE, 'gap_alice');
+      const curriculum = await uow.curricula.create(ALICE, {
+        id: 'cur_1',
+        gapId: 'gap_alice',
+        version: 1,
+        durationDays: 1,
+        dailyMinutes: 35,
+        status: 'published',
+        plan: referencePlan('gap_alice'),
+      });
+      const lessonPackage = referenceLesson(1);
+      await uow.curricula.upsertLesson(ALICE, {
+        id: 'lesson_1',
+        curriculumId: curriculum.id,
+        day: 1,
+        ordinal: 0,
+        title: lessonPackage.title,
+        estimatedMinutes: lessonPackage.estimatedMinutes,
+        objectiveIds: lessonPackage.objectiveIds,
+        package: lessonPackage,
+        version: 1,
+        publicationStatus: 'published',
+      });
+
+      for (let segment = 0; segment < 4; segment++) {
+        await uow.curricula.addArtefact(ALICE, {
+          id: `audio_${segment}`,
+          lessonId: 'lesson_1',
+          kind: 'audio',
+          storageKey: `lesson_1/seg_${segment}`,
+          mediaType: 'audio/mpeg',
+          checksum: `checksum_${segment}`,
+          durationSeconds: 30,
+          version: 1,
+          segmentOrdinal: segment,
+          frozen: false,
+        });
+      }
+      await uow.curricula.addArtefact(ALICE, {
+        id: 'transcript_1',
+        lessonId: 'lesson_1',
+        kind: 'transcript',
+        storageKey: 'lesson_1/transcript',
+        mediaType: 'text/plain',
+        checksum: 'transcript',
+        version: 1,
+        segmentOrdinal: 0,
+        frozen: false,
+      });
+
+      const artefacts = await uow.curricula.listArtefacts(ALICE, 'lesson_1');
+      const audio = artefacts.filter((a) => a.kind === 'audio');
+
+      expect(audio).toHaveLength(4);
+      // Playback order matters: segments out of order are a scrambled lesson.
+      expect(audio.map((a) => a.segmentOrdinal)).toEqual([0, 1, 2, 3]);
+      expect(artefacts.filter((a) => a.kind === 'transcript')).toHaveLength(1);
+
+      await uow.curricula.freezeArtefacts(ALICE, 'lesson_1');
+      expect((await uow.curricula.listArtefacts(ALICE, 'lesson_1')).every((a) => a.frozen)).toBe(
+        true,
+      );
     });
 
     it('round-trips a curriculum plan and a lesson package unchanged', async () => {

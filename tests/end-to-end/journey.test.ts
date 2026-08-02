@@ -146,6 +146,8 @@ describe('the primary journey', () => {
     const artefacts = await context.uow.curricula.listArtefacts(LEARNER, dayOne.lessonId);
     const audio = artefacts.filter((a) => a.kind === 'audio');
     expect(audio.length).toBe(dayOne.audioSegments);
+    expect(audio.length).toBeGreaterThan(1);
+    expect(audio.map((a) => a.segmentOrdinal)).toEqual(audio.map((_, i) => i));
 
     // Playable: a signed URL is issued, and it expires.
     const url = await context.storage.signedUrl(LEARNER, audio[0]!.storageKey);

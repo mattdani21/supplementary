@@ -719,7 +719,7 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
         throw new Error(`Audio integrity check failed: ${failures.map((f) => f.code).join(', ')}`);
       }
 
-      for (const result of results) {
+      for (const [index, result] of results.entries()) {
         await deps.storage.put(
           owner,
           result.storageKey,
@@ -735,6 +735,7 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
           checksum: result.checksum,
           durationSeconds: result.durationSeconds,
           version: repairAttempts + 1,
+          segmentOrdinal: index,
           frozen: false,
         });
       }
@@ -758,6 +759,7 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
     mediaType: 'text/plain',
     checksum: shortChecksum(lesson.transcript),
     version: repairAttempts + 1,
+    segmentOrdinal: 0,
     frozen: false,
   });
 

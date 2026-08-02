@@ -280,7 +280,9 @@ export const createMemoryUnitOfWork = (store: MemoryStore = createMemoryStore())
       return store.artefacts.insert({ ...artefact, ownerId: owner });
     },
     async listArtefacts(owner, lessonId) {
-      return store.artefacts.where(owner, (a) => a.lessonId === lessonId);
+      return store.artefacts
+        .where(owner, (a) => a.lessonId === lessonId)
+        .sort((a, b) => a.kind.localeCompare(b.kind) || a.segmentOrdinal - b.segmentOrdinal);
     },
     async freezeArtefacts(owner, lessonId) {
       for (const artefact of store.artefacts.where(owner, (a) => a.lessonId === lessonId)) {
