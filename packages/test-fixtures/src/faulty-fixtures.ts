@@ -38,7 +38,8 @@ export const lessonWithInvalidDistractor = (): LessonPackage => {
     questions: [
       {
         ...first,
-        options: [...first.options.slice(0, 3), 'each element of A also belongs to B'],
+        // A reworded copy of the key: the item now has two correct options.
+        options: [...first.options.slice(0, 3), 'each element of A also is an element of B'],
       },
       ...rest,
     ],
