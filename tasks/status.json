@@ -314,15 +314,15 @@
       {
         "command": "pnpm verify",
         "result": "pass",
-        "note": "328 passed + 14 skipped (Postgres block and the live-provider pack, both skipping loudly with the missing variable named). Format, lint, typecheck and the full suite are green with the GAP-014b harness in place."
+        "note": "330 passed + 14 skipped (Postgres block and the live-provider pack, both skipping loudly with the missing variable named). Format, lint, typecheck and the full suite are green with the pipeline hardening in place."
       },
       {
-        "command": "GAPOS_PROVIDER_MODE=live GAPOS_LLM_API_KEY=... pnpm tsx scripts/record-eval-baselines.ts",
-        "result": "pending",
-        "note": "The recording run compiles the nine requiresLiveProvider fixtures through the real pipeline (live LLM + live Google TTS, fake STT standing in only because compile never transcribes), scores each against every floor, and writes tasks/evaluation-baselines.json. Blocked on the human approval gate: an API key and an agreed budget before any paid call (AGENTS.md §5)."
+        "command": "live rehearsal of stages A-D-E against deepseek-v4-flash (eval_02 profile)",
+        "result": "pass",
+        "note": "With the learner statement, daily minutes, normalisation and diagnostic rendered into each stage's instruction: normalisation returns a real topic ('Equivalence classes and partitions') with zero blocking ambiguities; the plan clears findPlanViolations with zero violations (6 objectives, 5 days); the Day 1 lesson ships the blueprint's 2 retrieval + 1 application items with an 819-word spoken script. The rehearsal exposed and fixed four pipeline defects the fakes could never show: (1) the learner statement was never passed to normalisation, (2) the planner had no learner brief or daily minutes, (3) the lesson generator had no blueprint/glossary/difficulty context, (4) exact-match prerequisite validation failed on trailing punctuation. Explicit temperatures were also set: 0 for the structured stages, 0.2 for lesson prose (the pipeline previously ran at the provider default of 1.0)."
       }
     ],
-    "notes": "Harness complete: apps/web context accepts an explicit providers assembly (never the factory's all-or-nothing refusal), tests/evaluation/live-provider.test.ts gates floors, baseline regression (compareToBaseline against tasks/evaluation-baselines.json), the eval_08 clarification requirement and the eval_07 injection-finding requirement; scripts/record-eval-baselines.ts writes the baselines; scripts/ is now included in the typecheck (the existing generate-specs.ts was clean). The nine-fixture live scoring run itself remains blocked on the human approval gate: DeepSeek API key + agreed budget."
+    "notes": "Harness complete and the pipeline now works live: apps/web context accepts an explicit providers assembly; tests/evaluation/live-provider.test.ts gates floors, baseline regression, the eval_08 clarification requirement and the eval_07 injection-finding requirement; scripts/record-eval-baselines.ts writes baselines. Pipeline fixes in this pass: stage inputs rendered into instructions (statement -> normalisation; normalisation -> diagnostic; brief + dailyMinutes -> planner; blueprint + glossary + difficulty -> lesson), verbatim-copy rule for external prerequisites, trailing-punctuation tolerance in findPlanViolations, and explicit per-stage temperatures. The nine-fixture live scoring run is relaunched; remaining work is the run itself."
   },
   "blockers": []
 }

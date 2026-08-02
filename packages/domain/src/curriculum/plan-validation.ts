@@ -99,6 +99,10 @@ const findCycle = (objectives: readonly PlanObjective[]): string[] | undefined =
   return undefined;
 };
 
+/** A prerequisite is the same prerequisite with or without trailing sentence punctuation. */
+export const normalisePrerequisite = (value: string): string =>
+  value.trim().replace(/[.!?。]+$/, '');
+
 /**
  * Collect every violation rather than failing on the first. A planner repair prompt that receives
  * all four problems at once fixes them in one attempt; one at a time costs four round trips
@@ -194,7 +198,9 @@ export const findPlanViolations = (
     });
   }
 
-  const satisfied = new Set(context.satisfiedExternalPrerequisites ?? []);
+  const satisfied = new Set(
+    (context.satisfiedExternalPrerequisites ?? []).map(normalisePrerequisite),
+  );
   for (const objective of plan.objectives) {
     for (const id of objective.prerequisiteObjectiveIds) {
       if (!objectiveIds.has(id)) {
@@ -206,7 +212,7 @@ export const findPlanViolations = (
       }
     }
     for (const external of objective.externalPrerequisites) {
-      if (!satisfied.has(external)) {
+      if (!satisfied.has(normalisePrerequisite(external))) {
         violations.push({
           code: 'prerequisite_unmet',
           message:
