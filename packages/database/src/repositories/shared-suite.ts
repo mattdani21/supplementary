@@ -225,21 +225,23 @@ export const describeRepositoryContract = (name: string, harness: SuiteHarness):
       await uow.sources.replaceChunks(ALICE, 'src_two', chunksFor('src_two'));
       await uow.sources.replaceChunks(BOB, 'src_bob', chunksFor('src_bob'));
 
-      // The query embeds to [1,0,0]; only src_one's equivalence chunk is near it. The query
+      // The query embeds to [1,0,0,…]; only src_one's equivalence chunk is near it. The query
       // text itself ('frogurt') shares no words with any chunk — meaning, not overlap, is what
-      // ranks it.
-      const queryVector = [1, 0, 0];
+      // ranks it. Vectors are 384-dimensional because the pgvector column is vector(384).
+      const vec = (index: number): number[] =>
+        Array.from({ length: 384 }, (_, d) => (d === index ? 1 : 0));
+      const queryVector = vec(0);
       await uow.sources.setChunkEmbeddings(ALICE, 'src_one', [
-        { chunkId: 'chunk_src_one_a', vector: [0, 1, 0] },
-        { chunkId: 'chunk_src_one_b', vector: [1, 0, 0] },
+        { chunkId: 'chunk_src_one_a', vector: vec(1) },
+        { chunkId: 'chunk_src_one_b', vector: vec(0) },
       ]);
       await uow.sources.setChunkEmbeddings(ALICE, 'src_two', [
-        { chunkId: 'chunk_src_two_a', vector: [0, 0, 1] },
-        { chunkId: 'chunk_src_two_b', vector: [0, 0, 1] },
+        { chunkId: 'chunk_src_two_a', vector: vec(383) },
+        { chunkId: 'chunk_src_two_b', vector: vec(383) },
       ]);
       await uow.sources.setChunkEmbeddings(BOB, 'src_bob', [
-        { chunkId: 'chunk_src_bob_a', vector: [1, 0, 0] },
-        { chunkId: 'chunk_src_bob_b', vector: [1, 0, 0] },
+        { chunkId: 'chunk_src_bob_a', vector: vec(0) },
+        { chunkId: 'chunk_src_bob_b', vector: vec(0) },
       ]);
 
       const hits = await uow.sources.searchChunks(ALICE, 'gap_one', 'frogurt', 5, queryVector);
