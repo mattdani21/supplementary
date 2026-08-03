@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-03T15:29:52.000Z",
+  "updatedAt": "2026-08-03T15:31:49.000Z",
   "controller": "gapos-controller",
   "tasks": {
     "GAP-000": {
@@ -445,8 +445,21 @@
       ]
     },
     "GAP-028": {
-      "status": "ready",
-      "notes": "Defined in the next-loop plan; awaiting execution."
+      "status": "done",
+      "notes": "Voice gap capture (E16). POST /api/gaps/voice accepts raw audio bytes, transcribes through the provider STT (fake scriptable in tests, live via GAP-023), and returns an editable draft: the full transcript plus a suggested title with common lead-ins (I want to be able to\u2026) stripped. The VoiceCapture component records with MediaRecorder, posts the blob, and shows a confirm form that creates the real gap through the ordinary endpoint. Tests cover the draft shape and the confirm->create flow.",
+      "completedAt": "2026-08-03T15:31:49.000Z",
+      "evidence": [
+        {
+          "command": "pnpm test apps/web/src/server/api.test.ts",
+          "result": "pass",
+          "note": "Voice gap capture (E16). POST /api/gaps/voice accepts raw audio bytes (audio/webm) in the body, transcribes via the provider STT, and returns an editable draft gap; POST /api/gaps creates the real gap from the draft. The capture component records with MediaRecorder, sends the blob, and hands the transcript to a confirm form. With the fake STT scripted, a recorded blob becomes a draft whose text matches. Route handlers + capture UI + tests."
+        },
+        {
+          "command": "pnpm test apps/web/src/server/api.test.ts",
+          "result": "pass",
+          "note": "Voice gap capture (E16). POST /api/gaps/voice accepts raw audio bytes, transcribes through the provider STT (fake scriptable in tests, live via GAP-023), and returns an editable draft: the full transcript plus a suggested title with common lead-ins (I want to be able to\u2026) stripped. The VoiceCapture component records with MediaRecorder, posts the blob, and shows a confirm form that creates the real gap through the ordinary endpoint. Tests cover the draft shape and the confirm->create flow."
+        }
+      ]
     },
     "GAP-029": {
       "status": "ready",

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import type { Gap } from '@gapos/database';
 import { GapForm } from '../../components/gap-form';
 import { OwnerSwitcher } from '../../components/owner-switcher';
+import { VoiceCapture } from '../../components/voice-capture';
 import { listGaps } from '../../server/api';
 import { getServerContext } from '../../server/bootstrap';
 import { viewerOwner } from '../../lib/viewer';
@@ -38,6 +39,7 @@ export default async function GapsPage() {
       )}
 
       <GapForm />
+      <VoiceCapture />
     </main>
   );
 }

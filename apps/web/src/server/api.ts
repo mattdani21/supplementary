@@ -309,6 +309,42 @@ export const masteryView = async (
   mastery: await assessMastery(context, owner, gapId),
 });
 
+/**
+ * Voice gap capture (E16): transcribe raw audio and return an editable draft. The transcript
+ * becomes the gap's rawStatement; the suggested title is the first words. The learner edits
+ * both in the UI and creates the real gap through the ordinary endpoint.
+ */
+export const voiceGapDraft = async (
+  context: ServerContext,
+  owner: OwnerId,
+  audio: Uint8Array,
+  mediaType: string,
+): Promise<{ transcript: string; suggestedTitle: string }> => {
+  const response = await context.providers.speechToText.transcribe({
+    audio,
+    mediaType,
+    locale: 'en',
+    runId: `voice-${context.newId('run')}`,
+    userId: owner,
+  });
+  const text = response.text.trim();
+  // A dictation usually starts with "I want to be able to …"; that is not a title.
+  const LEAD_INS = [
+    'i want to be able to',
+    'i want to learn',
+    'i would like to',
+    'i need to',
+    'i want to',
+  ] as const;
+  const lower = text.toLowerCase();
+  const lead = LEAD_INS.find((candidate) => lower.startsWith(candidate));
+  const words = (lead ? text.slice(lead.length) : text).trim().split(/\s+/).filter(Boolean);
+  return {
+    transcript: text,
+    suggestedTitle: words.slice(0, 6).join(' '),
+  };
+};
+
 export interface KnowledgeNode {
   readonly id: string;
   readonly kind: 'gap' | 'capability';
@@ -361,7 +397,11 @@ export const knowledgeMap = async (
     ] as const) {
       if (!nodes.has(id)) nodes.set(id, { id, kind: 'capability', label });
     }
-    edges.push({ from: edge.fromCapability, to: edge.toCapability, relationship: edge.relationship });
+    edges.push({
+      from: edge.fromCapability,
+      to: edge.toCapability,
+      relationship: edge.relationship,
+    });
   }
 
   return { nodes: [...nodes.values()], edges };

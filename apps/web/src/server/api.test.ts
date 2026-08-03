@@ -11,6 +11,15 @@
 import { describe, expect, it } from 'vitest';
 import { ZodError } from 'zod';
 import { REFERENCE_GAP_STATEMENT, SET_THEORY_SOURCE } from '@gapos/test-fixtures';
+import { CostAccountant, createLogger, createMetrics } from '@gapos/observability';
+import {
+  createEmbeddings,
+  createFakeEmbeddings,
+  createFakeLanguageModel,
+  createFakeSpeechToText,
+  createFakeTextToSpeech,
+  createLanguageModel,
+} from '@gapos/provider-adapters';
 import type { Gap, Source, SourceChunk } from '@gapos/database';
 import { createServerContext, type ServerContext } from './context.js';
 import {
@@ -32,6 +41,7 @@ import {
   toHttpError,
   todayView,
   transitionGap,
+  voiceGapDraft,
 } from './api.js';
 
 const OWNER = 'api_user_1';
@@ -216,6 +226,45 @@ describe('health', () => {
   it('reports ok', async () => {
     const { context } = buildContext();
     expect((await apiHealth(context)).ok).toBe(true);
+  });
+});
+
+describe('voice gap capture (E16)', () => {
+  it('transcribes audio into an editable draft with a suggested title', async () => {
+    const costAccountant = new CostAccountant();
+    const metrics = createMetrics();
+    const logger = createLogger({}, { level: 'error' });
+    const context = createServerContext({
+      providers: {
+        mode: 'fake',
+        languageModel: createLanguageModel(createFakeLanguageModel(), {
+          costAccountant,
+          metrics,
+          logger,
+        }),
+        speechToText: createFakeSpeechToText({
+          transcript: 'I want to be able to read Korean news articles by March',
+        }),
+        textToSpeech: createFakeTextToSpeech(),
+        embeddings: createEmbeddings(createFakeEmbeddings(), { costAccountant, metrics, logger }),
+      },
+    });
+
+    const draft = await voiceGapDraft(context, OWNER, new Uint8Array([1, 2, 3]), 'audio/webm');
+    expect(draft.transcript).toContain('Korean news articles');
+    expect(draft.suggestedTitle).toContain('read Korean news articles');
+  });
+
+  it('creates the real gap from the confirmed draft', async () => {
+    const { context } = buildContext();
+    await seedUser(context);
+    const created = (await createGap(context, OWNER, {
+      title: 'read Korean news articles',
+      rawStatement: 'I want to be able to read Korean news articles by March',
+      dailyMinutes: 30,
+    })) as { gap: Gap };
+    expect(created.gap.status).toBe('draft');
+    expect(created.gap.rawStatement).toContain('Korean news articles');
   });
 });
 
