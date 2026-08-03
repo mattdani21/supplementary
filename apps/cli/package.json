@@ -1,0 +1,19 @@
+{
+  "name": "@gapos/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/main.ts"
+  },
+  "bin": {
+    "gapos": "src/main.ts"
+  },
+  "dependencies": {
+    "@gapos/database": "workspace:*",
+    "@gapos/domain": "workspace:*",
+    "@gapos/observability": "workspace:*",
+    "@gapos/provider-adapters": "workspace:*",
+    "@gapos/test-fixtures": "workspace:*"
+  }
+}

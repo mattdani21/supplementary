@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-03T15:37:02.000Z",
+  "updatedAt": "2026-08-03T15:38:36.000Z",
   "controller": "gapos-controller",
   "tasks": {
     "GAP-000": {
@@ -425,8 +425,16 @@
       ]
     },
     "GAP-025": {
-      "status": "ready",
-      "notes": "Defined in the next-loop plan; awaiting execution."
+      "status": "done",
+      "notes": "The command-line study client. apps/cli exposes : gap new (flags or prompts), gap list/show, source add (--file or --text), compile, plan, study (interactive answer loop with graded feedback), mastery. Commands are plain functions over the service layer with injectable IO; main.ts builds the context from env (Postgres or in-memory with a loud warning) and dispatches. The acceptance is proven in-process: a scripted session (gap new -> source add -> compile -> plan -> study -> mastery) runs end to end without a server or database.",
+      "completedAt": "2026-08-03T15:38:36.000Z",
+      "evidence": [
+        {
+          "command": "pnpm test apps/cli/src/cli.test.ts",
+          "result": "pass",
+          "note": "The command-line study client. apps/cli exposes : gap new (flags or prompts), gap list/show, source add (--file or --text), compile, plan, study (interactive answer loop with graded feedback), mastery. Commands are plain functions over the service layer with injectable IO; main.ts builds the context from env (Postgres or in-memory with a loud warning) and dispatches. The acceptance is proven in-process: a scripted session (gap new -> source add -> compile -> plan -> study -> mastery) runs end to end without a server or database."
+        }
+      ]
     },
     "GAP-026": {
       "status": "ready",

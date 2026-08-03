@@ -33,6 +33,24 @@ importers:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@22.20.1)(tsx@4.23.1)
 
+  apps/cli:
+    dependencies:
+      '@gapos/database':
+        specifier: workspace:*
+        version: link:../../packages/database
+      '@gapos/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@gapos/observability':
+        specifier: workspace:*
+        version: link:../../packages/observability
+      '@gapos/provider-adapters':
+        specifier: workspace:*
+        version: link:../../packages/provider-adapters
+      '@gapos/test-fixtures':
+        specifier: workspace:*
+        version: link:../../packages/test-fixtures
+
   apps/web:
     dependencies:
       '@gapos/ai-contracts':
