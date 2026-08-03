@@ -47,7 +47,7 @@ export const createLiveSpeechToText = (options: LiveSpeechToTextOptions): Speech
       form.append('model', options.model);
       form.append(
         'file',
-        new Blob([request.audio as BlobPart], { type: request.mediaType }),
+        new Blob([new Uint8Array(request.audio)], { type: request.mediaType }),
         'capture.webm',
       );
 

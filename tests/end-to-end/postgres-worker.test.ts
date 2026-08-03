@@ -20,6 +20,7 @@ import {
   type OwnerId,
 } from '@gapos/database';
 import { createServerContext, type ServerContext } from '../../apps/web/src/server/context.js';
+import { bootstrapDaemon } from '../../apps/worker/src/daemon.js';
 import { enqueueCompile } from '../../apps/worker/src/queue/enqueue.js';
 import { createCompileWorker } from '../../apps/worker/src/queue/worker.js';
 import { PIPELINE_VERSION } from '../../apps/worker/src/pipeline/compile.js';
@@ -181,6 +182,35 @@ describeIfPostgres('the durable worker on Postgres (GAP-015)', () => {
     expect(await context.queue.get(OTHER, job.id)).toBeUndefined();
     expect(await context.queue.complete(OTHER, job.id)).toBeUndefined();
     expect(await context.queue.get(LEARNER, job.id)).toMatchObject({ state: 'leased' });
+  });
+
+  it('boots the daemon against Postgres (GAP-020)', async () => {
+    // The daemon's Postgres bootstrap path: pool + migrate + Postgres queue, all wired by env.
+    const bundle = await bootstrapDaemon({
+      GAPOS_DATABASE_URL: databaseUrl,
+      GAPOS_PROVIDER_MODE: 'fake',
+      GAPOS_QUEUE_POLL_INTERVAL_MS: '1000',
+      GAPOS_LOG_LEVEL: 'error',
+    });
+    try {
+      const gap = await seedGap();
+      const job = await bundle.context.queue.enqueue(
+        LEARNER,
+        {
+          id: 'pg-daemon-job-1',
+          kind: 'compile',
+          payload: { gapId: gap.id, idempotencyKey: 'pg-daemon-1' },
+          maxAttempts: 1,
+        },
+        bundle.context.now(),
+      );
+      expect(job).toBeDefined();
+      expect(bundle.context.uow).toBeDefined();
+      expect(bundle.worker.start).toBeTypeOf('function');
+    } finally {
+      await bundle.worker.stop();
+      await bundle.close();
+    }
   });
 });
 

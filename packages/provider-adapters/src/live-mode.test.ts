@@ -72,7 +72,10 @@ describe('live speech-to-text backend', () => {
       endpoint: 'https://stt.example/v1',
       apiKey: 'key-123',
       model: 'whisper-1',
-      fetchImpl: scriptedFetch(async () => ({ status: 402, body: { error: 'insufficient funds' } })),
+      fetchImpl: scriptedFetch(async () => ({
+        status: 402,
+        body: { error: 'insufficient funds' },
+      })),
     });
 
     await expect(
