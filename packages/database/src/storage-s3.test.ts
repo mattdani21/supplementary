@@ -52,7 +52,11 @@ const recomputeSignature = (
   amzDate: string,
 ): string => {
   const credential = query.get('X-Amz-Credential') ?? '';
-  const [, dateStamp, region, service, terminator] = credential.split('/');
+  const parts = credential.split('/');
+  const dateStamp = parts[1]!;
+  const region = parts[2]!;
+  const service = parts[3]!;
+  const terminator = parts[4]!;
   const canonicalQuery = [...query.entries()]
     .filter(([key]) => key !== 'X-Amz-Signature')
     .map(([key, value]) => `${enc(key)}=${enc(value)}`)
@@ -241,6 +245,8 @@ describe('the S3 object store (GAP-006)', () => {
     await store.put('user_a', 'gap_1/seg_0', bytes, 'audio/mpeg');
 
     const signed = await store.signedUrl('user_a', 'gap_1/seg_0', 60);
+    expect(signed).toBeDefined();
+    if (!signed) throw new Error('expected a signed URL for an owned object');
     expect(signed.expiresAt.getTime()).toBe(now.getTime() + 60_000);
     expect(signed.url).toContain('X-Amz-Signature=');
 
@@ -254,7 +260,7 @@ describe('the S3 object store (GAP-006)', () => {
     // Expiry is enforced by the mock's independent recomputation, not just by the client:
     // once the clock passes the URL's expiry, the same URL is refused.
     now = new Date(signed.expiresAt.getTime() + 1000);
-    expect((await fetch(signed!.url)).status).toBe(403);
+    expect((await fetch(signed.url)).status).toBe(403);
   });
   it('deletes an object, and deletes everything an owner owns', async () => {
     await store.put('user_a', 'gap_1/a.md', bytesOfText('a'), 'text/plain');

@@ -200,7 +200,7 @@ export const compileGap = async (
     /* --------------------------------------------- stage B: ingest and ground sources */
     await advance('ingesting');
     await ingestSources({ owner, gapId: gap.id, step, deps });
-    const evidence = await gatherEvidence(owner, gap.id, gap.rawStatement, deps);
+    const evidence = await gatherEvidence(owner, gap.id, gap.rawStatement, step, deps);
 
     // Instruction-like text inside a source is reported, never followed (docs/SECURITY.md).
     //
@@ -560,6 +560,35 @@ const ingestSources = async (params: {
         return { chunks: chunks.length, cached: false };
       },
     );
+
+    // Embed the source's chunks for vector retrieval (GAP-018). A deployment without an
+    // embedding capability records no vectors and retrieval stays lexical; with one, the
+    // vectors are stored per chunk and the query later ranks by cosine distance.
+    const chunks = await deps.uow.sources.listChunks(owner, source.id);
+    if (chunks.length > 0) {
+      await runStep(
+        step,
+        { step: 'embed_chunk', subject: source.id, inputVersion: source.checksum },
+        async () => {
+          const result = await deps.providers.embeddings.embed({
+            texts: chunks.map((chunk) => chunk.text),
+            runId: step.runId,
+            userId: owner,
+          });
+          if (result) {
+            await deps.uow.sources.setChunkEmbeddings(
+              owner,
+              source.id,
+              chunks.map((chunk, index) => ({
+                chunkId: chunk.id,
+                vector: result.vectors[index]!,
+              })),
+            );
+          }
+          return { embedded: result ? result.vectors.length : 0 };
+        },
+      );
+    }
   });
 };
 
@@ -1022,9 +1051,27 @@ const gatherEvidence = async (
   owner: OwnerId,
   gapId: string,
   query: string,
+  step: StepContext,
   deps: CompileDeps,
 ): Promise<EvidenceItem[]> => {
-  const chunks = await deps.uow.sources.searchChunks(owner, gapId, query, 12);
+  // Embed the query once per run (GAP-018); the step records the vector so a resumed run
+  // reuses it instead of re-charging. A deployment without embeddings records { embedded:
+  // false } and retrieval stays lexical.
+  const embedding = await runStep(
+    step,
+    { step: 'embed_query', inputVersion: hash(query) },
+    async () => {
+      const result = await deps.providers.embeddings.embed({
+        texts: [query],
+        runId: step.runId,
+        userId: owner,
+      });
+      return result ? { vector: result.vectors[0]! } : { embedded: false as const };
+    },
+  );
+  const vector = embedding.embedded === false ? undefined : embedding.vector;
+
+  const chunks = await deps.uow.sources.searchChunks(owner, gapId, query, 12, vector);
   return chunks.map((chunk) => ({
     sourceId: chunk.sourceId,
     chunkId: chunk.id,

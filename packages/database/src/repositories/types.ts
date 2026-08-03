@@ -58,6 +58,8 @@ export interface SourceChunk {
   readonly locator: string;
   readonly extractionConfidence: number;
   readonly tokenEstimate: number;
+  /** Vector embedding (GAP-018). Absent when the deployment has no embedding capability. */
+  readonly embedding?: readonly number[];
 }
 
 export interface Curriculum {
@@ -252,12 +254,23 @@ export interface SourceRepository {
     chunks: Omit<SourceChunk, 'ownerId'>[],
   ): Promise<void>;
   listChunks(owner: OwnerId, sourceId: string): Promise<SourceChunk[]>;
-  /** Retrieval, always scoped to the owner and to the gap's own sources. */
+  /** Store the embeddings a provider produced for a source's chunks (GAP-018). */
+  setChunkEmbeddings(
+    owner: OwnerId,
+    sourceId: string,
+    vectors: readonly { chunkId: string; vector: readonly number[] }[],
+  ): Promise<void>;
+  /**
+   * Retrieval, always scoped to the owner and to the gap's own sources. When `embedding` (the
+   * query's embedding) is supplied and chunks carry embeddings, ranking is by cosine distance;
+   * otherwise it falls back to lexical overlap. Both implementations share this contract.
+   */
   searchChunks(
     owner: OwnerId,
     gapId: string,
     query: string,
     limit?: number,
+    embedding?: readonly number[],
   ): Promise<SourceChunk[]>;
 }
 

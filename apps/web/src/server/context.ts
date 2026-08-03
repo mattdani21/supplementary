@@ -25,6 +25,7 @@ import {
 } from '@gapos/observability';
 import {
   createProviders,
+  type FakeEmbeddingsOptions,
   type FakeLanguageModelOptions,
   type Providers,
 } from '@gapos/provider-adapters';
@@ -46,6 +47,8 @@ export interface ContextOptions {
   readonly newId?: (prefix: string) => string;
   readonly budget?: Budget;
   readonly fake?: FakeLanguageModelOptions;
+  /** Scripted vectors for the fake embeddings backend (GAP-018); unset stays lexical. */
+  readonly fakeEmbeddings?: FakeEmbeddingsOptions;
   readonly logLevel?: 'debug' | 'info' | 'warn' | 'error';
   /**
    * Providers. Defaults to the deterministic fakes via the all-or-nothing factory.
@@ -84,6 +87,7 @@ export const createServerContext = (options: ContextOptions = {}): ServerContext
         metrics,
         logger,
         ...(options.fake ? { fake: options.fake } : {}),
+        ...(options.fakeEmbeddings ? { fakeEmbeddings: options.fakeEmbeddings } : {}),
       }),
     metrics,
     costAccountant,

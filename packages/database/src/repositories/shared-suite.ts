@@ -193,6 +193,65 @@ export const describeRepositoryContract = (name: string, harness: SuiteHarness):
       expect(hits.map((c) => c.sourceId)).toEqual(['src_one']);
     });
 
+    it('retrieves by meaning when embeddings are present, staying inside owner and gap', async () => {
+      await seedGap(uow, ALICE, 'gap_one');
+      await seedGap(uow, ALICE, 'gap_two');
+      await seedGap(uow, BOB, 'gap_bob');
+      await seedSource(uow, ALICE, 'gap_one', 'src_one');
+      await seedSource(uow, ALICE, 'gap_two', 'src_two');
+      await seedSource(uow, BOB, 'gap_bob', 'src_bob');
+
+      const chunksFor = (sourceId: string) => [
+        {
+          id: `chunk_${sourceId}_a`,
+          sourceId,
+          ordinal: 0,
+          text: 'Linear algebra over finite fields.',
+          locator: '§1',
+          extractionConfidence: 1,
+          tokenEstimate: 10,
+        },
+        {
+          id: `chunk_${sourceId}_b`,
+          sourceId,
+          ordinal: 1,
+          text: 'An equivalence relation partitions the underlying set.',
+          locator: '§6',
+          extractionConfidence: 1,
+          tokenEstimate: 10,
+        },
+      ];
+      await uow.sources.replaceChunks(ALICE, 'src_one', chunksFor('src_one'));
+      await uow.sources.replaceChunks(ALICE, 'src_two', chunksFor('src_two'));
+      await uow.sources.replaceChunks(BOB, 'src_bob', chunksFor('src_bob'));
+
+      // The query embeds to [1,0,0]; only src_one's equivalence chunk is near it. The query
+      // text itself ('frogurt') shares no words with any chunk — meaning, not overlap, is what
+      // ranks it.
+      const queryVector = [1, 0, 0];
+      await uow.sources.setChunkEmbeddings(ALICE, 'src_one', [
+        { chunkId: 'chunk_src_one_a', vector: [0, 1, 0] },
+        { chunkId: 'chunk_src_one_b', vector: [1, 0, 0] },
+      ]);
+      await uow.sources.setChunkEmbeddings(ALICE, 'src_two', [
+        { chunkId: 'chunk_src_two_a', vector: [0, 0, 1] },
+        { chunkId: 'chunk_src_two_b', vector: [0, 0, 1] },
+      ]);
+      await uow.sources.setChunkEmbeddings(BOB, 'src_bob', [
+        { chunkId: 'chunk_src_bob_a', vector: [1, 0, 0] },
+        { chunkId: 'chunk_src_bob_b', vector: [1, 0, 0] },
+      ]);
+
+      const hits = await uow.sources.searchChunks(ALICE, 'gap_one', 'frogurt', 5, queryVector);
+      expect(hits.map((c) => c.id)).toEqual(['chunk_src_one_b']);
+
+      // The vector path is bounded by owner and gap exactly like the lexical one.
+      expect(
+        await uow.sources.searchChunks(BOB, 'gap_bob', 'frogurt', 5, queryVector),
+      ).toHaveLength(2);
+      expect(await uow.sources.searchChunks(BOB, 'gap_one', 'frogurt', 5, queryVector)).toEqual([]);
+    });
+
     it('finds a previously uploaded source by checksum, per owner', async () => {
       await seedGap(uow, ALICE, 'gap_alice');
       await seedGap(uow, BOB, 'gap_bob');

@@ -6,6 +6,8 @@
  */
 
 import type { CostAccountant, Logger, Metrics } from '@gapos/observability';
+import { createEmbeddings } from './embeddings.js';
+import { createFakeEmbeddings, type FakeEmbeddingsOptions } from './fake/embeddings.js';
 import { createFakeLanguageModel, type FakeLanguageModelOptions } from './fake/language-model.js';
 import { createFakeSpeechToText, createFakeTextToSpeech } from './fake/speech.js';
 import { createLanguageModel } from './language-model.js';
@@ -17,6 +19,7 @@ export interface ProviderFactoryOptions {
   readonly metrics: Metrics;
   readonly logger: Logger;
   readonly fake?: FakeLanguageModelOptions;
+  readonly fakeEmbeddings?: FakeEmbeddingsOptions;
 }
 
 export const resolveProviderMode = (
@@ -57,5 +60,10 @@ export const createProviders = (options: ProviderFactoryOptions): Providers => {
     }),
     speechToText: createFakeSpeechToText(),
     textToSpeech: createFakeTextToSpeech(),
+    embeddings: createEmbeddings(createFakeEmbeddings(options.fakeEmbeddings), {
+      costAccountant: options.costAccountant,
+      metrics: options.metrics,
+      logger: options.logger,
+    }),
   };
 };

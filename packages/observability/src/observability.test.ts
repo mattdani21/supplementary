@@ -154,6 +154,7 @@ describe('cost accounting', () => {
       teaching: 12000,
       verification: 8000,
       speech: 0,
+      retrieval: 0,
     });
   });
 

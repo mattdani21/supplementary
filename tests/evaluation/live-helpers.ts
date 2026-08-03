@@ -17,6 +17,8 @@ import {
   type Budget,
 } from '@gapos/observability';
 import {
+  createEmbeddings,
+  createFakeEmbeddings,
   createFakeSpeechToText,
   createGoogleTranslateTtsEngine,
   createLanguageModel,
@@ -64,6 +66,9 @@ export const createLiveEvalProviders = (): Providers => {
     }),
     speechToText: createFakeSpeechToText(),
     textToSpeech: createLiveTextToSpeech({ engine: createGoogleTranslateTtsEngine() }),
+    // The live eval pack does not depend on vector retrieval; fake embeddings keep it lexical
+    // so the nine fixtures score the same way they did when their baselines were recorded.
+    embeddings: createEmbeddings(createFakeEmbeddings(), { costAccountant, metrics, logger }),
   };
 };
 

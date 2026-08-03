@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-03T14:18:59.000Z",
+  "updatedAt": "2026-08-03T14:27:54.000Z",
   "controller": "gapos-controller",
   "tasks": {
     "GAP-000": {
@@ -334,6 +334,28 @@
           "command": "pnpm test tests/end-to-end/capability-reuse.test.ts",
           "result": "pass",
           "note": "5 tests. A strict provider (normalisation assumes nothing, diagnostic demonstrates nothing) makes the reference plan's 'set-builder notation' prerequisite only satisfiable via prior mastery: refused without it; satisfied by a fresh filled capability; refused again once 195 days of decay pass, with the decayed capability visible in the diagnostic instruction; per-learner scoping holds."
+        }
+      ]
+    },
+    "GAP-018": {
+      "status": "done",
+      "completedAt": "2026-08-03T14:27:54.000Z",
+      "notes": "Vector retrieval replaces lexical-only chunk search. Migration 004 adds a pgvector embedding column (vector(384), HNSW index); searchChunks takes an optional query embedding and ranks by cosine (pgvector <=> on SQL, cosineSimilarity on memory), falling back to full-text/term retrieval when the deployment has no embedding capability. New guarded Embeddings adapter in provider-adapters (budget check before the call, usage recorded, undefined = no capability), a scripted deterministic fake, and a live OpenAI-compatible backend. The pipeline embeds each source's chunks (embed_chunk step) and the query (embed_query step, keyed so a resumed run reuses the vector instead of re-charging) and passes the vector to retrieval. The e2e proves a chunk that shares no words with the learner's statement is retrieved when its embedding is nearest, and that the default (no capability) stays lexical.",
+      "evidence": [
+        {
+          "command": "pnpm test packages/database/src/repositories/ownership.test.ts",
+          "result": "pass",
+          "note": "Shared contract suite (memory + Postgres in CI) gained the vector-retrieval test: a query embedding ranks the semantically nearest chunk over chunks the query shares no words with, bounded by owner and gap exactly like lexical retrieval; setChunkEmbeddings is owner-scoped."
+        },
+        {
+          "command": "pnpm test tests/end-to-end/embedding-retrieval.test.ts",
+          "result": "pass",
+          "note": "2 tests: with a scripted embedding capability, a real compile embeds chunks + query, records embed_chunk/embed_query steps, and retrieval returns the target chunk by meaning alone; without the capability, no vectors are stored and retrieval stays lexical (the primary journey's behaviour is unchanged)."
+        },
+        {
+          "command": "pnpm verify",
+          "result": "pass",
+          "note": "360 passed + 20 loud skips. Full gate green with the vector path in place."
         }
       ]
     }

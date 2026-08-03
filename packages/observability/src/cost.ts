@@ -13,7 +13,8 @@ export type Millicents = number;
 export const centsToMillicents = (cents: number): Millicents => Math.round(cents * 1000);
 export const millicentsToCents = (millicents: Millicents): number => millicents / 1000;
 
-export type CallPurpose = 'classification' | 'planning' | 'teaching' | 'verification' | 'speech';
+export type CallPurpose =
+  'classification' | 'planning' | 'teaching' | 'verification' | 'speech' | 'retrieval';
 
 export interface UsageRecord {
   readonly runId: string;
@@ -124,6 +125,7 @@ export class CostAccountant {
       teaching: 0,
       verification: 0,
       speech: 0,
+      retrieval: 0,
     };
     for (const record of this.usageForRun(runId)) {
       totals[record.purpose] += record.costMillicents;

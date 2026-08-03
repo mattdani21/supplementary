@@ -126,6 +126,15 @@ const toChunk = (row: any): SourceChunk => ({
   locator: row.locator,
   extractionConfidence: Number(row.extraction_confidence),
   tokenEstimate: row.token_estimate,
+  // pgvector returns a string like '[0.1,0.2,...]' (or a Buffer in some drivers).
+  ...(row.embedding
+    ? {
+        embedding: (typeof row.embedding === 'string' ? row.embedding : String(row.embedding))
+          .replace(/^\[|\]$/g, '')
+          .split(',')
+          .map((n: string) => Number(n)),
+      }
+    : {}),
 });
 
 const toCurriculum = (row: any): Curriculum => ({
@@ -509,10 +518,35 @@ export const createPostgresUnitOfWork = (pool: Pool): UnitOfWork => {
       return rows.map(toChunk);
     },
 
-    async searchChunks(owner, gapId, query, limit = 8) {
-      // Full-text ranking stands in for the vector index until GAP-018. What matters here and
-      // is identical in both implementations: the join to `sources` bounds the result by owner
+    async setChunkEmbeddings(owner, sourceId, vectors) {
+      for (const { chunkId, vector } of vectors) {
+        await db.query(
+          `UPDATE source_chunks
+              SET embedding = $3::vector
+            WHERE id = $1 AND owner_id = $2 AND source_id = $4`,
+          [chunkId, owner, `[${vector.join(',')}]`, sourceId],
+        );
+      }
+    },
+
+    async searchChunks(owner, gapId, query, limit = 8, embedding) {
+      // With a query embedding, rank by pgvector cosine distance (GAP-018); without one, fall
+      // back to full-text ranking. Either way the join to `sources` bounds the result by owner
       // AND by gap, so a learner's second gap cannot pull chunks from their first.
+      if (embedding !== undefined) {
+        const { rows } = await db.query(
+          `SELECT c.*
+             FROM source_chunks c
+             JOIN sources s ON s.id = c.source_id AND s.owner_id = c.owner_id
+            WHERE c.owner_id = $1
+              AND s.gap_id = $2
+              AND c.embedding IS NOT NULL
+            ORDER BY c.embedding <=> $3::vector, c.ordinal ASC
+            LIMIT $4`,
+          [owner, gapId, `[${embedding.join(',')}]`, limit],
+        );
+        return rows.map(toChunk);
+      }
       const { rows } = await db.query(
         `SELECT c.*
            FROM source_chunks c
