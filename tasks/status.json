@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-03T15:28:02.000Z",
+  "updatedAt": "2026-08-03T15:29:52.000Z",
   "controller": "gapos-controller",
   "tasks": {
     "GAP-000": {
@@ -433,8 +433,16 @@
       "notes": "Defined in the next-loop plan; awaiting execution."
     },
     "GAP-027": {
-      "status": "ready",
-      "notes": "Defined in the next-loop plan; awaiting execution."
+      "status": "done",
+      "notes": "The knowledge map (E15). knowledgeMap handler builds nodes (the gap + every capability its curriculum teaches + their prerequisites + knowledge-graph edges) and edges (teaches / prerequisite_of / extends / related), owner-scoped. A /gaps/[gapId]/map page renders it as a deterministic BFS-ring SVG with no new dependencies; gap nodes are links, capability nodes carry tooltips. API tests cover the map contents and owner isolation; next build compiles the page.",
+      "completedAt": "2026-08-03T15:29:52.000Z",
+      "evidence": [
+        {
+          "command": "pnpm test apps/web/src/server/api.test.ts",
+          "result": "pass",
+          "note": "The knowledge map (E15). knowledgeMap handler builds nodes (the gap + every capability its curriculum teaches + their prerequisites + knowledge-graph edges) and edges (teaches / prerequisite_of / extends / related), owner-scoped. A /gaps/[gapId]/map page renders it as a deterministic BFS-ring SVG with no new dependencies; gap nodes are links, capability nodes carry tooltips. API tests cover the map contents and owner isolation; next build compiles the page."
+        }
+      ]
     },
     "GAP-028": {
       "status": "ready",

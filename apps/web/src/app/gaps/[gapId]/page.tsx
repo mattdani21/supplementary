@@ -64,7 +64,8 @@ export default async function GapDetailPage({ params }: { params: Promise<{ gapI
       {!today.lesson && gap.status === 'active' && <p className="muted">No lesson due today.</p>}
 
       <p>
-        <Link href={`/gaps/${gapId}/mastery`}>Mastery</Link>
+        <Link href={`/gaps/${gapId}/mastery`}>Mastery</Link> ·{' '}
+        <Link href={`/gaps/${gapId}/map`}>Knowledge map</Link>
       </p>
 
       <h2>Sources</h2>

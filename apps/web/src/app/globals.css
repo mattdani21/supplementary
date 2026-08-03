@@ -135,3 +135,11 @@ h2 {
 .owner input {
   width: 12rem;
 }
+
+.map {
+  width: 100%;
+  height: auto;
+  background: #0b1220;
+  border: 1px solid #334155;
+  border-radius: 12px;
+}

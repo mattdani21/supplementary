@@ -22,6 +22,7 @@ import {
   getCurriculum,
   getGap,
   getLesson,
+  knowledgeMap,
   listGaps,
   listSources,
   masteryView,
@@ -215,5 +216,27 @@ describe('health', () => {
   it('reports ok', async () => {
     const { context } = buildContext();
     expect((await apiHealth(context)).ok).toBe(true);
+  });
+});
+
+describe('the knowledge map (E15)', () => {
+  it('shows the gap, its taught capabilities and their prerequisites', async () => {
+    const { context } = buildContext();
+    const gapId = await seedCompiledGap(context);
+
+    const map = (await knowledgeMap(context, OWNER, gapId)) as {
+      nodes: { id: string; kind: string }[];
+      edges: { from: string; to: string; relationship: string }[];
+    };
+
+    expect(map.nodes.some((n) => n.id === gapId && n.kind === 'gap')).toBe(true);
+    expect(map.nodes.filter((n) => n.kind === 'capability').length).toBeGreaterThan(0);
+    expect(map.edges.some((e) => e.from === gapId && e.relationship === 'teaches')).toBe(true);
+  });
+
+  it('stays inside the owner', async () => {
+    const { context } = buildContext();
+    const gapId = await seedCompiledGap(context, OWNER);
+    await expect(knowledgeMap(context, OTHER, gapId)).rejects.toMatchObject({ status: 404 });
   });
 });

@@ -308,3 +308,61 @@ export const masteryView = async (
 ): Promise<{ mastery: unknown }> => ({
   mastery: await assessMastery(context, owner, gapId),
 });
+
+export interface KnowledgeNode {
+  readonly id: string;
+  readonly kind: 'gap' | 'capability';
+  readonly label: string;
+}
+
+export interface KnowledgeEdgeView {
+  readonly from: string;
+  readonly to: string;
+  readonly relationship: 'teaches' | 'prerequisite_of' | 'extends' | 'related';
+}
+
+/**
+ * The knowledge map (E15): the gap, the capabilities its curriculum teaches, their
+ * prerequisites, and any knowledge-graph edges the system has recorded. Deterministic data for
+ * a deterministic SVG layout in the UI.
+ */
+export const knowledgeMap = async (
+  context: ServerContext,
+  owner: OwnerId,
+  gapId: string,
+): Promise<{ nodes: KnowledgeNode[]; edges: KnowledgeEdgeView[] }> => {
+  const gap = await context.uow.gaps.get(owner, gapId);
+  if (!gap) throw new ApiError(404, 'gap_not_found', `Gap ${gapId} was not found for this owner.`);
+
+  const nodes = new Map<string, KnowledgeNode>();
+  const edges: KnowledgeEdgeView[] = [];
+  nodes.set(gapId, { id: gapId, kind: 'gap', label: gap.title });
+
+  const curriculum = await context.uow.curricula.getCurrentForGap(owner, gapId);
+  if (curriculum) {
+    for (const objective of curriculum.plan.objectives) {
+      nodes.set(objective.id, {
+        id: objective.id,
+        kind: 'capability',
+        label: objective.capabilityStatement,
+      });
+      edges.push({ from: gapId, to: objective.id, relationship: 'teaches' });
+      for (const prereq of objective.prerequisiteObjectiveIds ?? []) {
+        nodes.set(prereq, { id: prereq, kind: 'capability', label: prereq });
+        edges.push({ from: prereq, to: objective.id, relationship: 'prerequisite_of' });
+      }
+    }
+  }
+
+  for (const edge of await context.uow.knowledge.listEdges(owner)) {
+    for (const [id, label] of [
+      [edge.fromCapability, edge.fromCapability],
+      [edge.toCapability, edge.toCapability],
+    ] as const) {
+      if (!nodes.has(id)) nodes.set(id, { id, kind: 'capability', label });
+    }
+    edges.push({ from: edge.fromCapability, to: edge.toCapability, relationship: edge.relationship });
+  }
+
+  return { nodes: [...nodes.values()], edges };
+};
