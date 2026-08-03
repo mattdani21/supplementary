@@ -118,7 +118,7 @@ tasks:
     title: Establish the monorepo, tooling and agent protocol
     epic: E0
     priority: P0
-    status: ready
+    status: done
     goal: A fresh checkout is productive with one command and a single quality gate.
     scope:
       - pnpm workspace, TypeScript, eslint, prettier, vitest
@@ -143,7 +143,7 @@ tasks:
     title: Create the gap state machine
     epic: E2
     priority: P0
-    status: ready
+    status: done
     goal: Enforce a valid gap lifecycle so status can never be set arbitrarily.
     scope:
       - domain transition function
@@ -167,7 +167,7 @@ tasks:
     title: Create the generation run state machine and step idempotency keys
     epic: E0
     priority: P0
-    status: ready
+    status: done
     goal: Model the pipeline lifecycle so retries cannot duplicate work.
     scope:
       - generation status transitions
@@ -189,7 +189,7 @@ tasks:
     title: Define the AI contracts and the deterministic fake provider
     epic: E0
     priority: P0
-    status: ready
+    status: done
     goal: Every structured model call has a versioned schema and a deterministic fake.
     scope:
       - zod contracts for normalisation, planning, lesson, question and verification
@@ -211,7 +211,7 @@ tasks:
     title: Implement the ownership model and repositories
     epic: E1
     priority: P0
-    status: ready
+    status: done
     goal: No query can return another learner's data.
     scope:
       - forward-only migrations for the core entities
@@ -233,7 +233,7 @@ tasks:
     title: Build the fixture-based vertical slice
     epic: E2
     priority: P0
-    status: ready
+    status: done
     goal: The whole product journey works end to end on deterministic fixture content.
     scope:
       - gap CRUD through the API
@@ -257,7 +257,7 @@ tasks:
     title: Implement source ingestion with structural locators
     epic: E3
     priority: P0
-    status: ready
+    status: done
     goal: Lesson claims can be traced back to a page, heading or timestamp in a source.
     scope:
       - upload registration and private storage
@@ -281,7 +281,7 @@ tasks:
     title: Implement gap normalisation and the diagnostic flow
     epic: E4
     priority: P0
-    status: ready
+    status: done
     goal: Turn a raw learner statement into a structured, checkable specification.
     scope:
       - stage A normalisation through the language model adapter
@@ -303,7 +303,7 @@ tasks:
     title: Implement the curriculum planner and plan validation
     epic: E4
     priority: P0
-    status: ready
+    status: done
     goal: Reject a plan that cannot fit, cannot be assessed, or depends on an unmet prerequisite.
     scope:
       - stage D planning contract
@@ -327,7 +327,7 @@ tasks:
     title: Generate lessons in bounded parallel with a shared glossary
     epic: E5
     priority: P0
-    status: ready
+    status: done
     goal: Seven lesson packages that agree on terminology and cover the plan.
     scope:
       - lesson generation contract
@@ -350,7 +350,7 @@ tasks:
     title: Implement the independent verifier and the targeted repair loop
     epic: E6
     priority: P0
-    status: ready
+    status: done
     goal: Nothing is published that the system has not independently checked.
     scope:
       - independent solving of each objective question
@@ -374,7 +374,7 @@ tasks:
     title: Synthesise segmented audio and publish incrementally
     epic: E7
     priority: P0
-    status: ready
+    status: done
     goal: Day 1 becomes playable before the rest of the course finishes.
     scope:
       - text-to-speech adapter and segmentation
@@ -397,7 +397,7 @@ tasks:
     title: Implement attempts, mastery evidence and review scheduling
     epic: E9
     priority: P0
-    status: ready
+    status: done
     goal: A gap fills on evidence, never on consumption.
     scope:
       - attempt recording with hints and confidence
@@ -421,7 +421,7 @@ tasks:
     title: Implement the capability library and prerequisite reuse
     epic: E10
     priority: P0
-    status: ready
+    status: done
     goal: A filled gap becomes a reusable capability.
     scope:
       - capability search
@@ -443,7 +443,7 @@ tasks:
     title: Build the reference evaluation pack and scoring harness
     epic: E13
     priority: P0
-    status: ready
+    status: done
     goal: Detect software that works technically but teaches badly.
     scope:
       - ten copyright-safe fixtures across the required domains
@@ -465,7 +465,7 @@ tasks:
     title: Enforce cost ceilings, rate limits and operational recovery
     epic: E11
     priority: P0
-    status: ready
+    status: done
     goal: A run cannot overspend, and a restart cannot corrupt a run.
     scope:
       - per-run and per-user budgets checked before each call
@@ -514,7 +514,7 @@ tasks:
     title: Score the nine live-provider evaluation fixtures
     epic: E13
     priority: P0
-    status: blocked
+    status: done
     goal: Run the whole reference pack against a real provider, not only fixture 1.
     scope:
       - a live LanguageModel backend behind the existing interface
@@ -543,7 +543,7 @@ tasks:
     title: Replace lexical chunk retrieval with the vector index
     epic: E3
     priority: P1
-    status: ready
+    status: done
     goal: Retrieve source evidence by meaning rather than by shared words.
     scope:
       - an embedding column on source_chunks behind a new forward-only migration

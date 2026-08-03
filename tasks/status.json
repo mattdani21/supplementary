@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-03T14:27:54.000Z",
+  "updatedAt": "2026-08-03T14:28:29.000Z",
   "controller": "gapos-controller",
   "tasks": {
     "GAP-000": {
@@ -358,6 +358,11 @@
           "note": "360 passed + 20 loud skips. Full gate green with the vector path in place."
         }
       ]
+    },
+    "GAP-014b": {
+      "status": "done",
+      "completedAt": "2026-08-03T14:28:14.000Z",
+      "notes": " Closed: the nine-fixture live scoring run completed and the baselines were recorded (commits f65270d + 1b6426e on the branch: 9/9 PASS \u2014 eval_02 0.9957, eval_03-05/09-10 1.0, eval_06 0.9739, eval_07 0.9742 with the injection recorded as a finding, eval_08 clarified rather than guessing). The live gate test now has baselines to compare against."
     }
   },
   "GAP-014b": {
