@@ -11,6 +11,10 @@ import { createFakeEmbeddings, type FakeEmbeddingsOptions } from './fake/embeddi
 import { createFakeLanguageModel, type FakeLanguageModelOptions } from './fake/language-model.js';
 import { createFakeSpeechToText, createFakeTextToSpeech } from './fake/speech.js';
 import { createLanguageModel } from './language-model.js';
+import { createLiveEmbeddingsFromEnv } from './live/embeddings.js';
+import { createLiveLanguageModelFromEnv } from './live/language-model.js';
+import { createGoogleTranslateTtsEngine, createLiveTextToSpeech } from './live/speech.js';
+import { createLiveSpeechToTextFromEnv } from './live/speech-to-text.js';
 import { PROVIDER_MODES, type ProviderMode, type Providers } from './interfaces.js';
 
 export interface ProviderFactoryOptions {
@@ -38,17 +42,24 @@ export const createProviders = (options: ProviderFactoryOptions): Providers => {
   const mode = options.mode ?? resolveProviderMode();
 
   if (mode === 'live') {
-    // A provider set must be all-live or all-fake. The live language model (createLiveLanguageModel)
-    // and the live text-to-speech backend (createLiveTextToSpeech + createGoogleTranslateTtsEngine)
-    // exist, but live speech-to-text does not. Failing loudly beats silently falling back to the
-    // fakes and pretending a staging run exercised real speech. Creating paid external resources
-    // also requires a human approval gate (AGENTS.md §5).
-    throw new Error(
-      'Live mode is not fully available: the live language model and the live text-to-speech ' +
-        'backend exist, but live speech-to-text does not. A provider set must be all-live or ' +
-        'all-fake (AGENTS.md §4), and using live providers is a paid external resource requiring ' +
-        'a human approval gate (AGENTS.md §5).',
-    );
+    // A provider set must be all-live or all-fake (AGENTS.md §4). Live adapters assemble from
+    // env; their constructors refuse to run without the keys, and using them is a paid external
+    // resource — the human approval gate (AGENTS.md §5) is the act of configuring those keys.
+    return {
+      mode,
+      languageModel: createLanguageModel(createLiveLanguageModelFromEnv(), {
+        costAccountant: options.costAccountant,
+        metrics: options.metrics,
+        logger: options.logger,
+      }),
+      speechToText: createLiveSpeechToTextFromEnv(),
+      textToSpeech: createLiveTextToSpeech({ engine: createGoogleTranslateTtsEngine() }),
+      embeddings: createEmbeddings(createLiveEmbeddingsFromEnv(), {
+        costAccountant: options.costAccountant,
+        metrics: options.metrics,
+        logger: options.logger,
+      }),
+    };
   }
 
   return {

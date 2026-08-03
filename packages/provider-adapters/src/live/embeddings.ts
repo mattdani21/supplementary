@@ -104,3 +104,32 @@ export const createLiveEmbeddings = (options: LiveEmbeddingsOptions): Embeddings
     },
   };
 };
+
+interface EmbeddingsEnv {
+  readonly GAPOS_EMBEDDINGS_API_KEY?: string;
+  readonly GAPOS_EMBEDDINGS_BASE_URL?: string;
+  readonly GAPOS_EMBEDDINGS_MODEL?: string;
+  readonly GAPOS_EMBEDDINGS_DIMENSIONS?: string;
+  readonly GAPOS_EMBEDDINGS_PRICE_MILLICENTS_PER_MT?: string;
+}
+
+export const createLiveEmbeddingsFromEnv = (
+  env: EmbeddingsEnv = process.env,
+): EmbeddingsBackend => {
+  const apiKey = env.GAPOS_EMBEDDINGS_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      'GAPOS_EMBEDDINGS_API_KEY is not set. A live provider is a paid external resource: set ' +
+        'the key before selecting live mode (AGENTS.md §5).',
+    );
+  }
+  return createLiveEmbeddings({
+    endpoint: env.GAPOS_EMBEDDINGS_BASE_URL ?? 'https://api.openai.com/v1',
+    apiKey,
+    model: env.GAPOS_EMBEDDINGS_MODEL ?? 'text-embedding-3-small',
+    dimensions: Number(env.GAPOS_EMBEDDINGS_DIMENSIONS ?? 384),
+    ...(env.GAPOS_EMBEDDINGS_PRICE_MILLICENTS_PER_MT
+      ? { priceMillicentsPerMToken: Number(env.GAPOS_EMBEDDINGS_PRICE_MILLICENTS_PER_MT) }
+      : {}),
+  });
+};

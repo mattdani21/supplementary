@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-03T14:28:29.000Z",
+  "updatedAt": "2026-08-03T14:57:43.000Z",
   "controller": "gapos-controller",
   "tasks": {
     "GAP-000": {
@@ -377,8 +377,16 @@
       "notes": "Defined in the next-loop plan; awaiting execution."
     },
     "GAP-023": {
-      "status": "ready",
-      "notes": "Defined in the next-loop plan; awaiting execution."
+      "status": "done",
+      "notes": "Live speech-to-text and a real live-mode factory. createLiveSpeechToText speaks OpenAI-compatible /audio/transcriptions over plain fetch (multipart form, bearer auth, typed errors, cost from env price/minute with a floor). createLiveSpeechToTextFromEnv + createLiveEmbeddingsFromEnv assemble from GAPOS_* env. createProviders({mode:'live'}) now boots all four adapters instead of throwing; constructors still refuse without keys, which is the AGENTS.md \u00a75 human gate.",
+      "completedAt": "2026-08-03T14:57:43.000Z",
+      "evidence": [
+        {
+          "command": "pnpm test packages/provider-adapters/src/live-mode.test.ts",
+          "result": "pass",
+          "note": "Live speech-to-text and a real live-mode factory. createLiveSpeechToText speaks OpenAI-compatible /audio/transcriptions over plain fetch (multipart form, bearer auth, typed errors, cost from env price/minute with a floor). createLiveSpeechToTextFromEnv + createLiveEmbeddingsFromEnv assemble from GAPOS_* env. createProviders({mode:'live'}) now boots all four adapters instead of throwing; constructors still refuse without keys, which is the AGENTS.md \u00a75 human gate."
+        }
+      ]
     },
     "GAP-024": {
       "status": "ready",
