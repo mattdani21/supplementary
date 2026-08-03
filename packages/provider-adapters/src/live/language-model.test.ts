@@ -53,6 +53,8 @@ const build = (
 
   const backend = createLiveLanguageModel({
     apiKey: 'sk-test',
+    // Keep retryable-error tests fast; the retry policy itself has dedicated tests.
+    retryDelaysMs: [1, 1],
     ...(options.priceInputMillicentsPerMToken !== undefined
       ? { priceInputMillicentsPerMToken: options.priceInputMillicentsPerMToken }
       : {}),

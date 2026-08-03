@@ -205,9 +205,14 @@ export const compileGap = async (
               'The success condition must be observable behaviour, never "understands X". ' +
               'Ambiguities default to recorded_assumption: note them as labelled assumptions ' +
               'and proceed. Blocking is exceptional — a blocking ambiguity stops the run and ' +
-              'asks the learner a question, so use it only when the answer would make the ' +
+              'asks the learner a question — so use it only when the answer would make the ' +
               'curriculum materially different AND the learner cannot usefully start without ' +
-              'it. A normal statement yields zero blocking ambiguities.',
+              'it. A statement that names no target capability at all is blocking: for ' +
+              'example "I want to get better at maths" or "teach me something useful" — the ' +
+              'topic itself is missing, so the curriculum would be materially different ' +
+              'depending on the answer. A statement that names a topic and a target ("I can ' +
+              'define a relation but not why equivalence classes partition a set") is never ' +
+              'blocking: record assumptions and proceed.',
             evidence,
           })
         ).value,
@@ -588,8 +593,9 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
             'prompt must be unique within the lesson. Every claim drawn from the source ' +
             'evidence must cite a locator from the evidence. Only multiple-choice questions ' +
             'carry an options field, with at least three distinct options and the answer among ' +
-            'them; every other question type omits options, and free-response questions carry a ' +
-            'rubric instead.',
+            'them; every other question type omits options. Free-response questions MUST carry ' +
+            'a rubric — a non-empty string — and every other question type omits the rubric ' +
+            'field entirely. Never emit null for any field: omit optional fields instead.',
           evidence,
         })
       ).value,
