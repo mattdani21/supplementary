@@ -617,7 +617,7 @@ tasks:
     status: ready
     goal: A learner can run the whole loop in a browser.
     scope:
-      - Next.js app router pages: gap list, gap detail with source upload and compile, curriculum,
+      - Next.js app router pages — gap list, gap detail with source upload and compile, curriculum,
         lesson player (content, audio, attempt form), mastery view
       - app manifest and a service worker caching the app shell
       - the published lesson for the current day works when the network is cut after first load
@@ -636,7 +636,7 @@ tasks:
     goal: Live mode boots through the standard factory instead of throwing.
     scope:
       - an OpenAI-compatible /audio/transcriptions backend over plain fetch
-      - createProviders({ mode: 'live' }) assembles language model, TTS, STT and embeddings
+      - "createProviders({ mode: 'live' }) assembles language model, TTS, STT and embeddings"
       - GAPOS_STT_* env configuration mirroring the other live adapters
     out_of_scope:
       - STT streaming
@@ -666,7 +666,7 @@ tasks:
     status: ready
     goal: The whole loop is usable from a terminal.
     scope:
-      - a `gapos` bin: gap new, source add (file or stdin), compile, plan, study (lesson + attempt),
+      - a `gapos` bin — gap new, source add (file or stdin), compile, plan, study (lesson + attempt),
         mastery, status
       - in-process service layer with Postgres or in-memory storage selected by env
       - readline prompts; non-interactive flags for scripting
