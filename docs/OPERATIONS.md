@@ -1,5 +1,45 @@
 # OPERATIONS
 
+## Deployment surface
+
+Three processes, all configured entirely by environment (full table in `README.md`):
+
+| Process | Command | Purpose |
+| --- | --- | --- |
+| Web | `pnpm --filter @gapos/web start` | UI (PWA) + HTTP API on :3000 |
+| Worker | `pnpm --filter @gapos/worker start` | durable compile queue loop |
+| CLI | `pnpm --filter @gapos/cli start -- <cmd>` | terminal study client |
+
+**Boot order.** The web and worker processes both run migrations on boot, so a deploy is:
+start the worker, start the web app, run a smoke compilation (`gapos compile`), then open the
+cohort. `GAPOS_DATABASE_URL` selects Postgres; without it both processes run in-memory with a
+loud warning and must never be used for anything but a throwaway trial.
+
+**Worker shutdown.** SIGTERM/SIGINT stops the poller after the in-flight job, releases the
+pool, and exits 0. Restart recovery is the lease protocol: a job whose lease expired is
+re-claimed and re-enters its run, reusing completed steps (idempotency) instead of duplicating
+artefacts or charges.
+
+**Live mode.** `GAPOS_PROVIDER_MODE=live` assembles all four adapters from `GAPOS_*` env
+(language model, speech-to-text, text-to-speech, embeddings). The constructors refuse to boot
+without keys — configuring the keys *is* the human approval gate. `GAPOS_LLM_MODE=local`
+selects the Ollama/llama.cpp preset (localhost:11434/v1, no key); a local model only earns
+production use by clearing the evaluation threshold (see Release gates).
+
+**Object storage.** `GAPOS_STORAGE=s3` with `GAPOS_S3_*` env uses the SigV4 client (plain
+fetch) against MinIO or any S3 endpoint. Uploads are screened before storage; identical files
+are cached by checksum; signed URLs expire server-side.
+
+**HTTP API.** All endpoints under `/api`, owner-scoped by the `X-Owner-Id` header:
+users, gaps (create/list/get/transition/compile), sources (register/list), today, curriculum,
+lesson, artefact audio URL, attempts, mastery, knowledge map, review queue, voice gap capture.
+Bodies are zod-validated; errors map to HTTP statuses (400 validation, 401 owner header, 404
+missing, 402 budget, 409 conflict, 422 screening).
+
+**Offline (PWA).** The service worker caches same-origin GETs stale-while-revalidate; after a
+first load the current lesson renders with the network cut. Writes never cache — offline they
+fail loudly.
+
 ## Environments
 
 | Environment | Providers | Data |

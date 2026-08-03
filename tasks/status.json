@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-03T15:38:36.000Z",
+  "updatedAt": "2026-08-03T15:39:20.000Z",
   "controller": "gapos-controller",
   "tasks": {
     "GAP-000": {
@@ -437,8 +437,16 @@
       ]
     },
     "GAP-026": {
-      "status": "ready",
-      "notes": "Defined in the next-loop plan; awaiting execution."
+      "status": "done",
+      "notes": "Operations documentation for the deployment surface. OPERATIONS.md gains a Deployment surface section: the three processes (web/worker/CLI) with commands, boot order, worker shutdown semantics, live-mode + local-preset configuration, S3/MinIO storage, the full HTTP API map, and the PWA offline contract. README's quickstart now shows how to run the UI, worker and CLI, plus the complete GAPOS_* environment table.",
+      "completedAt": "2026-08-03T15:39:20.000Z",
+      "evidence": [
+        {
+          "command": "pnpm verify",
+          "result": "pass",
+          "note": "Operations documentation for the deployment surface. OPERATIONS.md gains a Deployment surface section: the three processes (web/worker/CLI) with commands, boot order, worker shutdown semantics, live-mode + local-preset configuration, S3/MinIO storage, the full HTTP API map, and the PWA offline contract. README's quickstart now shows how to run the UI, worker and CLI, plus the complete GAPOS_* environment table."
+        }
+      ]
     },
     "GAP-027": {
       "status": "done",

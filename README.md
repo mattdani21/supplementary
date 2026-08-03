@@ -20,11 +20,42 @@ for what is actually done, with evidence.
 That is the whole setup for development and tests: the default provider configuration is a set of
 deterministic fakes, so no API keys and no external services are needed to run the suite.
 
-For a database-backed run:
+### Run it
 
-    pnpm local:up        # Postgres + MinIO via Docker Compose
+Everything is configured by environment (see the table below). With Postgres + MinIO up
+(`pnpm local:up`):
+
     pnpm db:migrate
-    pnpm --filter @gapos/web dev
+    GAPOS_DATABASE_URL=<dsn> pnpm --filter @gapos/web dev       # the web app + HTTP API on :3000
+    GAPOS_DATABASE_URL=<dsn> pnpm --filter @gapos/worker start  # the durable compile worker
+
+Without a database the same commands run against in-memory repositories (throwaway data, with a
+loud warning) — enough to try the UI and the CLI immediately.
+
+### The command line
+
+    GAPOS_DATABASE_URL=<dsn> pnpm --filter @gapos/cli start -- gap new --title "..." --statement "..."
+    pnpm --filter @gapos/cli start -- source add <gapId> --file notes.md
+    pnpm --filter @gapos/cli start -- compile <gapId>
+    pnpm --filter @gapos/cli start -- study <gapId>
+
+### Environment
+
+| Variable | Purpose | Default |
+| --- | --- | --- |
+| `GAPOS_DATABASE_URL` | Postgres DSN; the API, daemon and CLI migrate on boot | in-memory |
+| `GAPOS_PROVIDER_MODE` | `fake` or `live` (live refuses to boot without keys) | `fake` |
+| `GAPOS_LLM_API_KEY` / `_BASE_URL` / `_MODEL` | live language model | DeepSeek |
+| `GAPOS_LLM_MODE=local` | local preset (Ollama/llama.cpp, no key) | — |
+| `GAPOS_MODEL_ROUTING` | per-purpose routing, e.g. `planning:model-a,teaching:model-b` | — |
+| `GAPOS_STT_API_KEY` / `_BASE_URL` / `_MODEL` | live speech-to-text | OpenAI-compatible |
+| `GAPOS_EMBEDDINGS_API_KEY` / `_BASE_URL` / `_MODEL` / `_DIMENSIONS` | live embeddings | OpenAI-compatible |
+| `GAPOS_STORAGE` | `memory` or `s3` (requires the `GAPOS_S3_*` vars) | `memory` |
+| `GAPOS_S3_ENDPOINT` / `_REGION` / `_BUCKET` / `_ACCESS_KEY_ID` / `_SECRET_ACCESS_KEY` | S3-compatible object storage (MinIO) | — |
+| `GAPOS_QUEUE_POLL_INTERVAL_MS` / `_LEASE_DURATION_MS` / `_CLAIM_BATCH` | worker loop tuning | 2000 / 300000 / 4 |
+| `GAPOS_BUDGET_PER_RUN_MILLICENTS` / `GAPOS_BUDGET_DAILY_MILLICENTS` | cost ceilings | unlimited |
+| `GAPOS_OWNER` | learner id for the CLI | `cli-learner` |
+| `GAPOS_LOG_LEVEL` | `debug` \| `info` \| `warn` \| `error` | `info` |
 
 ## Layout
 
@@ -32,6 +63,7 @@ For a database-backed run:
 | --- | --- |
 | `apps/web` | Next.js PWA shell and API route handlers |
 | `apps/worker` | durable generation worker |
+| `apps/cli` | `gapos` command-line study client |
 | `packages/domain` | pure business rules: gap lifecycle, mastery, review scheduling |
 | `packages/ai-contracts` | versioned zod contracts for every structured model call |
 | `packages/provider-adapters` | LLM / speech interfaces plus deterministic fakes |
