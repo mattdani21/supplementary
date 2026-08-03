@@ -494,7 +494,10 @@ const planCurriculum = async (params: {
         'an objective the plan teaches; (5) every source-grounded objective cites locators from ' +
         'the evidence; (6) externalPrerequisites must be copied verbatim from the list of what ' +
         'the learner is assumed to already hold — never invent a prerequisite outside it; teach ' +
-        'it as an objective instead, or remove the dependency.' +
+        'it as an objective instead, or remove the dependency; (7) an audio lesson is a ' +
+        'five-minute listening activity (~750 spoken words), scheduled alongside practice ' +
+        'activities that together fit the daily budget; (8) targetDifficulty must not decrease ' +
+        'across the course — later objectives are harder than earlier ones.' +
         (previousViolations.length > 0
           ? ` The previous plan was rejected for: ${previousViolations.join('; ')}. Fix all of them.`
           : ''),
@@ -580,9 +583,13 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
             `${blueprintForDay}. Ship at least those item counts across the lesson's questions ` +
             '(application items may be marked transfer). The script must be written to be spoken ' +
             'aloud — roughly 750 words for five minutes, plain sentences, no bullet lists, no ' +
-            'references to figures. Every claim drawn from the source evidence must cite a ' +
-            'locator from the evidence. Free-response questions require a rubric; ' +
-            'multiple-choice answers must be exactly one of the listed options.',
+            "references to figures. Set estimatedMinutes to the script's actual listening time " +
+            "(about 5 minutes for 750 words), never the day's total budget. Every question " +
+            'prompt must be unique within the lesson. Every claim drawn from the source ' +
+            'evidence must cite a locator from the evidence. Only multiple-choice questions ' +
+            'carry an options field, with at least three distinct options and the answer among ' +
+            'them; every other question type omits options, and free-response questions carry a ' +
+            'rubric instead.',
           evidence,
         })
       ).value,

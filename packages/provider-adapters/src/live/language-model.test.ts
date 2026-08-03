@@ -12,6 +12,8 @@ const baseRequest = (overrides: Partial<RawCompletionRequest> = {}): RawCompleti
   evidenceBlock: '<<<EVIDENCE_BLOCK>>>\nfenced source text\n<<<END_EVIDENCE_BLOCK>>>',
   contractName: 'curriculum_plan',
   contractVersion: '1.0.0',
+  schemaJson:
+    '{"type":"object","properties":{"ok":{"type":"boolean"}},"required":["ok"],"additionalProperties":false}',
   purpose: 'plan',
   ...overrides,
 });
@@ -108,6 +110,8 @@ describe('live language model', () => {
     expect(body.messages[0]!.role).toBe('system');
     expect(body.messages[0]!.content).toContain('curriculum_plan@1.0.0');
     expect(body.messages[0]!.content).toContain('JSON');
+    expect(body.messages[0]!.content).toContain('Match it exactly');
+    expect(body.messages[0]!.content).toContain('"additionalProperties":false');
     expect(body.messages[1]!.content).toContain('Produce the curriculum plan');
     expect(body.messages[1]!.content).toContain('<<<EVIDENCE_BLOCK>>>');
     expect(body.messages[1]!.content).toContain('fenced source text');
@@ -187,6 +191,70 @@ describe('live language model', () => {
   it('throws when the provider returns no message content', async () => {
     const { backend } = build(completion({ ok: true }, { choices: [] }));
     await expect(backend.complete(baseRequest())).rejects.toThrow(/no message content/);
+  });
+
+  it('retries a transient non-JSON body and succeeds on the second attempt', async () => {
+    const calls: CapturedCall[] = [];
+    let served = 0;
+    const fetchImpl = (async (
+      url: Parameters<typeof fetch>[0],
+      init?: RequestInit,
+    ): Promise<Response> => {
+      calls.push({ url: String(url), init: init ?? {} });
+      served += 1;
+      if (served === 1) {
+        // A gateway blip: HTTP 200 with an HTML error page instead of JSON.
+        return new Response('<html>upstream error</html>', {
+          status: 200,
+          headers: { 'content-type': 'text/html' },
+        });
+      }
+      return new Response(JSON.stringify(completion({ ok: true })), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as typeof fetch;
+
+    const backend = createLiveLanguageModel({
+      apiKey: 'sk-test',
+      retryDelaysMs: [1],
+      fetchImpl,
+    });
+    const result = await backend.complete(baseRequest());
+    expect(result.json).toEqual({ ok: true });
+    expect(calls).toHaveLength(2);
+  });
+
+  it('gives up after the retries are exhausted', async () => {
+    let served = 0;
+    const fetchImpl = (async (): Promise<Response> => {
+      served += 1;
+      return new Response('<html>upstream error</html>', { status: 200 });
+    }) as typeof fetch;
+
+    const backend = createLiveLanguageModel({
+      apiKey: 'sk-test',
+      retryDelaysMs: [1, 1],
+      fetchImpl,
+    });
+    await expect(backend.complete(baseRequest())).rejects.toThrow(/non-JSON response body/);
+    expect(served).toBe(3);
+  });
+
+  it('does not retry a non-retryable failure', async () => {
+    let served = 0;
+    const fetchImpl = (async (): Promise<Response> => {
+      served += 1;
+      return new Response(JSON.stringify({ error: 'bad request' }), { status: 400 });
+    }) as typeof fetch;
+
+    const backend = createLiveLanguageModel({
+      apiKey: 'sk-test',
+      retryDelaysMs: [1, 1],
+      fetchImpl,
+    });
+    await expect(backend.complete(baseRequest())).rejects.toThrow(/HTTP 400/);
+    expect(served).toBe(1);
   });
 });
 
