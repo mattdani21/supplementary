@@ -35,12 +35,16 @@ export const createProviders = (options: ProviderFactoryOptions): Providers => {
   const mode = options.mode ?? resolveProviderMode();
 
   if (mode === 'live') {
-    // Deliberately unimplemented: adding a live provider is a task with a human gate attached
-    // (paid external resources). Failing loudly beats silently falling back to the fake and
-    // pretending a staging run exercised a real provider.
+    // A provider set must be all-live or all-fake. The live language model (createLiveLanguageModel)
+    // and the live text-to-speech backend (createLiveTextToSpeech + createGoogleTranslateTtsEngine)
+    // exist, but live speech-to-text does not. Failing loudly beats silently falling back to the
+    // fakes and pretending a staging run exercised real speech. Creating paid external resources
+    // also requires a human approval gate (AGENTS.md §5).
     throw new Error(
-      'No live provider is configured. Implement a LanguageModelBackend and register it here; ' +
-        'creating paid external resources requires a human approval gate (AGENTS.md §5).',
+      'Live mode is not fully available: the live language model and the live text-to-speech ' +
+        'backend exist, but live speech-to-text does not. A provider set must be all-live or ' +
+        'all-fake (AGENTS.md §4), and using live providers is a paid external resource requiring ' +
+        'a human approval gate (AGENTS.md §5).',
     );
   }
 

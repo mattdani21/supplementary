@@ -174,6 +174,22 @@ describe('plan validation', () => {
     ).not.toContain('prerequisite_unmet');
   });
 
+  it('treats a satisfied prerequisite as held despite trailing punctuation', () => {
+    // A live planner copies the phrase verbatim and occasionally adds a full stop; the learner
+    // has been shown to hold the prerequisite either way.
+    const plan = validPlan();
+    const assuming: PlanToValidate = {
+      ...plan,
+      objectives: [
+        { ...plan.objectives[0]!, externalPrerequisites: ['Set-builder notation.'] },
+        plan.objectives[1]!,
+      ],
+    };
+    expect(
+      codes(assuming, { satisfiedExternalPrerequisites: ['Set-builder notation'] }),
+    ).not.toContain('prerequisite_unmet');
+  });
+
   it('rejects an objective claiming source grounding with no locator', () => {
     const plan = validPlan();
     const unsupported: PlanToValidate = {

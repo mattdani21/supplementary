@@ -78,6 +78,31 @@ describe('contract validation at the adapter boundary', () => {
     expect(response.provider).toBe('fake');
   });
 
+  it('attaches the contract schema to the raw request so a live model cannot invent shapes', async () => {
+    const { model, backend } = build();
+    await model.generate({ ...baseRequest, contract: GapNormalisationContract });
+
+    const raw = backend.calls[0]!;
+    const schema = JSON.parse(raw.schemaJson!) as {
+      type: string;
+      properties: Record<string, unknown>;
+      additionalProperties: boolean;
+    };
+    expect(schema.type).toBe('object');
+    expect(Object.keys(schema.properties)).toEqual(
+      expect.arrayContaining([
+        'topic',
+        'currentState',
+        'targetCapability',
+        'observableSuccessCondition',
+        'recommendedDiagnostic',
+      ]),
+    );
+    expect(schema.additionalProperties).toBe(false);
+    // The evidence fence is still what it was: the schema rides alongside, never inside it.
+    expect(raw.evidenceBlock).not.toContain('observableSuccessCondition');
+  });
+
   it('rejects a structurally invalid response instead of persisting it', async () => {
     const { model } = build({ script: { lesson_package: () => structurallyInvalidLesson() } });
     await expect(

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-02T11:45:00.000Z",
+  "updatedAt": "2026-08-02T20:01:00.000Z",
   "controller": "gapos-controller",
   "tasks": {
     "GAP-000": {
@@ -296,6 +296,33 @@
       ],
       "notes": "Found by reading a GREEN CI run's Postgres server log. Migration 001 declared UNIQUE (lesson_id, kind, version) on artefacts, encoding the assumption that a lesson has one artefact per kind. True for a transcript, false for audio: a script is synthesised as several segments, all kind='audio' at version 1, so the second insert violated the constraint. The insert threw, the pipeline's audio fallback caught it and degraded the lesson to transcript-only, and the run still reported success \u2014 an audio-first product shipping without audio, with only a warning line. The in-memory store has no constraints, so the memory journey passed throughout. Fixed by forward-only migration 002 adding segment_ordinal and a segment-aware unique constraint; the shared contract suite now stores four audio segments for one lesson so memory and SQL are held to the same behaviour, and both journeys assert audio publishes rather than only that the compile succeeded."
     }
+  },
+  "GAP-014b": {
+    "status": "in_progress",
+    "startedAt": "2026-08-02T19:40:00.000Z",
+    "evidence": [
+      {
+        "command": "pnpm vitest run packages/provider-adapters/src/live/language-model.test.ts",
+        "result": "pass",
+        "note": "13 tests. The live backend speaks OpenAI-compatible chat-completions over plain fetch (no SDK): bearer auth, response_format json_object, the contract named in the system prompt, evidence passed through inside the fence, temperature/max_tokens/timeout forwarded. Failures are typed LiveProviderErrors with a retryable flag (429/5xx/network retryable; 400/JSON/usage failures not). Usage is required because the wrapper cannot account for a call whose cost it cannot measure; cost is integer millicents rounded up from an env-overridable price table (defaults track deepseek-chat list prices)."
+      },
+      {
+        "command": "pnpm vitest run packages/provider-adapters/src/live/speech.test.ts",
+        "result": "pass",
+        "note": "14 tests. The live TTS wrapper computes the transcript-linked checksum (identical to the fake's, so memory/SQL/pipeline integrity checks hold for live runs), estimates duration with the same 14-characters-per-second heuristic the domain segmenter uses, forwards text/voice/locale verbatim, wraps engine failures in LiveSynthesisError naming the segment, and charges 0 by default (free endpoint) with an optional per-thousand-characters price. The Google Translate TTS engine is plain fetch with the gTTS query shape, chunks long segments at word boundaries under the endpoint cap, hard-splits overlong words, maps regional locales to language codes, and throws typed errors on HTTP and network failure."
+      },
+      {
+        "command": "pnpm verify",
+        "result": "pass",
+        "note": "330 passed + 14 skipped (Postgres block and the live-provider pack, both skipping loudly with the missing variable named). Format, lint, typecheck and the full suite are green with the pipeline hardening in place."
+      },
+      {
+        "command": "live rehearsal of stages A-D-E against deepseek-v4-flash (eval_02 profile)",
+        "result": "pass",
+        "note": "With the learner statement, daily minutes, normalisation and diagnostic rendered into each stage's instruction: normalisation returns a real topic ('Equivalence classes and partitions') with zero blocking ambiguities; the plan clears findPlanViolations with zero violations (6 objectives, 5 days); the Day 1 lesson ships the blueprint's 2 retrieval + 1 application items with an 819-word spoken script. The rehearsal exposed and fixed four pipeline defects the fakes could never show: (1) the learner statement was never passed to normalisation, (2) the planner had no learner brief or daily minutes, (3) the lesson generator had no blueprint/glossary/difficulty context, (4) exact-match prerequisite validation failed on trailing punctuation. Explicit temperatures were also set: 0 for the structured stages, 0.2 for lesson prose (the pipeline previously ran at the provider default of 1.0)."
+      }
+    ],
+    "notes": "Harness complete and the pipeline now works live: apps/web context accepts an explicit providers assembly; tests/evaluation/live-provider.test.ts gates floors, baseline regression, the eval_08 clarification requirement and the eval_07 injection-finding requirement; scripts/record-eval-baselines.ts writes baselines. Pipeline fixes in this pass: stage inputs rendered into instructions (statement -> normalisation; normalisation -> diagnostic; brief + dailyMinutes -> planner; blueprint + glossary + difficulty -> lesson), verbatim-copy rule for external prerequisites, trailing-punctuation tolerance in findPlanViolations, and explicit per-stage temperatures. The nine-fixture live scoring run is relaunched; remaining work is the run itself."
   },
   "blockers": []
 }

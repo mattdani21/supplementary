@@ -195,12 +195,19 @@ export const compileGap = async (
           await providers.languageModel.generate({
             contract: GapNormalisationContract,
             purpose: 'planning',
+            // Structured extraction must be deterministic: the run retries idempotently, and a
+            // degenerate-but-valid normalisation would poison every downstream stage.
+            temperature: 0,
             runId: run.id,
             userId: owner,
             instruction:
-              'Normalise the learner statement into the contract. The success condition must be ' +
-              'observable behaviour, never "understands X". Mark an ambiguity blocking only if ' +
-              'the curriculum would be materially different depending on the answer.',
+              `Normalise this learner statement into the contract: "${gap.rawStatement}". ` +
+              'The success condition must be observable behaviour, never "understands X". ' +
+              'Ambiguities default to recorded_assumption: note them as labelled assumptions ' +
+              'and proceed. Blocking is exceptional — a blocking ambiguity stops the run and ' +
+              'asks the learner a question, so use it only when the answer would make the ' +
+              'curriculum materially different AND the learner cannot usefully start without ' +
+              'it. A normal statement yields zero blocking ambiguities.',
             evidence,
           })
         ).value,
@@ -229,12 +236,15 @@ export const compileGap = async (
           await providers.languageModel.generate({
             contract: DiagnosticInterpretationContract,
             purpose: 'classification',
+            temperature: 0,
             runId: run.id,
             userId: owner,
             instruction:
-              'Interpret the diagnostic. If the learner skipped it, infer a conservative ' +
-              'baseline, set inferred to true, and recommend a lower starting difficulty so ' +
-              'Day 1 calibrates from the first attempts.',
+              'The learner skipped the diagnostic. Based on this normalisation — topic: ' +
+              `${normalisation.topic}; current state: ${normalisation.currentState}; target ` +
+              `capability: ${normalisation.targetCapability} — infer a conservative baseline, ` +
+              'set inferred to true, and recommend a lower starting difficulty so Day 1 ' +
+              'calibrates from the first attempts.',
           })
         ).value,
     );
@@ -249,6 +259,22 @@ export const compileGap = async (
     }
 
     /* ---------------------------------------------------- stage D: plan and validate */
+    const learnerBrief = [
+      `The learner stated: "${gap.rawStatement}".`,
+      `The learner has ${gap.dailyMinutes} minutes per day.`,
+      `Normalisation — topic: ${normalisation.topic}. Current state: ${normalisation.currentState}. ` +
+        `Target capability: ${normalisation.targetCapability}. Observable success condition: ` +
+        normalisation.observableSuccessCondition,
+      ...(normalisation.assumedPrerequisites.length > 0
+        ? [
+            `The learner is assumed to already hold: ${normalisation.assumedPrerequisites.join(', ')}.`,
+          ]
+        : []),
+      ...(diagnostic.demonstratedCapabilities.length > 0
+        ? [`The learner already demonstrates: ${diagnostic.demonstratedCapabilities.join(', ')}.`]
+        : []),
+    ].join(' ');
+
     const plan = await runStep(
       step,
       { step: 'plan_curriculum', inputVersion: hash([normalisation, diagnostic]) },
@@ -257,6 +283,7 @@ export const compileGap = async (
           runId: run.id,
           owner,
           gapId: gap.id,
+          learnerBrief,
           evidence,
           satisfiedExternalPrerequisites: [
             ...normalisation.assumedPrerequisites,
@@ -439,6 +466,8 @@ const planCurriculum = async (params: {
   runId: string;
   owner: OwnerId;
   gapId: string;
+  /** Rendered learner state: the statement plus the normalisation and diagnostic. */
+  learnerBrief: string;
   evidence: readonly EvidenceItem[];
   satisfiedExternalPrerequisites: readonly string[];
   deps: CompileDeps;
@@ -451,12 +480,24 @@ const planCurriculum = async (params: {
     const response = await deps.providers.languageModel.generate({
       contract: CurriculumPlanContract,
       purpose: 'planning',
+      temperature: 0,
       runId,
       userId: owner,
       subject: gapId,
       instruction:
-        "Produce a curriculum plan that fits within the learner's daily minutes, teaches and " +
-        'assesses every objective, and depends on no unaddressed prerequisite.' +
+        `${params.learnerBrief} Produce a curriculum plan that satisfies every invariant the ` +
+        "product enforces: (1) every day's activities fit within the learner's daily minutes; " +
+        '(2) every objective is taught on at least one day, and no day teaches an objective the ' +
+        'plan does not declare; (3) the assessment blueprint has exactly one entry per objective, ' +
+        'each with at least 2 retrieval and 1 application items, and no entry for an undeclared ' +
+        'objective; (4) the prerequisite graph is acyclic, and every prerequisiteObjectiveId names ' +
+        'an objective the plan teaches; (5) every source-grounded objective cites locators from ' +
+        'the evidence; (6) externalPrerequisites must be copied verbatim from the list of what ' +
+        'the learner is assumed to already hold — never invent a prerequisite outside it; teach ' +
+        'it as an objective instead, or remove the dependency; (7) an audio lesson is a ' +
+        'five-minute listening activity (~750 spoken words), scheduled alongside practice ' +
+        'activities that together fit the daily budget; (8) targetDifficulty must not decrease ' +
+        'across the course — later objectives are harder than earlier ones.' +
         (previousViolations.length > 0
           ? ` The previous plan was rejected for: ${previousViolations.join('; ')}. Fix all of them.`
           : ''),
@@ -506,6 +547,21 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
   const planVersion = hash(plan);
 
   /* ------------------------------------------- stage E: generate against the plan */
+  const objectiveStatements = new Map(plan.objectives.map((o) => [o.id, o.capabilityStatement]));
+  const blueprintForDay = plan.assessmentBlueprint
+    .filter((b) => dayPlan.objectiveIds.includes(b.objectiveId))
+    .map(
+      (b) =>
+        `objective ${b.objectiveId} (${objectiveStatements.get(b.objectiveId) ?? 'unknown'}): at ` +
+        `least ${b.retrievalItems} retrieval and ${b.applicationItems} application questions, ` +
+        `target difficulty ${b.targetDifficulty}`,
+    )
+    .join('; ');
+  const glossaryBrief =
+    plan.glossary.length > 0
+      ? plan.glossary.map((g) => `${g.term}: ${g.definition}`).join('; ')
+      : 'none';
+
   let lesson: LessonPackage = await runStep(
     step,
     { step: 'generate_lesson', subject: `day-${dayPlan.day}`, inputVersion: planVersion },
@@ -514,13 +570,26 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
         await providers.languageModel.generate({
           contract: LessonPackageContract,
           purpose: 'teaching',
+          // Prose benefits from a little variance; everything structural stays fixed.
+          temperature: 0.2,
           runId,
           userId: owner,
           subject: `day-${dayPlan.day}`,
           instruction:
             `Write the Day ${dayPlan.day} lesson package against the approved plan. The plan, ` +
             'the glossary and the objective identifiers are fixed inputs: use the shared terms ' +
-            'for the concepts they name and do not reinterpret an objective.',
+            'for the concepts they name and do not reinterpret an objective. ' +
+            `Shared glossary: ${glossaryBrief}. Assessment blueprint for this day's objectives: ` +
+            `${blueprintForDay}. Ship at least those item counts across the lesson's questions ` +
+            '(application items may be marked transfer). The script must be written to be spoken ' +
+            'aloud — roughly 750 words for five minutes, plain sentences, no bullet lists, no ' +
+            "references to figures. Set estimatedMinutes to the script's actual listening time " +
+            "(about 5 minutes for 750 words), never the day's total budget. Every question " +
+            'prompt must be unique within the lesson. Every claim drawn from the source ' +
+            'evidence must cite a locator from the evidence. Only multiple-choice questions ' +
+            'carry an options field, with at least three distinct options and the answer among ' +
+            'them; every other question type omits options, and free-response questions carry a ' +
+            'rubric instead.',
           evidence,
         })
       ).value,
@@ -560,6 +629,7 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
           await providers.languageModel.generate({
             contract: VerificationReportContract,
             purpose: 'verification',
+            temperature: 0,
             runId,
             userId: owner,
             subject: `day-${dayPlan.day}`,
@@ -627,6 +697,7 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
           await providers.languageModel.generate({
             contract: LessonPackageContract,
             purpose: 'teaching',
+            temperature: 0,
             runId,
             userId: owner,
             subject: `day-${dayPlan.day}`,
