@@ -122,9 +122,7 @@ export const createLiveLanguageModel = (
             method: 'POST',
             headers: {
               // Local endpoints (Ollama/llama.cpp) need no credentials; omit the header then.
-              ...(options.apiKey
-                ? { authorization: `Bearer ${options.apiKey}` }
-                : {}),
+              ...(options.apiKey ? { authorization: `Bearer ${options.apiKey}` } : {}),
               'content-type': 'application/json',
             },
             body: JSON.stringify(body),
@@ -284,7 +282,9 @@ export const createLiveLanguageModelFromEnv = (
     ...(fetchImpl ? { fetchImpl } : {}),
     baseUrl: env.GAPOS_LLM_BASE_URL ?? (local ? LOCAL_LLM_BASE_URL : undefined),
     model: env.GAPOS_LLM_MODEL ?? (local ? LOCAL_LLM_MODEL : undefined),
-    ...(parseRouting(env.GAPOS_MODEL_ROUTING) ? { routing: parseRouting(env.GAPOS_MODEL_ROUTING) } : {}),
+    ...(parseRouting(env.GAPOS_MODEL_ROUTING)
+      ? { routing: parseRouting(env.GAPOS_MODEL_ROUTING) }
+      : {}),
     ...(env.GAPOS_LLM_PRICE_INPUT_MILLICENTS_PER_MT
       ? { priceInputMillicentsPerMToken: Number(env.GAPOS_LLM_PRICE_INPUT_MILLICENTS_PER_MT) }
       : {}),

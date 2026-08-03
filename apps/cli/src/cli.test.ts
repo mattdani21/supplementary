@@ -39,7 +39,14 @@ describe('the scripted CLI session (GAP-025)', () => {
     const created = collectIO();
     await gapNew(
       context,
-      ['--title', 'Relations and proof techniques', '--statement', REFERENCE_GAP_STATEMENT, '--minutes', '35'],
+      [
+        '--title',
+        'Relations and proof techniques',
+        '--statement',
+        REFERENCE_GAP_STATEMENT,
+        '--minutes',
+        '35',
+      ],
       created.io,
     );
     const gapId = created.lines[0]!.split(' ')[1]!;
@@ -48,11 +55,7 @@ describe('the scripted CLI session (GAP-025)', () => {
 
     // 2. source add
     const sourced = collectIO();
-    await sourceAdd(
-      context,
-      [gapId, '--text', SET_THEORY_SOURCE],
-      sourced.io,
-    );
+    await sourceAdd(context, [gapId, '--text', SET_THEORY_SOURCE], sourced.io);
     expect(sourced.lines[0]).toContain('added');
 
     // 3. compile
@@ -68,11 +71,17 @@ describe('the scripted CLI session (GAP-025)', () => {
 
     // 5. study — answer every question
     const studied = collectIO();
-    studied.answers.push('the union of equivalence classes is disjoint', 'a partition of the set', 'by applying the definition');
+    studied.answers.push(
+      'the union of equivalence classes is disjoint',
+      'a partition of the set',
+      'by applying the definition',
+    );
     await studyCommand(context, [gapId], studied.io);
     expect(studied.lines.some((l) => l.startsWith('day 1:'))).toBe(true);
     expect(studied.lines.some((l) => l.startsWith('Q:'))).toBe(true);
-    expect(studied.lines.some((l) => l.startsWith('correct') || l.startsWith('incorrect'))).toBe(true);
+    expect(studied.lines.some((l) => l.startsWith('correct') || l.startsWith('incorrect'))).toBe(
+      true,
+    );
 
     // 6. mastery
     const mastered = collectIO();

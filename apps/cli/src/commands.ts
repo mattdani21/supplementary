@@ -51,12 +51,18 @@ export const usage = (io: CliIO): void => {
   );
 };
 
-export const gapNew = async (context: ServerContext, args: readonly string[], io: CliIO): Promise<void> => {
+export const gapNew = async (
+  context: ServerContext,
+  args: readonly string[],
+  io: CliIO,
+): Promise<void> => {
   const title = arg(args, '--title') ?? (io.prompt ? await io.prompt('Title: ') : '');
   const statement =
     arg(args, '--statement') ??
     (io.prompt ? await io.prompt('What do you want to be able to do? ') : '');
-  const minutes = Number(arg(args, '--minutes') ?? (io.prompt ? await io.prompt('Minutes per day: ') : 35));
+  const minutes = Number(
+    arg(args, '--minutes') ?? (io.prompt ? await io.prompt('Minutes per day: ') : 35),
+  );
 
   const gap = await createGap(context, OWNER, {
     title: title || 'Untitled gap',
@@ -66,7 +72,11 @@ export const gapNew = async (context: ServerContext, args: readonly string[], io
   io.out(`created ${gap.id} (${gap.status})`);
 };
 
-export const gapList = async (context: ServerContext, _args: readonly string[], io: CliIO): Promise<void> => {
+export const gapList = async (
+  context: ServerContext,
+  _args: readonly string[],
+  io: CliIO,
+): Promise<void> => {
   const gaps = await context.uow.gaps.list(OWNER);
   if (gaps.length === 0) {
     io.out('no gaps yet');
@@ -75,7 +85,11 @@ export const gapList = async (context: ServerContext, _args: readonly string[], 
   for (const gap of gaps) io.out(`${gap.id}\t${gap.status}\t${gap.title}`);
 };
 
-export const gapShow = async (context: ServerContext, args: readonly string[], io: CliIO): Promise<void> => {
+export const gapShow = async (
+  context: ServerContext,
+  args: readonly string[],
+  io: CliIO,
+): Promise<void> => {
   const id = args[0] ?? '';
   const gap = await context.uow.gaps.get(OWNER, id);
   if (!gap) {
@@ -87,7 +101,11 @@ export const gapShow = async (context: ServerContext, args: readonly string[], i
   io.out(`  statement: ${gap.rawStatement}`);
 };
 
-export const sourceAdd = async (context: ServerContext, args: readonly string[], io: CliIO): Promise<void> => {
+export const sourceAdd = async (
+  context: ServerContext,
+  args: readonly string[],
+  io: CliIO,
+): Promise<void> => {
   const gapId = args[0] ?? '';
   const file = arg(args, '--file');
   const text = arg(args, '--text');
@@ -104,7 +122,12 @@ export const sourceAdd = async (context: ServerContext, args: readonly string[],
       ? 'text/html'
       : 'text/plain';
 
-  const result = await registerSource(context, OWNER, { gapId, filename, mediaType, text: content });
+  const result = await registerSource(context, OWNER, {
+    gapId,
+    filename,
+    mediaType,
+    text: content,
+  });
   if (result.accepted) {
     io.out(`source ${result.source.id} ${result.deduplicated ? '(reused)' : 'added'}`);
   } else {
@@ -112,7 +135,11 @@ export const sourceAdd = async (context: ServerContext, args: readonly string[],
   }
 };
 
-export const compileCommand = async (context: ServerContext, args: readonly string[], io: CliIO): Promise<void> => {
+export const compileCommand = async (
+  context: ServerContext,
+  args: readonly string[],
+  io: CliIO,
+): Promise<void> => {
   const gapId = args[0] ?? '';
   const outcome = await compileGap(context, OWNER, {
     gapId,
@@ -122,16 +149,24 @@ export const compileCommand = async (context: ServerContext, args: readonly stri
   if (outcome.status === 'failed' && outcome.error) io.out(`  ${outcome.error}`);
 };
 
-export const planCommand = async (context: ServerContext, args: readonly string[], io: CliIO): Promise<void> => {
+export const planCommand = async (
+  context: ServerContext,
+  args: readonly string[],
+  io: CliIO,
+): Promise<void> => {
   const gapId = args[0] ?? '';
   const curriculum = await context.uow.curricula.getCurrentForGap(OWNER, gapId);
   if (!curriculum) {
     io.out('no curriculum yet — compile the gap first');
     return;
   }
-  io.out(`plan: ${curriculum.durationDays} days × ${curriculum.dailyMinutes} min/day (${curriculum.status})`);
+  io.out(
+    `plan: ${curriculum.durationDays} days × ${curriculum.dailyMinutes} min/day (${curriculum.status})`,
+  );
   for (const objective of curriculum.plan.objectives) {
-    io.out(`  ${objective.required ? 'req' : 'opt'} ${objective.id}: ${objective.capabilityStatement}`);
+    io.out(
+      `  ${objective.required ? 'req' : 'opt'} ${objective.id}: ${objective.capabilityStatement}`,
+    );
   }
   const lessons = await context.uow.curricula.listLessons(OWNER, curriculum.id);
   for (const lesson of lessons) {
@@ -139,7 +174,11 @@ export const planCommand = async (context: ServerContext, args: readonly string[
   }
 };
 
-export const studyCommand = async (context: ServerContext, args: readonly string[], io: CliIO): Promise<void> => {
+export const studyCommand = async (
+  context: ServerContext,
+  args: readonly string[],
+  io: CliIO,
+): Promise<void> => {
   const gapId = args[0] ?? '';
   const today = await getToday(context, OWNER, gapId);
   if (!today.lesson) {
@@ -169,7 +208,11 @@ export const studyCommand = async (context: ServerContext, args: readonly string
   }
 };
 
-export const masteryCommand = async (context: ServerContext, args: readonly string[], io: CliIO): Promise<void> => {
+export const masteryCommand = async (
+  context: ServerContext,
+  args: readonly string[],
+  io: CliIO,
+): Promise<void> => {
   const gapId = args[0] ?? '';
   const mastery = await assessMastery(context, OWNER, gapId);
   io.out(
