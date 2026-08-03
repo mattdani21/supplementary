@@ -210,3 +210,42 @@ export const PREREQUISITE_REUSE_THRESHOLD = 0.6;
 
 export const satisfiesPrerequisite = (masteredAt: Date, now: Date, reinforcements = 0): boolean =>
   retainedStrength(masteredAt, now, reinforcements) >= PREREQUISITE_REUSE_THRESHOLD;
+
+/** A capability the learner demonstrated by filling a gap. */
+export interface PriorCapability {
+  /** Matches the capability text a new plan may declare as an external prerequisite. */
+  readonly capabilityId: string;
+  /** When the gap filled. The evidence decays from this point. */
+  readonly masteredAt: Date;
+  /** Later review passes extend the half-life. Zero by default: the conservative reading. */
+  readonly reinforcements?: number;
+}
+
+export interface PrerequisiteReuse {
+  /** Capabilities still strong enough to assume without reteaching. */
+  readonly satisfied: readonly string[];
+  /** Capabilities that have decayed below the reuse threshold and must be re-demonstrated. */
+  readonly decayed: readonly string[];
+}
+
+/**
+ * Classify the learner's prior mastered capabilities for a new curriculum.
+ *
+ * A capability above the reuse threshold can be handed to the planner as already held; one
+ * below it must not be assumed — the learner has to re-demonstrate it, which is the decay that
+ * forces a diagnostic rather than a silent reteach-or-skip decision.
+ */
+export const classifyPriorCapabilities = (
+  prior: readonly PriorCapability[],
+  now: Date,
+): PrerequisiteReuse => {
+  const satisfied: string[] = [];
+  const decayed: string[] = [];
+  for (const capability of prior) {
+    const target = satisfiesPrerequisite(capability.masteredAt, now, capability.reinforcements ?? 0)
+      ? satisfied
+      : decayed;
+    target.push(capability.capabilityId);
+  }
+  return { satisfied, decayed };
+};

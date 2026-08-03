@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-02T20:01:00.000Z",
+  "updatedAt": "2026-08-03T14:10:48.000Z",
   "controller": "gapos-controller",
   "tasks": {
     "GAP-000": {
@@ -133,24 +133,26 @@
       ]
     },
     "GAP-010": {
-      "status": "partial",
-      "notes": "The verifier and repair decision logic are done. Structural checks run without a model; independent solutions are interpreted here but obtained by the pipeline, which is not yet written.",
+      "status": "done",
+      "completedAt": "2026-08-03T14:10:48.000Z",
+      "notes": "Closed a stale 'partial': the note claimed the pipeline was not yet written, but compile.ts stages F-G run verify_artefact with independent solutions from the model, verifyLesson, decideRepair (repair->repair->exclude, never a third attempt), and partial publication when coverage does not survive. The end-to-end and security suites exercise it (a generator that obeys injection is caught structurally).",
       "evidence": [
         {
-          "command": "pnpm test packages/domain/src/verification",
+          "command": "pnpm test packages/domain/src/verification packages/domain/src/mastery tests/end-to-end",
           "result": "pass",
-          "note": "24 tests. All three reference lessons pass; answer leakage caught verbatim and by six-word phrase; a reworded distractor that restates the key is caught by content-sequence comparison; a missing rubric blocks publication; a disagreeing independent solve blocks publication; an injection signal is recorded as a finding without blocking a correct lesson; repair ladder is repair\u2192repair\u2192exclude, never a third attempt; partial when coverage does not survive"
+          "note": "24 verifier tests + 31 mastery tests + e2e journey/security suites: independent solutions, leakage rejection, repair ladder, partial publication all green."
         }
       ]
     },
     "GAP-012": {
-      "status": "partial",
-      "notes": "The mastery rule, grading and the review ladder are complete in the domain. Persistence wiring through the API is not yet done.",
+      "status": "done",
+      "completedAt": "2026-08-03T14:10:48.000Z",
+      "notes": "Closed a stale 'partial': learning-service.ts persists attempts, evidence, reviews and mastery checks through the API (submitAttempt, completeReview, runMasteryCheck), records knowledge edges on fill, and the journey proves two-session evidence fills a gap while consumption alone cannot.",
       "evidence": [
         {
-          "command": "pnpm test packages/domain/src/mastery",
+          "command": "pnpm test packages/domain/src/mastery tests/end-to-end",
           "result": "pass",
-          "note": "31 tests. Each of the five mastery clauses is broken individually and shown to block; consumption with no evidence cannot master; a failed application item does not satisfy the application clause; optional objectives never block filling; a prerequisite cycle blocks rather than hangs; decayed prior mastery stops satisfying a prerequisite; wrong answers schedule a same-session correction plus a next-day check; the ladder is 0\u21921\u21923\u21927 then graduate; a failed review drops back to the bottom"
+          "note": "31 mastery tests; journey tests cover listening-without-practice refusal, single-session refusal, two-session fill, review ladder scheduling."
         }
       ]
     },
@@ -206,13 +208,29 @@
       ]
     },
     "GAP-015": {
-      "status": "partial",
-      "notes": "Budget enforcement and step idempotency are done and covered end to end. The durable job queue table exists in the schema but the worker loop that leases from it is not yet written.",
+      "status": "done",
+      "completedAt": "2026-08-03T14:10:48.000Z",
+      "notes": "The durable job queue and worker loop are implemented. jobs table (already in 001) now has code: JobQueue (memory + Postgres) with atomic lease (FOR UPDATE SKIP LOCKED), lease-expiry re-claim, exponential backoff and dead-lettering; createCompileWorker polls, leases, runs compileGap and records outcomes; enqueueCompile moves the gap to compiling at request time. Budget degradation was already proven end-to-end. Two design gaps were found and fixed while building the retry path: (1) compileGap deduplicated ANY existing run, so a job retry with the same idempotency key could never re-run the pipeline and a crashed in-flight run would be 'completed' prematurely \u2014 added resumeExisting semantics (re-enter the run, reuse recorded steps, skip stages already reached) and attempt-scoped keys (user key for attempt 1, K#attempt-N after); (2) curricula now carry run_id (migration 003) so a resumed run re-enters its own curriculum instead of creating a second course, and artefact ids are deterministic (lesson:kind:segment:version) with addArtefact idempotent on them, so no audio is duplicated across a restart.",
       "evidence": [
         {
-          "command": "pnpm test tests/end-to-end",
+          "command": "pnpm test tests/end-to-end/worker.test.ts",
           "result": "pass",
-          "note": "An exhausted budget fails the run before any provider call rather than overspending, and increments budget_degradation_total; a provider failure fails the run cleanly and a retry compiles the identical course"
+          "note": "7 tests: enqueue->lease->complete lifecycle; leased-job return after worker death without duplication; retry-after-failure under a fresh attempt key; mid-run crash resume re-entering the run's curriculum (one course); dead-letter with last error + reproduction context; gap fail/retry parity with the API path; tenant scoping of jobs."
+        },
+        {
+          "command": "pnpm test packages/database/src/repositories/ownership.test.ts",
+          "result": "pass",
+          "note": "shared contract suite extended: getForRun owner-scoping and addArtefact idempotency on deterministic ids (both implementations)."
+        },
+        {
+          "command": "pnpm verify",
+          "result": "pass",
+          "note": "352 passed + 14 loud skips. Full gate green with the resume path and queue in place."
+        },
+        {
+          "command": "GAPOS_TEST_DATABASE_URL=... pnpm test tests/end-to-end/postgres-worker.test.ts",
+          "result": "pending",
+          "note": "SQL-level verification (atomic lease, lease-expiry re-claim, JSONB round-trip, resume against real Postgres) runs in CI where the pgvector service lives; skipped loudly locally without the URL."
         }
       ]
     },
@@ -295,6 +313,23 @@
         }
       ],
       "notes": "Found by reading a GREEN CI run's Postgres server log. Migration 001 declared UNIQUE (lesson_id, kind, version) on artefacts, encoding the assumption that a lesson has one artefact per kind. True for a transcript, false for audio: a script is synthesised as several segments, all kind='audio' at version 1, so the second insert violated the constraint. The insert threw, the pipeline's audio fallback caught it and degraded the lesson to transcript-only, and the run still reported success \u2014 an audio-first product shipping without audio, with only a warning line. The in-memory store has no constraints, so the memory journey passed throughout. Fixed by forward-only migration 002 adding segment_ordinal and a segment-aware unique constraint; the shared contract suite now stores four audio segments for one lesson so memory and SQL are held to the same behaviour, and both journeys assert audio publishes rather than only that the compile succeeded."
+    },
+    "GAP-013": {
+      "status": "done",
+      "completedAt": "2026-08-03T14:10:48.000Z",
+      "notes": "The capability library is now wired into compilation. classifyPriorCapabilities (domain) splits prior filled gaps' objectives + target capability into satisfied (>= 0.6 reuse threshold) and decayed. compile.ts recalls prior capabilities (stage B), passes satisfied into the planner's satisfiedExternalPrerequisites AND the learner brief (so the planner can copy them verbatim), and hands decayed capabilities to the diagnostic as material to re-demonstrate. Step input versions include the new inputs so retries stay idempotent. Search was already done; edges were already written on fill \u2014 the read side was missing.",
+      "evidence": [
+        {
+          "command": "pnpm test packages/domain/src/mastery",
+          "result": "pass",
+          "note": "5 new tests for classifyPriorCapabilities: fresh reuse, decay, mixed history, reinforcement extension, threshold crossing."
+        },
+        {
+          "command": "pnpm test tests/end-to-end/capability-reuse.test.ts",
+          "result": "pass",
+          "note": "5 tests. A strict provider (normalisation assumes nothing, diagnostic demonstrates nothing) makes the reference plan's 'set-builder notation' prerequisite only satisfiable via prior mastery: refused without it; satisfied by a fresh filled capability; refused again once 195 days of decay pass, with the decayed capability visible in the diagnostic instruction; per-learner scoping holds."
+        }
+      ]
     }
   },
   "GAP-014b": {

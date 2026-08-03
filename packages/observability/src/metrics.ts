@@ -20,6 +20,10 @@ export const METRICS = [
   'day_one_publication_latency_ms',
   'full_course_publication_latency_ms',
   'budget_degradation_total',
+  'prior_capability_decay_total',
+  'job_claimed_total',
+  'job_completed_total',
+  'job_failed_total',
   'job_dead_lettered_total',
 ] as const;
 

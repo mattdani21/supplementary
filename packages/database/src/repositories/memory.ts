@@ -246,7 +246,13 @@ export const createMemoryUnitOfWork = (store: MemoryStore = createMemoryStore())
     async getCurrentForGap(owner, gapId) {
       return store.curricula
         .where(owner, (c) => c.gapId === gapId && c.status !== 'superseded')
-        .sort((a, b) => b.version - a.version)[0];
+        .sort(
+          (a, b) =>
+            b.version - a.version || (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0),
+        )[0];
+    },
+    async getForRun(owner, runId) {
+      return store.curricula.where(owner, (c) => c.runId === runId)[0];
     },
     async setStatus(owner, id, status) {
       const curriculum = store.curricula.require('Curriculum', owner, id);
@@ -277,6 +283,8 @@ export const createMemoryUnitOfWork = (store: MemoryStore = createMemoryStore())
     },
 
     async addArtefact(owner, artefact) {
+      const existing = store.artefacts.get(owner, artefact.id);
+      if (existing) return existing;
       return store.artefacts.insert({ ...artefact, ownerId: owner });
     },
     async listArtefacts(owner, lessonId) {

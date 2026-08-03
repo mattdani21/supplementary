@@ -64,12 +64,15 @@ export interface Curriculum {
   readonly id: string;
   readonly ownerId: OwnerId;
   readonly gapId: string;
+  /** The generation run that produced it; a re-entered run re-enters its curriculum. */
+  readonly runId?: string;
   readonly version: number;
   readonly durationDays: number;
   readonly dailyMinutes: number;
   readonly status: 'draft' | 'published' | 'partial' | 'superseded';
   readonly qualityScore?: number;
   readonly plan: CurriculumPlan;
+  readonly createdAt?: Date;
 }
 
 export interface Lesson {
@@ -262,6 +265,8 @@ export interface CurriculumRepository {
   create(owner: OwnerId, curriculum: Omit<Curriculum, 'ownerId'>): Promise<Curriculum>;
   get(owner: OwnerId, id: string): Promise<Curriculum | undefined>;
   getCurrentForGap(owner: OwnerId, gapId: string): Promise<Curriculum | undefined>;
+  /** The curriculum a generation run produced — the run's own, which a resumed run re-enters. */
+  getForRun(owner: OwnerId, runId: string): Promise<Curriculum | undefined>;
   setStatus(owner: OwnerId, id: string, status: Curriculum['status']): Promise<Curriculum>;
 
   upsertLesson(owner: OwnerId, lesson: Omit<Lesson, 'ownerId'>): Promise<Lesson>;
@@ -331,6 +336,66 @@ export interface GenerationRepository {
 export interface KnowledgeRepository {
   addEdge(owner: OwnerId, edge: Omit<KnowledgeEdge, 'ownerId'>): Promise<KnowledgeEdge>;
   listEdges(owner: OwnerId): Promise<KnowledgeEdge[]>;
+}
+
+/* --------------------------------------------------------------------- job queue */
+
+export type JobKind = 'compile';
+export type JobState = 'ready' | 'leased' | 'succeeded' | 'failed' | 'dead_letter';
+
+export interface CompileJobPayload {
+  readonly gapId: string;
+  readonly idempotencyKey: string;
+  readonly audioEnabled?: boolean;
+  readonly concurrency?: number;
+}
+
+/**
+ * A durable work item. The worker leases jobs rather than deleting them, so a crash returns the
+ * job to the queue once `leasedUntil` passes; step idempotency then makes the re-run safe. A job
+ * that fails `maxAttempts` times is dead-lettered with its last error, and `payload` is the
+ * reproduction context (docs/OPERATIONS.md).
+ */
+export interface Job {
+  readonly id: string;
+  readonly ownerId: OwnerId;
+  readonly kind: JobKind;
+  readonly runId?: string;
+  readonly payload: CompileJobPayload;
+  readonly state: JobState;
+  readonly attempts: number;
+  readonly maxAttempts: number;
+  readonly availableAt: Date;
+  readonly leasedUntil?: Date;
+  readonly lastError?: string;
+  readonly createdAt: Date;
+}
+
+/**
+ * The durable job queue (GAP-015). Unlike the learner repositories this is system
+ * infrastructure — the worker processes every learner's jobs — so `claimDue` is deliberately
+ * the one method without an owner: it is the polling face of the worker, equivalent to the
+ * migration runner. Every other method is owner-scoped like everything else: completing or
+ * failing a job requires knowing its owner first, so a guessed job id is not a way to touch
+ * another learner's work.
+ */
+export interface JobQueue {
+  enqueue(
+    owner: OwnerId,
+    job: Omit<Job, 'ownerId' | 'state' | 'attempts' | 'availableAt' | 'createdAt'>,
+    now: Date,
+  ): Promise<Job>;
+  /**
+   * Lease the jobs that are due: `ready` with `availableAt` passed, or `leased` past their
+   * lease (a crashed worker's job returning to the queue). Postgres leases atomically with
+   * `FOR UPDATE SKIP LOCKED` so concurrent workers cannot claim the same job.
+   */
+  claimDue(now: Date, limit?: number, leaseDurationMs?: number): Promise<Job[]>;
+  complete(owner: OwnerId, id: string): Promise<Job | undefined>;
+  /** Record a failure: one more attempt, exponential backoff, dead-letter at `maxAttempts`. */
+  fail(owner: OwnerId, id: string, error: string, now: Date): Promise<Job | undefined>;
+  get(owner: OwnerId, id: string): Promise<Job | undefined>;
+  listByState(owner: OwnerId, state: JobState): Promise<Job[]>;
 }
 
 export interface UnitOfWork {

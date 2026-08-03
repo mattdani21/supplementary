@@ -33,17 +33,21 @@ import type { ObjectStore, OwnerId, UnitOfWork } from '@gapos/database';
 import { textOf } from '@gapos/database';
 import {
   DomainError,
+  GENERATION_STATUSES,
   blocksPublication,
   checkAudioIntegrity,
   chunkDocument,
+  classifyPriorCapabilities,
   decideRepair,
   findAssessmentGaps,
   findPlanViolations,
+  isTerminalGenerationStatus,
   segmentScript,
   transitionGeneration,
   verifyLesson,
   type Finding,
   type GenerationStatus,
+  type PriorCapability,
 } from '@gapos/domain';
 import type { Logger, Metrics } from '@gapos/observability';
 import type { Providers } from '@gapos/provider-adapters';
@@ -66,6 +70,13 @@ export interface CompileDeps {
   readonly concurrency?: number;
   /** Text-only mode. Audio also falls back to this automatically when synthesis fails. */
   readonly audioEnabled?: boolean;
+  /**
+   * Re-enter an existing run instead of deduplicating to it. The durable worker sets this: a
+   * crash left the run in flight and its steps recorded, so re-entry resumes from where it
+   * stopped (recorded steps are reused). The synchronous API path leaves it false, where a
+   * repeated idempotency key must return the existing run without touching it.
+   */
+  readonly resumeExisting?: boolean;
 }
 
 export interface CompileRequest {
@@ -131,22 +142,54 @@ export const compileGap = async (
   const logger = deps.logger.child({ runId: run.id, gapId: gap.id });
 
   if (!created) {
-    // The idempotency guarantee: a repeated compile returns the run already in flight rather
-    // than starting a second one and charging twice for the same curriculum.
-    logger.info('Compile already started for this idempotency key; returning the existing run');
-    return {
-      runId: run.id,
-      status: run.status,
-      days: await summariseExistingRun(owner, gap.id, deps),
-      deduplicated: true,
-    };
+    if (!deps.resumeExisting) {
+      // The idempotency guarantee: a repeated compile returns the run already in flight rather
+      // than starting a second one and charging twice for the same curriculum.
+      logger.info('Compile already started for this idempotency key; returning the existing run');
+      return {
+        runId: run.id,
+        status: run.status,
+        days: await summariseExistingRun(owner, gap.id, deps),
+        deduplicated: true,
+      };
+    }
+
+    // The worker re-enters its own run after a crash. An in-flight run is resumed from its
+    // recorded step state; a terminal one cannot be — report it as the failure it was, and the
+    // job's next attempt uses a fresh key.
+    if (isTerminalGenerationStatus(run.status)) {
+      if (run.status === 'complete' || run.status === 'partial') {
+        logger.info('Run already finished successfully; replaying its outcome', {
+          status: run.status,
+        });
+        return {
+          runId: run.id,
+          status: run.status,
+          days: await summariseExistingRun(owner, gap.id, deps),
+          deduplicated: false,
+        };
+      }
+      logger.warn('Run already ended; the attempt cannot resume it', { status: run.status });
+      return {
+        runId: run.id,
+        status: 'failed',
+        days: [],
+        error: run.error ?? `The run already ended as ${run.status}.`,
+        deduplicated: false,
+      };
+    }
+    logger.info('Resuming an in-flight run after a worker restart', { status: run.status });
   }
 
   const step: StepContext = { owner, runId: run.id, generation: uow.generation, logger, metrics };
   const compileStarted = Date.now();
 
   let status: GenerationStatus = run.status;
+  const stageOrder = new Map(GENERATION_STATUSES.map((stage, index) => [stage, index]));
   const advance = async (next: GenerationStatus): Promise<void> => {
+    // Re-entry must not walk backwards: a run resumed from `publishing` is already past
+    // `ingesting`, and the state machine would rightly refuse the backward transition.
+    if (stageOrder.get(status)! >= stageOrder.get(next)!) return;
     const result = transitionGeneration(status, next);
     if (!result.ok) throw result.error;
     status = result.value;
@@ -232,10 +275,42 @@ export const compileGap = async (
       };
     }
 
+    /* ----------------------------------- stage B: recall prior mastered capabilities */
+    // A filled gap is a reusable capability: its objectives and target capability can satisfy
+    // an external prerequisite in a new curriculum — while the evidence is still strong. Decayed
+    // evidence must not be assumed; the learner has to re-demonstrate it, so the decayed list is
+    // handed to the diagnostic as material it must not take for granted.
+    const filledGaps = await uow.gaps.list(owner, { status: 'filled' });
+    const priorCapabilities: PriorCapability[] = [];
+    for (const filled of filledGaps) {
+      const priorCurriculum = await uow.curricula.getCurrentForGap(owner, filled.id);
+      for (const objective of priorCurriculum?.plan.objectives ?? []) {
+        priorCapabilities.push({
+          capabilityId: objective.capabilityStatement,
+          masteredAt: filled.updatedAt,
+        });
+      }
+      if (filled.targetCapability) {
+        priorCapabilities.push({
+          capabilityId: filled.targetCapability,
+          masteredAt: filled.updatedAt,
+        });
+      }
+    }
+    const priorReuse = classifyPriorCapabilities(priorCapabilities, now());
+    if (priorReuse.decayed.length > 0) {
+      metrics.increment('prior_capability_decay_total', {
+        count: String(priorReuse.decayed.length),
+      });
+      logger.info('Prior capabilities have decayed; the diagnostic must re-demonstrate them', {
+        decayed: priorReuse.decayed.length,
+      });
+    }
+
     /* --------------------------------------------------------------- stage C: diagnose */
     const diagnostic = await runStep(
       step,
-      { step: 'interpret_diagnostic', inputVersion: hash(normalisation) },
+      { step: 'interpret_diagnostic', inputVersion: hash([normalisation, priorReuse.decayed]) },
       async () =>
         (
           await providers.languageModel.generate({
@@ -249,7 +324,12 @@ export const compileGap = async (
               `${normalisation.topic}; current state: ${normalisation.currentState}; target ` +
               `capability: ${normalisation.targetCapability} — infer a conservative baseline, ` +
               'set inferred to true, and recommend a lower starting difficulty so Day 1 ' +
-              'calibrates from the first attempts.',
+              'calibrates from the first attempts.' +
+              (priorReuse.decayed.length > 0
+                ? ` The learner previously demonstrated: ${priorReuse.decayed.join('; ')} — ` +
+                  'treat that as decayed. Do not assume it is current; recommend a ' +
+                  're-demonstration item so the evidence is re-established.'
+                : ''),
           })
         ).value,
     );
@@ -278,11 +358,21 @@ export const compileGap = async (
       ...(diagnostic.demonstratedCapabilities.length > 0
         ? [`The learner already demonstrates: ${diagnostic.demonstratedCapabilities.join(', ')}.`]
         : []),
+      ...(priorReuse.satisfied.length > 0
+        ? [
+            `The learner has previously mastered and still holds: ${priorReuse.satisfied.join(
+              ', ',
+            )}.`,
+          ]
+        : []),
     ].join(' ');
 
     const plan = await runStep(
       step,
-      { step: 'plan_curriculum', inputVersion: hash([normalisation, diagnostic]) },
+      {
+        step: 'plan_curriculum',
+        inputVersion: hash([normalisation, diagnostic, priorReuse.satisfied]),
+      },
       async () =>
         planCurriculum({
           runId: run.id,
@@ -293,21 +383,29 @@ export const compileGap = async (
           satisfiedExternalPrerequisites: [
             ...normalisation.assumedPrerequisites,
             ...diagnostic.demonstratedCapabilities,
+            ...priorReuse.satisfied,
           ],
           deps,
           logger,
         }),
     );
 
-    const curriculum = await uow.curricula.create(owner, {
-      id: newId('cur'),
-      gapId: gap.id,
-      version: 1,
-      durationDays: plan.days.length,
-      dailyMinutes: plan.dailyMinutes,
-      status: 'draft',
-      plan,
-    });
+    // The run's own curriculum, if it already exists (a resumed run re-enters it rather than
+    // creating a second course for the same gap — that is what keeps lesson and artefact ids
+    // stable across a restart). A fresh run creates one.
+    const curriculum =
+      (await uow.curricula.getForRun(owner, run.id)) ??
+      (await uow.curricula.create(owner, {
+        id: newId('cur'),
+        gapId: gap.id,
+        runId: run.id,
+        version: 1,
+        durationDays: plan.days.length,
+        dailyMinutes: plan.dailyMinutes,
+        status: 'draft',
+        plan,
+        createdAt: now(),
+      }));
 
     /* -------------------- stages E–H: generate, verify, repair, synthesise, publish */
     await advance('generating_lessons');
@@ -804,7 +902,8 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
           result.mediaType,
         );
         await uow.curricula.addArtefact(owner, {
-          id: newId('artefact'),
+          // Deterministic: a resumed run re-enters the same artefacts instead of duplicating them.
+          id: artefactId(lessonId, 'audio', index, repairAttempts + 1),
           lessonId,
           kind: 'audio',
           storageKey: result.storageKey,
@@ -829,7 +928,7 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
   }
 
   await uow.curricula.addArtefact(owner, {
-    id: newId('artefact'),
+    id: artefactId(lessonId, 'transcript', 0, repairAttempts + 1),
     lessonId,
     kind: 'transcript',
     storageKey: `${lessonId}/transcript`,
@@ -868,6 +967,18 @@ const requiredObjectivesCovered = (
   );
   return plan.objectives.filter((o) => o.required).every((o) => covered.has(o.id));
 };
+
+/**
+ * The stable identity of an artefact within a lesson. Keyed by (lesson, kind, segment, version)
+ * rather than a random id so a resumed run re-enters the same rows: `addArtefact` is idempotent
+ * on this id, which is what prevents duplicate audio after a worker restart.
+ */
+const artefactId = (
+  lessonId: string,
+  kind: 'audio' | 'transcript',
+  segmentOrdinal: number,
+  version: number,
+): string => `${lessonId}:${kind}:${segmentOrdinal}:v${version}`;
 
 /** The published items, as the blueprint conformance check needs to see them. */
 const collectPublishedItems = async (

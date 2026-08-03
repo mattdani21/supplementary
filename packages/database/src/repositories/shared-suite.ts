@@ -363,6 +363,83 @@ export const describeRepositoryContract = (name: string, harness: SuiteHarness):
       expect(lesson?.objectiveIds).toEqual(lessonPackage.objectiveIds);
     });
 
+    it('returns the curriculum a generation run produced, to the owner only', async () => {
+      await seedGap(uow, ALICE, 'gap_alice');
+      await seedGap(uow, ALICE, 'gap_alice_2');
+      const { run } = await uow.generation.startRun(ALICE, {
+        id: 'run_cur',
+        gapId: 'gap_alice',
+        pipelineVersion: '1.0.0',
+        status: 'queued',
+        idempotencyKey: 'key_cur',
+        startedAt: new Date('2026-08-02T09:00:00Z'),
+        costMillicents: 0,
+      });
+      const created = await uow.curricula.create(ALICE, {
+        id: 'cur_run',
+        gapId: 'gap_alice',
+        runId: run.id,
+        version: 1,
+        durationDays: 1,
+        dailyMinutes: 35,
+        status: 'draft',
+        plan: referencePlan('gap_alice'),
+      });
+
+      // A resumed run finds its own curriculum…
+      expect((await uow.curricula.getForRun(ALICE, run.id))?.id).toBe(created.id);
+      // …and nobody else's run or learner can.
+      expect(await uow.curricula.getForRun(ALICE, 'run_unknown')).toBeUndefined();
+      expect(await uow.curricula.getForRun(BOB, run.id)).toBeUndefined();
+    });
+
+    it('is idempotent on artefact identity, as a resumed run needs it to be', async () => {
+      // A worker restart re-enters the same lesson and re-synthesises from the recorded step,
+      // then adds the artefact rows again. The deterministic id (lesson:kind:segment:version)
+      // must make that a no-op, or a green restart would double the audio.
+      await seedGap(uow, ALICE, 'gap_alice');
+      const curriculum = await uow.curricula.create(ALICE, {
+        id: 'cur_art',
+        gapId: 'gap_alice',
+        version: 1,
+        durationDays: 1,
+        dailyMinutes: 35,
+        status: 'published',
+        plan: referencePlan('gap_alice'),
+      });
+      await uow.curricula.upsertLesson(ALICE, {
+        id: 'lesson_art',
+        curriculumId: curriculum.id,
+        day: 1,
+        ordinal: 0,
+        title: 'Lesson',
+        estimatedMinutes: 5,
+        objectiveIds: ['obj_a'],
+        package: referenceLesson(1),
+        version: 1,
+        publicationStatus: 'published',
+      });
+
+      const artefact = {
+        id: 'lesson_art:audio:0:v1',
+        lessonId: 'lesson_art',
+        kind: 'audio' as const,
+        storageKey: 'lesson_art/seg_0',
+        mediaType: 'audio/mpeg',
+        checksum: 'checksum',
+        durationSeconds: 30,
+        version: 1,
+        segmentOrdinal: 0,
+        frozen: false,
+      };
+      await uow.curricula.addArtefact(ALICE, artefact);
+      await uow.curricula.addArtefact(ALICE, { ...artefact, checksum: 're-synthesised' });
+
+      const artefacts = await uow.curricula.listArtefacts(ALICE, 'lesson_art');
+      expect(artefacts).toHaveLength(1);
+      expect(artefacts[0]?.checksum).toBe('checksum');
+    });
+
     it('hides runs, steps and findings from another learner', async () => {
       await seedGap(uow, ALICE, 'gap_alice');
       const { run } = await uow.generation.startRun(ALICE, {

@@ -132,12 +132,14 @@ const toCurriculum = (row: any): Curriculum => ({
   id: row.id,
   ownerId: row.owner_id,
   gapId: row.gap_id,
+  runId: row.run_id ?? undefined,
   version: row.version,
   durationDays: row.duration_days,
   dailyMinutes: row.daily_minutes,
   status: row.status,
   ...(row.quality_score === null ? {} : { qualityScore: Number(row.quality_score) }),
   plan: row.plan as CurriculumPlan,
+  createdAt: new Date(row.created_at),
 });
 
 const toLesson = (row: any): Lesson => ({
@@ -530,13 +532,14 @@ export const createPostgresUnitOfWork = (pool: Pool): UnitOfWork => {
   const curricula: CurriculumRepository = {
     async create(owner, curriculum) {
       const { rows } = await db.query(
-        `INSERT INTO curricula (id, owner_id, gap_id, version, duration_days, daily_minutes,
+        `INSERT INTO curricula (id, owner_id, gap_id, run_id, version, duration_days, daily_minutes,
                                 status, quality_score, plan)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb) RETURNING *`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb) RETURNING *`,
         [
           curriculum.id,
           owner,
           curriculum.gapId,
+          curriculum.runId ?? null,
           curriculum.version,
           curriculum.durationDays,
           curriculum.dailyMinutes,
@@ -560,8 +563,16 @@ export const createPostgresUnitOfWork = (pool: Pool): UnitOfWork => {
       const { rows } = await db.query(
         `SELECT * FROM curricula
           WHERE owner_id = $1 AND gap_id = $2 AND status <> 'superseded'
-          ORDER BY version DESC LIMIT 1`,
+          ORDER BY version DESC, created_at DESC, id LIMIT 1`,
         [owner, gapId],
+      );
+      return one(rows, toCurriculum);
+    },
+
+    async getForRun(owner, runId) {
+      const { rows } = await db.query(
+        'SELECT * FROM curricula WHERE owner_id = $1 AND run_id = $2 ORDER BY created_at DESC, id LIMIT 1',
+        [owner, runId],
       );
       return one(rows, toCurriculum);
     },
@@ -684,7 +695,9 @@ export const createPostgresUnitOfWork = (pool: Pool): UnitOfWork => {
       const { rows } = await db.query(
         `INSERT INTO artefacts (id, owner_id, lesson_id, kind, storage_key, media_type, checksum,
                                 duration_seconds, version, segment_ordinal, frozen)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+         ON CONFLICT (id) DO UPDATE SET frozen = artefacts.frozen
+         RETURNING *`,
         [
           artefact.id,
           owner,

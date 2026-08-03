@@ -9,6 +9,7 @@
 import { screenSource, transitionGap, type GapStatus, type GapTransition } from '@gapos/domain';
 import { bytesOfText, checksumOf, type Gap, type OwnerId, type Source } from '@gapos/database';
 import { compileGap, type CompileOutcome } from '../../../../worker/src/pipeline/compile.js';
+import { beginCompilation, finishCompilation } from '../../../../worker/src/pipeline/lifecycle.js';
 import type { ServerContext } from '../context.js';
 
 export interface CreateGapInput {
@@ -135,14 +136,7 @@ export const compile = async (
   const gap = await context.uow.gaps.get(owner, input.gapId);
   if (!gap) throw new Error(`Gap ${input.gapId} was not found for this owner.`);
 
-  if (gap.status === 'ready' || gap.status === 'active' || gap.status === 'failed') {
-    await applyTransition(
-      context,
-      owner,
-      input.gapId,
-      gap.status === 'failed' ? { type: 'retry_compilation' } : { type: 'compile' },
-    );
-  }
+  await beginCompilation(context.uow, owner, input.gapId);
 
   const outcome = await compileGap(
     { owner, gapId: input.gapId, idempotencyKey: input.idempotencyKey },
@@ -159,20 +153,7 @@ export const compile = async (
     },
   );
 
-  if (outcome.deduplicated) return outcome;
-
-  const current = await context.uow.gaps.get(owner, input.gapId);
-  if (current?.status === 'compiling') {
-    await applyTransition(
-      context,
-      owner,
-      input.gapId,
-      outcome.status === 'failed'
-        ? { type: 'compilation_failed', reason: outcome.error ?? 'unknown' }
-        : { type: 'compilation_succeeded' },
-    );
-  }
-
+  await finishCompilation(context.uow, owner, input.gapId, outcome);
   return outcome;
 };
 
