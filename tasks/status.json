@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-03T15:35:05.000Z",
+  "updatedAt": "2026-08-03T15:37:02.000Z",
   "controller": "gapos-controller",
   "tasks": {
     "GAP-000": {
@@ -462,12 +462,28 @@
       ]
     },
     "GAP-029": {
-      "status": "ready",
-      "notes": "Defined in the next-loop plan; awaiting execution."
+      "status": "done",
+      "notes": "Provider routing by policy (E17). The live language model accepts a per-purpose routing table (purpose -> model); unlisted purposes fall back to the default model. createLiveLanguageModelFromEnv parses GAPOS_MODEL_ROUTING ('planning:model-a,teaching:model-b'). Tests prove a teaching call uses the teaching model, a planning call the planning model, and an unlisted purpose the default, plus env parsing.",
+      "completedAt": "2026-08-03T15:37:02.000Z",
+      "evidence": [
+        {
+          "command": "pnpm test packages/provider-adapters/src/live-mode.test.ts",
+          "result": "pass",
+          "note": "Provider routing by policy (E17). The live language model accepts a per-purpose routing table (purpose -> model); unlisted purposes fall back to the default model. createLiveLanguageModelFromEnv parses GAPOS_MODEL_ROUTING ('planning:model-a,teaching:model-b'). Tests prove a teaching call uses the teaching model, a planning call the planning model, and an unlisted purpose the default, plus env parsing."
+        }
+      ]
     },
     "GAP-030": {
-      "status": "ready",
-      "notes": "Defined in the next-loop plan; awaiting execution."
+      "status": "done",
+      "notes": "Local-model execution preset (E18). GAPOS_LLM_MODE=local assembles the live backend against Ollama/llama.cpp's OpenAI-compatible endpoint (default http://localhost:11434/v1, model qwen2.5:7b-instruct) with no API key \u2014 the Authorization header is omitted when no key is set. The remote gate still applies without local mode (GAPOS_LLM_API_KEY required). Tested with a scripted fetch; model qualification against the evaluation pack is documented in OPERATIONS.md.",
+      "completedAt": "2026-08-03T15:37:02.000Z",
+      "evidence": [
+        {
+          "command": "pnpm test packages/provider-adapters/src/live-mode.test.ts",
+          "result": "pass",
+          "note": "Local-model execution preset (E18). GAPOS_LLM_MODE=local assembles the live backend against Ollama/llama.cpp's OpenAI-compatible endpoint (default http://localhost:11434/v1, model qwen2.5:7b-instruct) with no API key \u2014 the Authorization header is omitted when no key is set. The remote gate still applies without local mode (GAPOS_LLM_API_KEY required). Tested with a scripted fetch; model qualification against the evaluation pack is documented in OPERATIONS.md."
+        }
+      ]
     },
     "GAP-031": {
       "status": "done",

@@ -11,6 +11,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { createLogger, createMetrics, CostAccountant } from '@gapos/observability';
 import { createLiveSpeechToText } from './live/speech-to-text.js';
 import { createLiveEmbeddings } from './live/embeddings.js';
+import { createLiveLanguageModel, createLiveLanguageModelFromEnv } from './live/language-model.js';
 import { createProviders } from './factory.js';
 
 const audioBytes = new Uint8Array([0, 1, 2, 3, 4]);
@@ -87,6 +88,79 @@ describe('live speech-to-text backend', () => {
         userId: 'user_1',
       }),
     ).rejects.toMatchObject({ name: 'LiveSpeechToTextError', code: 'http' });
+  });
+});
+
+describe('provider routing (E17) and the local preset (E18)', () => {
+  const completionFetch = (capture: { bodies: { model?: string; authorization?: string }[] }) =>
+    scriptedFetch(async (_url, init) => {
+      const body = JSON.parse(String(init.body)) as { model?: string };
+      const headers = (init.headers ?? {}) as Record<string, string>;
+      capture.bodies.push({ model: body.model, authorization: headers.authorization });
+      return {
+        status: 200,
+        body: {
+          model: body.model ?? 'm',
+          choices: [{ message: { content: JSON.stringify({ ok: true }) } }],
+          usage: { prompt_tokens: 10, completion_tokens: 5 },
+        },
+      };
+    });
+
+  const request = (purpose: string) => ({
+    instruction: 'Produce the artefact',
+    evidenceBlock: '<evidence/>',
+    contractName: 'lesson_package',
+    contractVersion: '1.0.0',
+    purpose,
+  });
+
+  it('routes the model by call purpose', async () => {
+    const capture: { bodies: { model?: string; authorization?: string }[] } = { bodies: [] };
+    const backend = createLiveLanguageModel({
+      apiKey: 'key',
+      model: 'default-model',
+      routing: { teaching: 'teacher-model', planning: 'planner-model' },
+      fetchImpl: completionFetch(capture),
+    });
+
+    await backend.complete(request('teaching'));
+    await backend.complete(request('planning'));
+    await backend.complete(request('verification')); // unlisted -> default
+    expect(capture.bodies.map((b) => b.model)).toEqual([
+      'teacher-model',
+      'planner-model',
+      'default-model',
+    ]);
+  });
+
+  it('parses the routing table from the environment', async () => {
+    const capture: { bodies: { model?: string; authorization?: string }[] } = { bodies: [] };
+    const backend = createLiveLanguageModelFromEnv(
+      {
+        GAPOS_LLM_API_KEY: 'key',
+        GAPOS_MODEL_ROUTING: 'teaching:model-x,planning:model-y',
+      },
+      completionFetch(capture),
+    );
+    await backend.complete(request('teaching'));
+    expect(capture.bodies[0]?.model).toBe('model-x');
+  });
+
+  it('assembles the local preset without any key (E18)', async () => {
+    const capture: { bodies: { model?: string; authorization?: string }[] } = { bodies: [] };
+    const backend = createLiveLanguageModelFromEnv(
+      { GAPOS_LLM_MODE: 'local' },
+      completionFetch(capture),
+    );
+    const completion = await backend.complete(request('teaching'));
+    expect(completion.json).toEqual({ ok: true });
+    expect(capture.bodies[0]?.model).toBe('qwen2.5:7b-instruct');
+    expect(capture.bodies[0]?.authorization).toBeUndefined();
+  });
+
+  it('still refuses live mode without a key and without the local mode', () => {
+    expect(() => createLiveLanguageModelFromEnv({})).toThrow(/GAPOS_LLM_API_KEY/);
   });
 });
 
