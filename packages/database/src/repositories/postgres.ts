@@ -164,6 +164,8 @@ const toLesson = (row: any): Lesson => ({
   version: row.version,
   publicationStatus: row.publication_status,
   ...(row.published_at ? { publishedAt: row.published_at } : {}),
+  ...(row.review_status ? { reviewStatus: row.review_status } : {}),
+  ...(row.review_note ? { reviewNote: row.review_note } : {}),
 });
 
 const toArtefact = (row: any): Artefact => ({
@@ -674,6 +676,18 @@ export const createPostgresUnitOfWork = (pool: Pool): UnitOfWork => {
         [lessonId, owner, at],
       );
       return require_(one(rows, toLesson), 'Lesson', lessonId);
+    },
+
+    async setReview(owner, lessonId, reviewStatus, note) {
+      const { rows } = await db.query(
+        `UPDATE lessons
+            SET review_status = $3,
+                review_note = COALESCE($4, review_note)
+          WHERE id = $1 AND owner_id = $2
+          RETURNING *`,
+        [lessonId, owner, reviewStatus, note ?? null],
+      );
+      return one(rows, toLesson);
     },
 
     async upsertQuestions(owner, questions) {

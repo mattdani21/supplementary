@@ -18,7 +18,10 @@ export default async function GapsPage() {
     <main>
       <header className="row">
         <h1>GapOS</h1>
-        <OwnerSwitcher />
+        <span className="actions">
+          <Link href="/review">Review queue</Link>
+          <OwnerSwitcher />
+        </span>
       </header>
 
       {gaps.length === 0 ? (

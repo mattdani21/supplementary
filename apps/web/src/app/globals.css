@@ -136,6 +136,19 @@ h2 {
   width: 12rem;
 }
 
+.actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.review {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
 .map {
   width: 100%;
   height: auto;

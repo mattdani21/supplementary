@@ -37,6 +37,8 @@ import {
   masteryView,
   registerSourceHandler,
   requireOwner,
+  reviewLesson,
+  reviewQueue,
   submitAttemptHandler,
   toHttpError,
   todayView,
@@ -287,5 +289,58 @@ describe('the knowledge map (E15)', () => {
     const { context } = buildContext();
     const gapId = await seedCompiledGap(context, OWNER);
     await expect(knowledgeMap(context, OTHER, gapId)).rejects.toMatchObject({ status: 404 });
+  });
+});
+
+describe('the educator review queue (E19)', () => {
+  it('flags lessons whose run recorded findings, and records a rejection with a note', async () => {
+    const { context } = buildContext();
+    const gapId = await seedCompiledGap(context);
+
+    // Inject an audit finding into the run that produced the curriculum.
+    const { curriculum } = (await getCurriculum(context, OWNER, gapId)) as {
+      curriculum: { runId: string };
+    };
+    await context.uow.generation.addFinding(OWNER, {
+      id: 'finding_1',
+      runId: curriculum.runId,
+      targetId: 'chunk_1',
+      category: 'prompt_injection',
+      severity: 'high',
+      finding: 'A hostile paragraph tried to override instructions.',
+      repairStatus: 'open',
+      repairAttempts: 0,
+    });
+
+    const { items } = await reviewQueue(context, OWNER);
+    expect(items.length).toBeGreaterThan(0);
+    const flagged = items.find((item) => item.findings.some((f) => f.severity === 'high'));
+    expect(flagged).toBeDefined();
+
+    // Reject with a note; the queue and the lesson both carry it.
+    const decided = (await reviewLesson(context, OWNER, flagged!.lessonId, {
+      decision: 'reject',
+      note: 'Rewrite: the first paragraph is hostile.',
+    })) as { lesson: { reviewStatus: string; reviewNote: string } };
+    expect(decided.lesson.reviewStatus).toBe('rejected');
+    expect(decided.lesson.reviewNote).toBe('Rewrite: the first paragraph is hostile.');
+
+    const after = await reviewQueue(context, OWNER);
+    expect(after.items.find((item) => item.lessonId === flagged!.lessonId)).toMatchObject({
+      reviewStatus: 'rejected',
+      reviewNote: 'Rewrite: the first paragraph is hostile.',
+    });
+  });
+
+  it('stays inside the owner', async () => {
+    const { context } = buildContext();
+    const gapId = await seedCompiledGap(context, OWNER);
+    const { curriculum } = (await getCurriculum(context, OWNER, gapId)) as {
+      curriculum: { runId: string };
+    };
+    await expect(
+      reviewLesson(context, OTHER, 'lesson_1', { decision: 'approve' }),
+    ).rejects.toMatchObject({ status: 404 });
+    expect(curriculum.runId).toBeTruthy();
   });
 });

@@ -11,7 +11,12 @@
 
 import { z } from 'zod';
 import type { GapTransition } from '@gapos/domain';
-import { ConcurrentModificationError, NotFoundError, type OwnerId } from '@gapos/database';
+import {
+  ConcurrentModificationError,
+  NotFoundError,
+  type Lesson,
+  type OwnerId,
+} from '@gapos/database';
 import { ProviderBudgetError } from '@gapos/provider-adapters';
 import type { ServerContext } from './context.js';
 import {
@@ -308,6 +313,76 @@ export const masteryView = async (
 ): Promise<{ mastery: unknown }> => ({
   mastery: await assessMastery(context, owner, gapId),
 });
+
+export interface ReviewQueueItem {
+  readonly lessonId: string;
+  readonly lessonTitle: string;
+  readonly day: number;
+  readonly gapId: string;
+  readonly gapTitle: string;
+  readonly reviewStatus?: Lesson['reviewStatus'];
+  readonly reviewNote?: string;
+  readonly findings: readonly { category: string; severity: string; finding: string }[];
+}
+
+/**
+ * The educator review queue (E19): lessons from curricula whose generation run recorded audit
+ * findings, plus their review state. A lesson the reviewer has decided on still appears, marked
+ * with the decision and note, so the queue is an audit trail rather than a disappearing list.
+ */
+export const reviewQueue = async (
+  context: ServerContext,
+  owner: OwnerId,
+): Promise<{ items: ReviewQueueItem[] }> => {
+  const gaps = await context.uow.gaps.list(owner);
+  const items: ReviewQueueItem[] = [];
+  for (const gap of gaps) {
+    const curriculum = await context.uow.curricula.getCurrentForGap(owner, gap.id);
+    if (!curriculum?.runId) continue;
+    const findings = await context.uow.generation.listFindings(owner, curriculum.runId);
+    if (findings.length === 0) continue;
+    const lessons = await context.uow.curricula.listLessons(owner, curriculum.id);
+    for (const lesson of lessons) {
+      items.push({
+        lessonId: lesson.id,
+        lessonTitle: lesson.title,
+        day: lesson.day,
+        gapId: gap.id,
+        gapTitle: gap.title,
+        reviewStatus: lesson.reviewStatus,
+        reviewNote: lesson.reviewNote,
+        findings: findings.map((f) => ({
+          category: f.category,
+          severity: f.severity,
+          finding: f.finding,
+        })),
+      });
+    }
+  }
+  return { items };
+};
+
+const reviewDecisionSchema = z.object({
+  decision: z.enum(['approve', 'reject']),
+  note: z.string().max(2000).optional(),
+});
+
+export const reviewLesson = async (
+  context: ServerContext,
+  owner: OwnerId,
+  lessonId: string,
+  body: unknown,
+): Promise<{ lesson: unknown }> => {
+  const { decision, note } = reviewDecisionSchema.parse(body);
+  const lesson = await context.uow.curricula.setReview(
+    owner,
+    lessonId,
+    decision === 'approve' ? 'approved' : 'rejected',
+    note,
+  );
+  if (!lesson) throw new ApiError(404, 'lesson_not_found', `Lesson ${lessonId} was not found.`);
+  return { lesson };
+};
 
 /**
  * Voice gap capture (E16): transcribe raw audio and return an editable draft. The transcript
