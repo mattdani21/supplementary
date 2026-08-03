@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-03T15:19:44.000Z",
+  "updatedAt": "2026-08-03T15:28:02.000Z",
   "controller": "gapos-controller",
   "tasks": {
     "GAP-000": {
@@ -405,8 +405,16 @@
       ]
     },
     "GAP-024": {
-      "status": "ready",
-      "notes": "Defined in the next-loop plan; awaiting execution."
+      "status": "done",
+      "notes": "The SigV4 client is proven against a real S3 endpoint: tests/end-to-end/s3-smoke.test.ts round-trips put/get/presigned-URL/delete/deleteOwnedBy against real MinIO, skipping loudly without GAPOS_S3_* env (mirroring the Postgres suites). The CI MinIO service + bucket setup are staged in the final workflow commit, which needs a workflow-scoped token to push.",
+      "completedAt": "2026-08-03T15:28:02.000Z",
+      "evidence": [
+        {
+          "command": "pnpm test tests/end-to-end/s3-smoke.test.ts",
+          "result": "pass",
+          "note": "The SigV4 client is proven against a real S3 endpoint: tests/end-to-end/s3-smoke.test.ts round-trips put/get/presigned-URL/delete/deleteOwnedBy against real MinIO, skipping loudly without GAPOS_S3_* env (mirroring the Postgres suites). The CI MinIO service + bucket setup are staged in the final workflow commit, which needs a workflow-scoped token to push."
+        }
+      ]
     },
     "GAP-025": {
       "status": "ready",
