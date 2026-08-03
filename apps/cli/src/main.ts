@@ -20,7 +20,11 @@ import {
 } from './commands.js';
 import { createInterface } from 'node:readline/promises';
 
-const out = (line: string): void => console.log(line);
+const out = (line: string): void => {
+  // The CLI's stdout is its interface; lint's no-console exception covers warn/error only,
+  // so the CLI writes through process.stdout explicitly.
+  process.stdout.write(`${line}\n`);
+};
 
 const isTty = process.stdin.isTTY === true;
 

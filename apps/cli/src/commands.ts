@@ -11,7 +11,6 @@ import { randomUUID } from 'node:crypto';
 import type { OwnerId } from '@gapos/database';
 import type { ServerContext } from '../../web/src/server/context.js';
 import {
-  applyTransition,
   compile as compileGap,
   createGap,
   registerSource,
