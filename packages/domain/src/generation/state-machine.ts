@@ -90,6 +90,8 @@ export const transitionGeneration = (
 
 export const GENERATION_STEPS = [
   'ingest_source',
+  'embed_chunk',
+  'embed_query',
   'normalise_gap',
   'interpret_diagnostic',
   'plan_curriculum',

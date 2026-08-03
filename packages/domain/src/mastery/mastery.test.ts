@@ -3,6 +3,7 @@ import {
   MASTERY_THRESHOLD,
   assessCurriculum,
   assessObjective,
+  classifyPriorCapabilities,
   satisfiesPrerequisite,
   retainedStrength,
   type Evidence,
@@ -192,6 +193,67 @@ describe('decay and prerequisite reuse', () => {
 
   it('is full strength at the moment of mastery', () => {
     expect(retainedStrength(mastered, mastered)).toBe(1);
+  });
+});
+
+describe('classifyPriorCapabilities', () => {
+  const now = new Date('2026-02-01T00:00:00Z');
+
+  it('treats recent mastery as reusable for a new curriculum', () => {
+    const result = classifyPriorCapabilities(
+      [{ capabilityId: 'set-builder notation', masteredAt: new Date('2026-01-01T00:00:00Z') }],
+      now,
+    );
+    expect(result.satisfied).toEqual(['set-builder notation']);
+    expect(result.decayed).toEqual([]);
+  });
+
+  it('flags mastery that has decayed below the reuse threshold', () => {
+    const result = classifyPriorCapabilities(
+      [{ capabilityId: 'set-builder notation', masteredAt: new Date('2025-06-01T00:00:00Z') }],
+      now,
+    );
+    expect(result.decayed).toEqual(['set-builder notation']);
+    expect(result.satisfied).toEqual([]);
+  });
+
+  it('classifies a mixed history into both buckets', () => {
+    const result = classifyPriorCapabilities(
+      [
+        { capabilityId: 'fresh', masteredAt: new Date('2026-01-20T00:00:00Z') },
+        { capabilityId: 'stale', masteredAt: new Date('2025-01-01T00:00:00Z') },
+      ],
+      now,
+    );
+    expect(result.satisfied).toEqual(['fresh']);
+    expect(result.decayed).toEqual(['stale']);
+  });
+
+  it('keeps reinforced mastery reusable longer than unreinforced mastery', () => {
+    const oldButReinforced = new Date('2025-10-01T00:00:00Z');
+    const reinforced = classifyPriorCapabilities(
+      [{ capabilityId: 'x', masteredAt: oldButReinforced, reinforcements: 4 }],
+      new Date('2026-02-01T00:00:00Z'),
+    );
+    const unreinforced = classifyPriorCapabilities(
+      [{ capabilityId: 'x', masteredAt: oldButReinforced }],
+      new Date('2026-02-01T00:00:00Z'),
+    );
+    expect(reinforced.satisfied).toEqual(['x']);
+    expect(unreinforced.decayed).toEqual(['x']);
+  });
+
+  it('crosses the reuse threshold somewhere inside the half-life', () => {
+    // The 0.6 threshold is crossed at log2(1/0.6) × 90 ≈ 66 days of decay. Concrete dates on
+    // either side pin the classification without depending on float-exact boundary arithmetic.
+    const sixtyDays = new Date(now.getTime() - 60 * 86_400_000);
+    const seventyDays = new Date(now.getTime() - 70 * 86_400_000);
+    expect(
+      classifyPriorCapabilities([{ capabilityId: 'x', masteredAt: sixtyDays }], now).satisfied,
+    ).toEqual(['x']);
+    expect(
+      classifyPriorCapabilities([{ capabilityId: 'x', masteredAt: seventyDays }], now).decayed,
+    ).toEqual(['x']);
   });
 });
 

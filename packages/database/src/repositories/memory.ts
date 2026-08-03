@@ -98,6 +98,21 @@ export interface MemoryStore {
   readonly auditLog: { ownerId?: OwnerId; action: string; target: string }[];
 }
 
+/** Cosine similarity in [0, 1]; identical vectors score 1, orthogonal score 0. */
+export const cosineSimilarity = (a: readonly number[], b: readonly number[]): number => {
+  let dot = 0;
+  let normA = 0;
+  let normB = 0;
+  const length = Math.min(a.length, b.length);
+  for (let i = 0; i < length; i++) {
+    dot += a[i]! * b[i]!;
+    normA += a[i]! * a[i]!;
+    normB += b[i]! * b[i]!;
+  }
+  if (normA === 0 || normB === 0) return 0;
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+};
+
 export const createMemoryStore = (): MemoryStore => ({
   users: new Map(),
   gaps: new OwnedTable(),
@@ -213,26 +228,46 @@ export const createMemoryUnitOfWork = (store: MemoryStore = createMemoryStore())
         .where(owner, (c) => c.sourceId === sourceId)
         .sort((a, b) => a.ordinal - b.ordinal);
     },
-    async searchChunks(owner, gapId, query, limit = 8) {
-      // Lexical overlap stands in for the vector index. The property being tested here is the
-      // ownership and gap boundary, which is identical in both implementations.
+    async setChunkEmbeddings(owner, sourceId, vectors) {
+      for (const { chunkId, vector } of vectors) {
+        const chunk = store.chunks.get(owner, chunkId);
+        if (chunk && chunk.sourceId === sourceId) {
+          store.chunks.replace({ ...chunk, embedding: vector });
+        }
+      }
+    },
+    async searchChunks(owner, gapId, query, limit = 8, embedding) {
+      // The property being tested is the ownership and gap boundary, identical in both
+      // implementations; the ranking differs. With a query embedding and embedded chunks,
+      // rank by cosine similarity; otherwise fall back to lexical overlap.
       const gapSourceIds = new Set(
         store.sources.where(owner, (s) => s.gapId === gapId).map((s) => s.id),
       );
+      const chunks = store.chunks.where(owner, (c) => gapSourceIds.has(c.sourceId));
+      const embedded = embedding !== undefined && chunks.some((c) => c.embedding !== undefined);
+
       const terms = query
         .toLowerCase()
         .split(/\W+/)
         .filter((t) => t.length > 3);
-      return store.chunks
-        .where(owner, (c) => gapSourceIds.has(c.sourceId))
-        .map((chunk) => {
-          const text = chunk.text.toLowerCase();
-          return { chunk, score: terms.filter((t) => text.includes(t)).length };
-        })
-        .filter((scored) => scored.score > 0)
+
+      const scored = chunks.map((chunk) => {
+        if (embedded) {
+          // Mirrors the SQL path: only embedded chunks compete, ranked by cosine distance.
+          return {
+            chunk,
+            score: chunk.embedding ? cosineSimilarity(embedding!, chunk.embedding) : 0,
+          };
+        }
+        const text = chunk.text.toLowerCase();
+        return { chunk, score: terms.filter((t) => text.includes(t)).length };
+      });
+
+      return scored
+        .filter((s) => s.score > 0)
         .sort((a, b) => b.score - a.score || a.chunk.ordinal - b.chunk.ordinal)
         .slice(0, limit)
-        .map((scored) => scored.chunk);
+        .map((s) => s.chunk);
     },
   };
 
@@ -246,7 +281,13 @@ export const createMemoryUnitOfWork = (store: MemoryStore = createMemoryStore())
     async getCurrentForGap(owner, gapId) {
       return store.curricula
         .where(owner, (c) => c.gapId === gapId && c.status !== 'superseded')
-        .sort((a, b) => b.version - a.version)[0];
+        .sort(
+          (a, b) =>
+            b.version - a.version || (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0),
+        )[0];
+    },
+    async getForRun(owner, runId) {
+      return store.curricula.where(owner, (c) => c.runId === runId)[0];
     },
     async setStatus(owner, id, status) {
       const curriculum = store.curricula.require('Curriculum', owner, id);
@@ -277,6 +318,8 @@ export const createMemoryUnitOfWork = (store: MemoryStore = createMemoryStore())
     },
 
     async addArtefact(owner, artefact) {
+      const existing = store.artefacts.get(owner, artefact.id);
+      if (existing) return existing;
       return store.artefacts.insert({ ...artefact, ownerId: owner });
     },
     async listArtefacts(owner, lessonId) {

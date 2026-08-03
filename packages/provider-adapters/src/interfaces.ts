@@ -97,10 +97,35 @@ export interface TextToSpeech {
   synthesise(request: SynthesisRequest): Promise<SynthesisResponse>;
 }
 
+export interface EmbeddingRequest {
+  readonly texts: readonly string[];
+  readonly runId: string;
+  readonly userId: string;
+}
+
+export interface EmbeddingResult {
+  /** One vector per input text, in order. */
+  readonly vectors: readonly (readonly number[])[];
+  readonly model: string;
+  readonly inputTokens: number;
+  readonly costMillicents: Millicents;
+}
+
+export interface Embeddings {
+  readonly name: string;
+  /**
+   * Embed texts for vector retrieval (GAP-018). Returns `undefined` when this deployment has no
+   * embedding capability — retrieval then stays lexical, and nothing is charged. A deployment
+   * with embeddings never silently falls back: a configured provider that fails is an error.
+   */
+  embed(request: EmbeddingRequest): Promise<EmbeddingResult | undefined>;
+}
+
 export interface Providers {
   readonly languageModel: LanguageModel;
   readonly speechToText: SpeechToText;
   readonly textToSpeech: TextToSpeech;
+  readonly embeddings: Embeddings;
   readonly mode: ProviderMode;
 }
 

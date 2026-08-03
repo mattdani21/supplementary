@@ -8,8 +8,10 @@
 
 import { randomUUID } from 'node:crypto';
 import {
+  createMemoryJobQueue,
   createMemoryObjectStore,
   createMemoryUnitOfWork,
+  type JobQueue,
   type ObjectStore,
   type UnitOfWork,
 } from '@gapos/database';
@@ -23,6 +25,7 @@ import {
 } from '@gapos/observability';
 import {
   createProviders,
+  type FakeEmbeddingsOptions,
   type FakeLanguageModelOptions,
   type Providers,
 } from '@gapos/provider-adapters';
@@ -30,6 +33,7 @@ import {
 export interface ServerContext {
   readonly uow: UnitOfWork;
   readonly storage: ObjectStore;
+  readonly queue: JobQueue;
   readonly providers: Providers;
   readonly metrics: MetricsRecorder;
   readonly costAccountant: CostAccountant;
@@ -43,6 +47,8 @@ export interface ContextOptions {
   readonly newId?: (prefix: string) => string;
   readonly budget?: Budget;
   readonly fake?: FakeLanguageModelOptions;
+  /** Scripted vectors for the fake embeddings backend (GAP-018); unset stays lexical. */
+  readonly fakeEmbeddings?: FakeEmbeddingsOptions;
   readonly logLevel?: 'debug' | 'info' | 'warn' | 'error';
   /**
    * Providers. Defaults to the deterministic fakes via the all-or-nothing factory.
@@ -61,6 +67,8 @@ export interface ContextOptions {
    */
   readonly uow?: UnitOfWork;
   readonly storage?: ObjectStore;
+  /** Durable job queue. Defaults to the in-memory queue; the worker uses the Postgres one. */
+  readonly queue?: JobQueue;
 }
 
 export const createServerContext = (options: ContextOptions = {}): ServerContext => {
@@ -71,6 +79,7 @@ export const createServerContext = (options: ContextOptions = {}): ServerContext
   return {
     uow: options.uow ?? createMemoryUnitOfWork(),
     storage: options.storage ?? createMemoryObjectStore(options.now),
+    queue: options.queue ?? createMemoryJobQueue(),
     providers:
       options.providers ??
       createProviders({
@@ -78,6 +87,7 @@ export const createServerContext = (options: ContextOptions = {}): ServerContext
         metrics,
         logger,
         ...(options.fake ? { fake: options.fake } : {}),
+        ...(options.fakeEmbeddings ? { fakeEmbeddings: options.fakeEmbeddings } : {}),
       }),
     metrics,
     costAccountant,

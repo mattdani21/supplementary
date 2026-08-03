@@ -35,7 +35,7 @@ export interface LiveLanguageModelOptions {
 
 export const DEFAULT_LIVE_BASE_URL = 'https://api.deepseek.com';
 export const DEFAULT_LIVE_MODEL = 'deepseek-chat';
-export const DEFAULT_RETRY_DELAYS_MS = [500, 1_500] as const;
+export const DEFAULT_RETRY_DELAYS_MS = [1_000, 3_000, 8_000, 15_000] as const;
 
 /**
  * deepseek-chat list prices, in millicents per million tokens ($0.27/M input, $1.10/M output).
@@ -63,7 +63,7 @@ interface ChatCompletionPayload {
   readonly usage?: { readonly prompt_tokens?: number; readonly completion_tokens?: number };
 }
 
-const DEFAULT_TIMEOUT_MS = 120_000;
+const DEFAULT_TIMEOUT_MS = 300_000;
 
 export const createLiveLanguageModel = (
   options: LiveLanguageModelOptions,
@@ -144,8 +144,21 @@ export const createLiveLanguageModel = (
 
         let payload: ChatCompletionPayload;
         try {
-          payload = (await response.json()) as ChatCompletionPayload;
-        } catch {
+          const text = await response.text();
+          try {
+            payload = JSON.parse(text) as ChatCompletionPayload;
+          } catch {
+            // The excerpt is diagnostic gold: an empty body and an HTML error page need
+            // different fixes, and both show up here.
+            throw new LiveProviderError(
+              'Live provider returned a non-JSON response body',
+              response.status,
+              true,
+              text.slice(0, 200),
+            );
+          }
+        } catch (error) {
+          if (error instanceof LiveProviderError) throw error;
           throw new LiveProviderError(
             'Live provider returned a non-JSON response body',
             response.status,

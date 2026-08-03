@@ -47,7 +47,11 @@ export const createPool = (connectionString: string, options: PoolOptions = {}):
   new pg.Pool({
     connectionString,
     max: options.max ?? 10,
-    ...(options.schema ? { options: `-c search_path=${assertIdentifier(options.schema)}` } : {}),
+    // The test schema comes first (isolation); `public` follows so shared extensions — the
+    // pgvector types and operators from migration 004 — resolve without leaking the tables.
+    ...(options.schema
+      ? { options: `-c search_path=${assertIdentifier(options.schema)},public` }
+      : {}),
   });
 
 /** Create the schema a pool is confined to, if it does not already exist. */

@@ -193,6 +193,71 @@ export const describeRepositoryContract = (name: string, harness: SuiteHarness):
       expect(hits.map((c) => c.sourceId)).toEqual(['src_one']);
     });
 
+    it('retrieves by meaning when embeddings are present, staying inside owner and gap', async () => {
+      await seedGap(uow, ALICE, 'gap_one');
+      await seedGap(uow, ALICE, 'gap_two');
+      await seedGap(uow, BOB, 'gap_bob');
+      await seedSource(uow, ALICE, 'gap_one', 'src_one');
+      await seedSource(uow, ALICE, 'gap_two', 'src_two');
+      await seedSource(uow, BOB, 'gap_bob', 'src_bob');
+
+      const chunksFor = (sourceId: string) => [
+        {
+          id: `chunk_${sourceId}_a`,
+          sourceId,
+          ordinal: 0,
+          text: 'Linear algebra over finite fields.',
+          locator: '§1',
+          extractionConfidence: 1,
+          tokenEstimate: 10,
+        },
+        {
+          id: `chunk_${sourceId}_b`,
+          sourceId,
+          ordinal: 1,
+          text: 'An equivalence relation partitions the underlying set.',
+          locator: '§6',
+          extractionConfidence: 1,
+          tokenEstimate: 10,
+        },
+      ];
+      await uow.sources.replaceChunks(ALICE, 'src_one', chunksFor('src_one'));
+      await uow.sources.replaceChunks(ALICE, 'src_two', chunksFor('src_two'));
+      await uow.sources.replaceChunks(BOB, 'src_bob', chunksFor('src_bob'));
+
+      // The query embeds to [1,0,0,…]; only src_one's equivalence chunk is near it. The query
+      // text itself ('frogurt') shares no words with any chunk — meaning, not overlap, is what
+      // ranks it. Vectors are 384-dimensional because the pgvector column is vector(384).
+      const vec = (index: number): number[] =>
+        Array.from({ length: 384 }, (_, d) => (d === index ? 1 : 0));
+      const queryVector = vec(0);
+      await uow.sources.setChunkEmbeddings(ALICE, 'src_one', [
+        { chunkId: 'chunk_src_one_a', vector: vec(1) },
+        { chunkId: 'chunk_src_one_b', vector: vec(0) },
+      ]);
+      await uow.sources.setChunkEmbeddings(ALICE, 'src_two', [
+        { chunkId: 'chunk_src_two_a', vector: vec(383) },
+        { chunkId: 'chunk_src_two_b', vector: vec(383) },
+      ]);
+      await uow.sources.setChunkEmbeddings(BOB, 'src_bob', [
+        { chunkId: 'chunk_src_bob_a', vector: vec(0) },
+        { chunkId: 'chunk_src_bob_b', vector: vec(0) },
+      ]);
+
+      const hits = await uow.sources.searchChunks(ALICE, 'gap_one', 'frogurt', 5, queryVector);
+      // The semantically nearest chunk ranks first; the others tie at distance 1 (all one-hot
+      // vectors are mutually orthogonal), so the top of the ranking is the contract, not a
+      // single-row result.
+      expect(hits[0]?.id).toBe('chunk_src_one_b');
+      expect(hits.length).toBeGreaterThan(0);
+
+      // The vector path is bounded by owner and gap exactly like the lexical one.
+      expect(
+        await uow.sources.searchChunks(BOB, 'gap_bob', 'frogurt', 5, queryVector),
+      ).toHaveLength(2);
+      expect(await uow.sources.searchChunks(BOB, 'gap_one', 'frogurt', 5, queryVector)).toEqual([]);
+    });
+
     it('finds a previously uploaded source by checksum, per owner', async () => {
       await seedGap(uow, ALICE, 'gap_alice');
       await seedGap(uow, BOB, 'gap_bob');
@@ -361,6 +426,83 @@ export const describeRepositoryContract = (name: string, harness: SuiteHarness):
       const [lesson] = await uow.curricula.listLessons(ALICE, created.id);
       expect(lesson?.package).toEqual(lessonPackage);
       expect(lesson?.objectiveIds).toEqual(lessonPackage.objectiveIds);
+    });
+
+    it('returns the curriculum a generation run produced, to the owner only', async () => {
+      await seedGap(uow, ALICE, 'gap_alice');
+      await seedGap(uow, ALICE, 'gap_alice_2');
+      const { run } = await uow.generation.startRun(ALICE, {
+        id: 'run_cur',
+        gapId: 'gap_alice',
+        pipelineVersion: '1.0.0',
+        status: 'queued',
+        idempotencyKey: 'key_cur',
+        startedAt: new Date('2026-08-02T09:00:00Z'),
+        costMillicents: 0,
+      });
+      const created = await uow.curricula.create(ALICE, {
+        id: 'cur_run',
+        gapId: 'gap_alice',
+        runId: run.id,
+        version: 1,
+        durationDays: 1,
+        dailyMinutes: 35,
+        status: 'draft',
+        plan: referencePlan('gap_alice'),
+      });
+
+      // A resumed run finds its own curriculum…
+      expect((await uow.curricula.getForRun(ALICE, run.id))?.id).toBe(created.id);
+      // …and nobody else's run or learner can.
+      expect(await uow.curricula.getForRun(ALICE, 'run_unknown')).toBeUndefined();
+      expect(await uow.curricula.getForRun(BOB, run.id)).toBeUndefined();
+    });
+
+    it('is idempotent on artefact identity, as a resumed run needs it to be', async () => {
+      // A worker restart re-enters the same lesson and re-synthesises from the recorded step,
+      // then adds the artefact rows again. The deterministic id (lesson:kind:segment:version)
+      // must make that a no-op, or a green restart would double the audio.
+      await seedGap(uow, ALICE, 'gap_alice');
+      const curriculum = await uow.curricula.create(ALICE, {
+        id: 'cur_art',
+        gapId: 'gap_alice',
+        version: 1,
+        durationDays: 1,
+        dailyMinutes: 35,
+        status: 'published',
+        plan: referencePlan('gap_alice'),
+      });
+      await uow.curricula.upsertLesson(ALICE, {
+        id: 'lesson_art',
+        curriculumId: curriculum.id,
+        day: 1,
+        ordinal: 0,
+        title: 'Lesson',
+        estimatedMinutes: 5,
+        objectiveIds: ['obj_a'],
+        package: referenceLesson(1),
+        version: 1,
+        publicationStatus: 'published',
+      });
+
+      const artefact = {
+        id: 'lesson_art:audio:0:v1',
+        lessonId: 'lesson_art',
+        kind: 'audio' as const,
+        storageKey: 'lesson_art/seg_0',
+        mediaType: 'audio/mpeg',
+        checksum: 'checksum',
+        durationSeconds: 30,
+        version: 1,
+        segmentOrdinal: 0,
+        frozen: false,
+      };
+      await uow.curricula.addArtefact(ALICE, artefact);
+      await uow.curricula.addArtefact(ALICE, { ...artefact, checksum: 're-synthesised' });
+
+      const artefacts = await uow.curricula.listArtefacts(ALICE, 'lesson_art');
+      expect(artefacts).toHaveLength(1);
+      expect(artefacts[0]?.checksum).toBe('checksum');
     });
 
     it('hides runs, steps and findings from another learner', async () => {

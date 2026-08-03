@@ -33,17 +33,21 @@ import type { ObjectStore, OwnerId, UnitOfWork } from '@gapos/database';
 import { textOf } from '@gapos/database';
 import {
   DomainError,
+  GENERATION_STATUSES,
   blocksPublication,
   checkAudioIntegrity,
   chunkDocument,
+  classifyPriorCapabilities,
   decideRepair,
   findAssessmentGaps,
   findPlanViolations,
+  isTerminalGenerationStatus,
   segmentScript,
   transitionGeneration,
   verifyLesson,
   type Finding,
   type GenerationStatus,
+  type PriorCapability,
 } from '@gapos/domain';
 import type { Logger, Metrics } from '@gapos/observability';
 import type { Providers } from '@gapos/provider-adapters';
@@ -66,6 +70,13 @@ export interface CompileDeps {
   readonly concurrency?: number;
   /** Text-only mode. Audio also falls back to this automatically when synthesis fails. */
   readonly audioEnabled?: boolean;
+  /**
+   * Re-enter an existing run instead of deduplicating to it. The durable worker sets this: a
+   * crash left the run in flight and its steps recorded, so re-entry resumes from where it
+   * stopped (recorded steps are reused). The synchronous API path leaves it false, where a
+   * repeated idempotency key must return the existing run without touching it.
+   */
+  readonly resumeExisting?: boolean;
 }
 
 export interface CompileRequest {
@@ -131,22 +142,54 @@ export const compileGap = async (
   const logger = deps.logger.child({ runId: run.id, gapId: gap.id });
 
   if (!created) {
-    // The idempotency guarantee: a repeated compile returns the run already in flight rather
-    // than starting a second one and charging twice for the same curriculum.
-    logger.info('Compile already started for this idempotency key; returning the existing run');
-    return {
-      runId: run.id,
-      status: run.status,
-      days: await summariseExistingRun(owner, gap.id, deps),
-      deduplicated: true,
-    };
+    if (!deps.resumeExisting) {
+      // The idempotency guarantee: a repeated compile returns the run already in flight rather
+      // than starting a second one and charging twice for the same curriculum.
+      logger.info('Compile already started for this idempotency key; returning the existing run');
+      return {
+        runId: run.id,
+        status: run.status,
+        days: await summariseExistingRun(owner, gap.id, deps),
+        deduplicated: true,
+      };
+    }
+
+    // The worker re-enters its own run after a crash. An in-flight run is resumed from its
+    // recorded step state; a terminal one cannot be — report it as the failure it was, and the
+    // job's next attempt uses a fresh key.
+    if (isTerminalGenerationStatus(run.status)) {
+      if (run.status === 'complete' || run.status === 'partial') {
+        logger.info('Run already finished successfully; replaying its outcome', {
+          status: run.status,
+        });
+        return {
+          runId: run.id,
+          status: run.status,
+          days: await summariseExistingRun(owner, gap.id, deps),
+          deduplicated: false,
+        };
+      }
+      logger.warn('Run already ended; the attempt cannot resume it', { status: run.status });
+      return {
+        runId: run.id,
+        status: 'failed',
+        days: [],
+        error: run.error ?? `The run already ended as ${run.status}.`,
+        deduplicated: false,
+      };
+    }
+    logger.info('Resuming an in-flight run after a worker restart', { status: run.status });
   }
 
   const step: StepContext = { owner, runId: run.id, generation: uow.generation, logger, metrics };
   const compileStarted = Date.now();
 
   let status: GenerationStatus = run.status;
+  const stageOrder = new Map(GENERATION_STATUSES.map((stage, index) => [stage, index]));
   const advance = async (next: GenerationStatus): Promise<void> => {
+    // Re-entry must not walk backwards: a run resumed from `publishing` is already past
+    // `ingesting`, and the state machine would rightly refuse the backward transition.
+    if (stageOrder.get(status)! >= stageOrder.get(next)!) return;
     const result = transitionGeneration(status, next);
     if (!result.ok) throw result.error;
     status = result.value;
@@ -157,7 +200,7 @@ export const compileGap = async (
     /* --------------------------------------------- stage B: ingest and ground sources */
     await advance('ingesting');
     await ingestSources({ owner, gapId: gap.id, step, deps });
-    const evidence = await gatherEvidence(owner, gap.id, gap.rawStatement, deps);
+    const evidence = await gatherEvidence(owner, gap.id, gap.rawStatement, step, deps);
 
     // Instruction-like text inside a source is reported, never followed (docs/SECURITY.md).
     //
@@ -205,9 +248,14 @@ export const compileGap = async (
               'The success condition must be observable behaviour, never "understands X". ' +
               'Ambiguities default to recorded_assumption: note them as labelled assumptions ' +
               'and proceed. Blocking is exceptional — a blocking ambiguity stops the run and ' +
-              'asks the learner a question, so use it only when the answer would make the ' +
+              'asks the learner a question — so use it only when the answer would make the ' +
               'curriculum materially different AND the learner cannot usefully start without ' +
-              'it. A normal statement yields zero blocking ambiguities.',
+              'it. A statement that names no target capability at all is blocking: for ' +
+              'example "I want to get better at maths" or "teach me something useful" — the ' +
+              'topic itself is missing, so the curriculum would be materially different ' +
+              'depending on the answer. A statement that names a topic and a target ("I can ' +
+              'define a relation but not why equivalence classes partition a set") is never ' +
+              'blocking: record assumptions and proceed.',
             evidence,
           })
         ).value,
@@ -227,10 +275,42 @@ export const compileGap = async (
       };
     }
 
+    /* ----------------------------------- stage B: recall prior mastered capabilities */
+    // A filled gap is a reusable capability: its objectives and target capability can satisfy
+    // an external prerequisite in a new curriculum — while the evidence is still strong. Decayed
+    // evidence must not be assumed; the learner has to re-demonstrate it, so the decayed list is
+    // handed to the diagnostic as material it must not take for granted.
+    const filledGaps = await uow.gaps.list(owner, { status: 'filled' });
+    const priorCapabilities: PriorCapability[] = [];
+    for (const filled of filledGaps) {
+      const priorCurriculum = await uow.curricula.getCurrentForGap(owner, filled.id);
+      for (const objective of priorCurriculum?.plan.objectives ?? []) {
+        priorCapabilities.push({
+          capabilityId: objective.capabilityStatement,
+          masteredAt: filled.updatedAt,
+        });
+      }
+      if (filled.targetCapability) {
+        priorCapabilities.push({
+          capabilityId: filled.targetCapability,
+          masteredAt: filled.updatedAt,
+        });
+      }
+    }
+    const priorReuse = classifyPriorCapabilities(priorCapabilities, now());
+    if (priorReuse.decayed.length > 0) {
+      metrics.increment('prior_capability_decay_total', {
+        count: String(priorReuse.decayed.length),
+      });
+      logger.info('Prior capabilities have decayed; the diagnostic must re-demonstrate them', {
+        decayed: priorReuse.decayed.length,
+      });
+    }
+
     /* --------------------------------------------------------------- stage C: diagnose */
     const diagnostic = await runStep(
       step,
-      { step: 'interpret_diagnostic', inputVersion: hash(normalisation) },
+      { step: 'interpret_diagnostic', inputVersion: hash([normalisation, priorReuse.decayed]) },
       async () =>
         (
           await providers.languageModel.generate({
@@ -244,7 +324,12 @@ export const compileGap = async (
               `${normalisation.topic}; current state: ${normalisation.currentState}; target ` +
               `capability: ${normalisation.targetCapability} — infer a conservative baseline, ` +
               'set inferred to true, and recommend a lower starting difficulty so Day 1 ' +
-              'calibrates from the first attempts.',
+              'calibrates from the first attempts.' +
+              (priorReuse.decayed.length > 0
+                ? ` The learner previously demonstrated: ${priorReuse.decayed.join('; ')} — ` +
+                  'treat that as decayed. Do not assume it is current; recommend a ' +
+                  're-demonstration item so the evidence is re-established.'
+                : ''),
           })
         ).value,
     );
@@ -273,11 +358,21 @@ export const compileGap = async (
       ...(diagnostic.demonstratedCapabilities.length > 0
         ? [`The learner already demonstrates: ${diagnostic.demonstratedCapabilities.join(', ')}.`]
         : []),
+      ...(priorReuse.satisfied.length > 0
+        ? [
+            `The learner has previously mastered and still holds: ${priorReuse.satisfied.join(
+              ', ',
+            )}.`,
+          ]
+        : []),
     ].join(' ');
 
     const plan = await runStep(
       step,
-      { step: 'plan_curriculum', inputVersion: hash([normalisation, diagnostic]) },
+      {
+        step: 'plan_curriculum',
+        inputVersion: hash([normalisation, diagnostic, priorReuse.satisfied]),
+      },
       async () =>
         planCurriculum({
           runId: run.id,
@@ -288,21 +383,29 @@ export const compileGap = async (
           satisfiedExternalPrerequisites: [
             ...normalisation.assumedPrerequisites,
             ...diagnostic.demonstratedCapabilities,
+            ...priorReuse.satisfied,
           ],
           deps,
           logger,
         }),
     );
 
-    const curriculum = await uow.curricula.create(owner, {
-      id: newId('cur'),
-      gapId: gap.id,
-      version: 1,
-      durationDays: plan.days.length,
-      dailyMinutes: plan.dailyMinutes,
-      status: 'draft',
-      plan,
-    });
+    // The run's own curriculum, if it already exists (a resumed run re-enters it rather than
+    // creating a second course for the same gap — that is what keeps lesson and artefact ids
+    // stable across a restart). A fresh run creates one.
+    const curriculum =
+      (await uow.curricula.getForRun(owner, run.id)) ??
+      (await uow.curricula.create(owner, {
+        id: newId('cur'),
+        gapId: gap.id,
+        runId: run.id,
+        version: 1,
+        durationDays: plan.days.length,
+        dailyMinutes: plan.dailyMinutes,
+        status: 'draft',
+        plan,
+        createdAt: now(),
+      }));
 
     /* -------------------- stages E–H: generate, verify, repair, synthesise, publish */
     await advance('generating_lessons');
@@ -457,6 +560,35 @@ const ingestSources = async (params: {
         return { chunks: chunks.length, cached: false };
       },
     );
+
+    // Embed the source's chunks for vector retrieval (GAP-018). A deployment without an
+    // embedding capability records no vectors and retrieval stays lexical; with one, the
+    // vectors are stored per chunk and the query later ranks by cosine distance.
+    const chunks = await deps.uow.sources.listChunks(owner, source.id);
+    if (chunks.length > 0) {
+      await runStep(
+        step,
+        { step: 'embed_chunk', subject: source.id, inputVersion: source.checksum },
+        async () => {
+          const result = await deps.providers.embeddings.embed({
+            texts: chunks.map((chunk) => chunk.text),
+            runId: step.runId,
+            userId: owner,
+          });
+          if (result) {
+            await deps.uow.sources.setChunkEmbeddings(
+              owner,
+              source.id,
+              chunks.map((chunk, index) => ({
+                chunkId: chunk.id,
+                vector: result.vectors[index]!,
+              })),
+            );
+          }
+          return { embedded: result ? result.vectors.length : 0 };
+        },
+      );
+    }
   });
 };
 
@@ -588,8 +720,9 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
             'prompt must be unique within the lesson. Every claim drawn from the source ' +
             'evidence must cite a locator from the evidence. Only multiple-choice questions ' +
             'carry an options field, with at least three distinct options and the answer among ' +
-            'them; every other question type omits options, and free-response questions carry a ' +
-            'rubric instead.',
+            'them; every other question type omits options. Free-response questions MUST carry ' +
+            'a rubric — a non-empty string — and every other question type omits the rubric ' +
+            'field entirely. Never emit null for any field: omit optional fields instead.',
           evidence,
         })
       ).value,
@@ -798,7 +931,8 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
           result.mediaType,
         );
         await uow.curricula.addArtefact(owner, {
-          id: newId('artefact'),
+          // Deterministic: a resumed run re-enters the same artefacts instead of duplicating them.
+          id: artefactId(lessonId, 'audio', index, repairAttempts + 1),
           lessonId,
           kind: 'audio',
           storageKey: result.storageKey,
@@ -823,7 +957,7 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
   }
 
   await uow.curricula.addArtefact(owner, {
-    id: newId('artefact'),
+    id: artefactId(lessonId, 'transcript', 0, repairAttempts + 1),
     lessonId,
     kind: 'transcript',
     storageKey: `${lessonId}/transcript`,
@@ -862,6 +996,18 @@ const requiredObjectivesCovered = (
   );
   return plan.objectives.filter((o) => o.required).every((o) => covered.has(o.id));
 };
+
+/**
+ * The stable identity of an artefact within a lesson. Keyed by (lesson, kind, segment, version)
+ * rather than a random id so a resumed run re-enters the same rows: `addArtefact` is idempotent
+ * on this id, which is what prevents duplicate audio after a worker restart.
+ */
+const artefactId = (
+  lessonId: string,
+  kind: 'audio' | 'transcript',
+  segmentOrdinal: number,
+  version: number,
+): string => `${lessonId}:${kind}:${segmentOrdinal}:v${version}`;
 
 /** The published items, as the blueprint conformance check needs to see them. */
 const collectPublishedItems = async (
@@ -905,9 +1051,27 @@ const gatherEvidence = async (
   owner: OwnerId,
   gapId: string,
   query: string,
+  step: StepContext,
   deps: CompileDeps,
 ): Promise<EvidenceItem[]> => {
-  const chunks = await deps.uow.sources.searchChunks(owner, gapId, query, 12);
+  // Embed the query once per run (GAP-018); the step records the vector so a resumed run
+  // reuses it instead of re-charging. A deployment without embeddings records { embedded:
+  // false } and retrieval stays lexical.
+  const embedding = await runStep(
+    step,
+    { step: 'embed_query', inputVersion: hash(query) },
+    async () => {
+      const result = await deps.providers.embeddings.embed({
+        texts: [query],
+        runId: step.runId,
+        userId: owner,
+      });
+      return result ? { vector: result.vectors[0]! } : { embedded: false as const };
+    },
+  );
+  const vector = embedding.embedded === false ? undefined : embedding.vector;
+
+  const chunks = await deps.uow.sources.searchChunks(owner, gapId, query, 12, vector);
   return chunks.map((chunk) => ({
     sourceId: chunk.sourceId,
     chunkId: chunk.id,
