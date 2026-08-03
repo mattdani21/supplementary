@@ -363,6 +363,54 @@
       "status": "done",
       "completedAt": "2026-08-03T14:28:14.000Z",
       "notes": " Closed: the nine-fixture live scoring run completed and the baselines were recorded (commits f65270d + 1b6426e on the branch: 9/9 PASS \u2014 eval_02 0.9957, eval_03-05/09-10 1.0, eval_06 0.9739, eval_07 0.9742 with the injection recorded as a finding, eval_08 clarified rather than guessing). The live gate test now has baselines to compare against."
+    },
+    "GAP-020": {
+      "status": "ready",
+      "notes": "Defined in the next-loop plan; awaiting execution."
+    },
+    "GAP-021": {
+      "status": "ready",
+      "notes": "Defined in the next-loop plan; awaiting execution."
+    },
+    "GAP-022": {
+      "status": "ready",
+      "notes": "Defined in the next-loop plan; awaiting execution."
+    },
+    "GAP-023": {
+      "status": "ready",
+      "notes": "Defined in the next-loop plan; awaiting execution."
+    },
+    "GAP-024": {
+      "status": "ready",
+      "notes": "Defined in the next-loop plan; awaiting execution."
+    },
+    "GAP-025": {
+      "status": "ready",
+      "notes": "Defined in the next-loop plan; awaiting execution."
+    },
+    "GAP-026": {
+      "status": "ready",
+      "notes": "Defined in the next-loop plan; awaiting execution."
+    },
+    "GAP-027": {
+      "status": "ready",
+      "notes": "Defined in the next-loop plan; awaiting execution."
+    },
+    "GAP-028": {
+      "status": "ready",
+      "notes": "Defined in the next-loop plan; awaiting execution."
+    },
+    "GAP-029": {
+      "status": "ready",
+      "notes": "Defined in the next-loop plan; awaiting execution."
+    },
+    "GAP-030": {
+      "status": "ready",
+      "notes": "Defined in the next-loop plan; awaiting execution."
+    },
+    "GAP-031": {
+      "status": "ready",
+      "notes": "Defined in the next-loop plan; awaiting execution."
     }
   },
   "GAP-014b": {
