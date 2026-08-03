@@ -30,21 +30,18 @@ import {
 } from '@gapos/evaluation';
 import {
   compileFixture,
+  compileRaw,
   createEvalUser,
   createLiveEvalContext,
   createLiveEvalProviders,
   EVAL_OWNER,
 } from './live-helpers.js';
-import {
-  applyTransition,
-  compile,
-  createGap,
-  registerSource,
-} from '../../apps/web/src/server/services/gap-service.js';
 import type { ServerContext } from '../../apps/web/src/server/context.js';
 
 const LIVE = process.env.GAPOS_PROVIDER_MODE === 'live';
 const liveFixtures = EVALUATION_FIXTURES.filter((f) => f.requiresLiveProvider);
+/** The underspecified fixture is verified separately: it must clarify, not produce a curriculum. */
+const floorFixtures = liveFixtures.filter((f) => f.id !== 'eval_08_underspecified');
 
 const loadBaselines = (): Record<string, Baseline> => {
   try {
@@ -58,24 +55,8 @@ const loadBaselines = (): Record<string, Baseline> => {
 };
 
 /** Compile a fixture inline so the run id is available for finding lookups. */
-const compileRaw = async (context: ServerContext, fixtureId: string, idempotencyKey: string) => {
-  const fixture = fixtureById(fixtureId)!;
-  const gap = await createGap(context, EVAL_OWNER, {
-    title: fixture.title,
-    rawStatement: fixture.learnerStatement,
-    dailyMinutes: fixture.dailyMinutes,
-  });
-  if (fixture.source) {
-    await registerSource(context, EVAL_OWNER, {
-      gapId: gap.id,
-      filename: fixture.source.filename,
-      mediaType: fixture.source.mediaType,
-      text: fixture.source.text,
-    });
-  }
-  await applyTransition(context, EVAL_OWNER, gap.id, { type: 'define' });
-  return compile(context, EVAL_OWNER, { gapId: gap.id, idempotencyKey });
-};
+const compileRawFor = (context: ServerContext, fixtureId: string, idempotencyKey: string) =>
+  compileRaw(context, fixtureById(fixtureId)!, idempotencyKey);
 
 if (LIVE) {
   describe('the live-provider pack clears the gate (GAP-014b)', () => {
@@ -86,20 +67,20 @@ if (LIVE) {
     beforeAll(async () => {
       await createEvalUser(context);
       scorecards = new Map();
-      for (const fixture of liveFixtures) {
+      for (const fixture of floorFixtures) {
         const produced = await compileFixture(context, fixture.id);
         scorecards.set(fixture.id, scoreCurriculum(fixture, produced));
       }
     }, 30 * 60_000);
 
     it('scores every fixture, not only eval_01', () => {
-      expect(scorecards.size).toBe(liveFixtures.length);
-      for (const fixture of liveFixtures) {
+      expect(scorecards.size).toBe(floorFixtures.length);
+      for (const fixture of floorFixtures) {
         expect(scorecards.has(fixture.id), `${fixture.id} has a scorecard`).toBe(true);
       }
     });
 
-    it.each(liveFixtures.map((f) => [f.id, f.title] as const))(
+    it.each(floorFixtures.map((f) => [f.id, f.title] as const))(
       '%s clears every floor',
       (fixtureId) => {
         const scorecard = scorecards.get(fixtureId)!;
@@ -108,7 +89,7 @@ if (LIVE) {
     );
 
     it('does not regress beyond tolerance against the stored baseline', () => {
-      for (const fixture of liveFixtures) {
+      for (const fixture of floorFixtures) {
         const scorecard = scorecards.get(fixture.id)!;
         const verdict = compareToBaseline(scorecard, baselines[fixture.id]);
         if (verdict.status === 'regressed') {
@@ -126,7 +107,7 @@ if (LIVE) {
     it(
       'the underspecified fixture asks for clarification rather than guessing',
       async () => {
-        const outcome = await compileRaw(context, 'eval_08_underspecified', 'eval_08_live');
+        const outcome = await compileRawFor(context, 'eval_08_underspecified', 'eval_08_live');
         expect(outcome.error).toBe('clarification_required');
         expect(outcome.curriculumId).toBeUndefined();
       },
@@ -136,7 +117,7 @@ if (LIVE) {
     it(
       'the injection fixture is reported as a finding and does not shape the curriculum',
       async () => {
-        const outcome = await compileRaw(context, 'eval_07_prompt_injection', 'eval_07_live');
+        const outcome = await compileRawFor(context, 'eval_07_prompt_injection', 'eval_07_live');
         expect(outcome.error).toBeUndefined();
         expect(outcome.curriculumId).toBeDefined();
 

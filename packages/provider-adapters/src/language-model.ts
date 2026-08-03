@@ -12,6 +12,7 @@
  */
 
 import { createHash } from 'node:crypto';
+import { z } from 'zod';
 import { detectInjectionAttempts, renderEvidenceEnvelope } from '@gapos/ai-contracts';
 import type { CostAccountant, Logger, Metrics, Millicents } from '@gapos/observability';
 import {
@@ -28,6 +29,11 @@ export interface RawCompletionRequest {
   readonly evidenceBlock: string;
   readonly contractName: string;
   readonly contractVersion: string;
+  /**
+   * The contract's JSON schema (output form), so a live model can produce the exact field
+   * names and types the contract demands instead of inventing its own. The fake ignores it.
+   */
+  readonly schemaJson?: string;
   readonly purpose: string;
   readonly subject?: string;
   readonly temperature?: number;
@@ -98,6 +104,9 @@ export const createLanguageModel = (
         evidenceBlock: renderEvidenceEnvelope(evidence),
         contractName: request.contract.name,
         contractVersion: request.contract.version,
+        // Output-form schema, matching what specs/ generation uses, so a live model is told
+        // the exact shape rather than left to guess it.
+        schemaJson: JSON.stringify(z.toJSONSchema(request.contract.schema, { io: 'output' })),
         purpose: request.purpose,
         ...(request.subject === undefined ? {} : { subject: request.subject }),
         ...(request.temperature === undefined ? {} : { temperature: request.temperature }),
