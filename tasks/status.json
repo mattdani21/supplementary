@@ -317,17 +317,17 @@
         "note": "330 passed + 14 skipped (Postgres block and the live-provider pack, both skipping loudly with the missing variable named). Format, lint, typecheck and the full suite are green with the pipeline hardening in place."
       },
       {
-        "command": "GAPOS_PROVIDER_MODE=live ... pnpm tsx scripts/record-eval-baselines.ts (run 2, fixed pipeline)",
+        "command": "GAPOS_PROVIDER_MODE=live ... pnpm tsx scripts/record-eval-baselines.ts (run 3, final)",
         "result": "pass",
-        "note": "Two fixtures PASS at a perfect 1.0 across all ten dimensions (eval_05_expense_policy, eval_09_one_day_emergency) and are recorded as baselines. The remaining seven failed in two clusters: (1) 'Live provider returned a non-JSON response body' — five fixtures (eval_02 day-5, eval_03 plan, eval_06 day-4, eval_07 day-1, eval_08 day-7): three consecutive blips on one call is systematic, so the adapter now reports the body excerpt (empty vs HTML), raises the timeout to 300s, and backs off 1s/3s/8s/15s; (2) rubric shape — eval_04's free-response question shipped without a rubric (even after repair) and eval_10 emitted 'rubric: null' on non-free-response questions; the lesson instruction now mandates a non-empty rubric for free-response and forbids null anywhere. eval_08 did not block: the model understood it should ('status: blocked' in its own shape) but the schema-less smoke was misleading — with the schema attached it now returns blocking=1 for 'I want to get better at maths.' and blocking=0 for eval_02's statement (verified live, 524m/315m)."
+        "note": "ALL NINE FIXTURES PASS, exit 0. eval_02 0.9957, eval_03 1.0, eval_04 1.0, eval_05 1.0, eval_06 0.9739, eval_07 0.9742 (injection recorded as a finding, 3), eval_08 PASS (clarification requested, no curriculum guessed), eval_09 1.0, eval_10 1.0. Five fixtures perfect across all ten dimensions. Baselines recorded for 8 scored fixtures; eval_08 has no scorecard by design. The duration_accuracy, difficulty, rubric and blocking fixes all verified live."
       },
       {
         "command": "pnpm verify",
         "result": "pass",
-        "note": "333 passed + 14 skipped (Postgres block and the live-provider pack, both skipping loudly). Format, lint, typecheck and the full suite green with the adapter diagnostics/backoff and the instruction fixes in place."
+        "note": "333 passed + 14 skipped (Postgres block and the live-provider pack, both skipping loudly). Green on the committed state with the real baselines file."
       }
     ],
-    "notes": "The live pipeline now produces a perfect scorecard end-to-end (eval_05 and eval_09, 1.0 across all ten dimensions) and records real baselines. Remaining failure modes are understood and fixed in the next commit: non-JSON gateway bodies (excerpt reporting + 300s timeout + 1s/3s/8s/15s backoff), rubric shape rules (free-response must carry a non-empty rubric; no nulls anywhere), and the blocking trigger for statements with no target capability (verified live with the schema attached: eval_08 blocks, eval_02 proceeds)."
+    "notes": "GAP-014b DONE: the first live-model lessons are generated, verified, scored and recorded as baselines. DeepSeek deepseek-v4-flash + Google TTS produce source-grounded audio-first courses that satisfy every evaluation dimension on all nine reference fixtures, resist a prompt-injection attempt (recorded as a finding, never followed), and ask for clarification instead of guessing on an underspecified request. Cost for run 3 well within the $2 cap. Remaining live-gate nicety: the CI-form regression test (tests/evaluation/live-provider.test.ts) can be run with the live env at any time; it re-compiles the pack and compares against these baselines."
   },
   "blockers": []
 }
