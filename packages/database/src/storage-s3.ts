@@ -156,7 +156,8 @@ export const createS3ObjectStore = (options: S3ObjectStoreOptions): ObjectStore 
       const response = await fetchImpl(`${baseUrl}/${fullKey}`, {
         method: 'PUT',
         headers: { ...headers, 'Content-Type': mediaType },
-        body: bytes,
+        // A fresh ArrayBuffer-backed copy satisfies both the node and DOM fetch typings.
+        body: new Uint8Array(bytes),
       });
       if (!response.ok) {
         throw new Error(`S3 put failed: ${response.status} ${await response.text()}`);

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-03T15:05:48.000Z",
+  "updatedAt": "2026-08-03T15:19:44.000Z",
   "controller": "gapos-controller",
   "tasks": {
     "GAP-000": {
@@ -377,8 +377,16 @@
       ]
     },
     "GAP-021": {
-      "status": "ready",
-      "notes": "Defined in the next-loop plan; awaiting execution."
+      "status": "done",
+      "notes": "The HTTP API over the service layer. Handlers are plain functions (context, owner, params, body) in server/api.ts with zod validation and an error map (400 validation, 401 owner header, 404 missing, 409 conflict, 402 budget, 422 screening); Next.js route handlers are thin adapters. Owner scoping is enforced by X-Owner-Id on every learner endpoint. Endpoints: health, users, gaps (list/create/get/transition/compile), sources (list with chunks/register), today, curriculum, lesson, artefact audio URL, attempts, mastery. The web process bootstraps from env (Postgres + migrate when GAPOS_DATABASE_URL, else memory; storage + providers by env). next build compiles; the repo's extension-alias webpack config makes the .js-specifier workspace imports resolve. CI now builds the web app.",
+      "completedAt": "2026-08-03T15:19:44.000Z",
+      "evidence": [
+        {
+          "command": "pnpm test apps/web/src/server/api.test.ts",
+          "result": "pass",
+          "note": "The HTTP API over the service layer. Handlers are plain functions (context, owner, params, body) in server/api.ts with zod validation and an error map (400 validation, 401 owner header, 404 missing, 409 conflict, 402 budget, 422 screening); Next.js route handlers are thin adapters. Owner scoping is enforced by X-Owner-Id on every learner endpoint. Endpoints: health, users, gaps (list/create/get/transition/compile), sources (list with chunks/register), today, curriculum, lesson, artefact audio URL, attempts, mastery. The web process bootstraps from env (Postgres + migrate when GAPOS_DATABASE_URL, else memory; storage + providers by env). next build compiles; the repo's extension-alias webpack config makes the .js-specifier workspace imports resolve. CI now builds the web app."
+        }
+      ]
     },
     "GAP-022": {
       "status": "ready",

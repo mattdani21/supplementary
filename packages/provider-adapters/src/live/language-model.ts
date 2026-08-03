@@ -239,7 +239,7 @@ export interface LiveLanguageModelEnv {
  * a staging run must never quietly become a fake run, and spending requires a human gate.
  */
 export const createLiveLanguageModelFromEnv = (
-  env: LiveLanguageModelEnv = process.env,
+  env: LiveLanguageModelEnv = process.env as LiveLanguageModelEnv,
   fetchImpl?: typeof fetch,
 ): LanguageModelBackend => {
   const apiKey = env.GAPOS_LLM_API_KEY;

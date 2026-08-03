@@ -44,6 +44,9 @@ jobs:
       - name: Test
         run: pnpm test
 
+      - name: Web build
+        run: pnpm --filter @gapos/web build
+
   database:
     name: Migrations and integration
     runs-on: ubuntu-latest

@@ -114,7 +114,7 @@ interface EmbeddingsEnv {
 }
 
 export const createLiveEmbeddingsFromEnv = (
-  env: EmbeddingsEnv = process.env,
+  env: EmbeddingsEnv = process.env as EmbeddingsEnv,
 ): EmbeddingsBackend => {
   const apiKey = env.GAPOS_EMBEDDINGS_API_KEY;
   if (!apiKey) {

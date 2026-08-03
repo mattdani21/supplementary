@@ -66,7 +66,9 @@ export interface DaemonBundle {
   readonly close: () => Promise<void>;
 }
 
-export const bootstrapDaemon = async (env: DaemonEnv = process.env): Promise<DaemonBundle> => {
+export const bootstrapDaemon = async (
+  env: DaemonEnv = process.env as DaemonEnv,
+): Promise<DaemonBundle> => {
   const logger = createLogger({}, { level: (env.GAPOS_LOG_LEVEL as LoggerLevel) ?? 'info' });
 
   const databaseUrl = env.GAPOS_DATABASE_URL;
@@ -155,7 +157,7 @@ const numberFromEnv = (raw: string | undefined, fallback: number, name: string):
   return value;
 };
 
-export const budgetFromEnv = (env: DaemonEnv = process.env): Budget | undefined => {
+export const budgetFromEnv = (env: DaemonEnv = process.env as DaemonEnv): Budget | undefined => {
   const perRun = env.GAPOS_BUDGET_PER_RUN_MILLICENTS;
   const perUserDaily = env.GAPOS_BUDGET_DAILY_MILLICENTS;
   if (!perRun && !perUserDaily) return undefined;

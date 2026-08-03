@@ -16,10 +16,12 @@
     "@gapos/domain": "workspace:*",
     "@gapos/observability": "workspace:*",
     "@gapos/provider-adapters": "workspace:*",
-    "@gapos/ui": "workspace:*"
+    "@gapos/ui": "workspace:*",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0"
+    "@types/react-dom": "^19.0.0",
+    "@gapos/test-fixtures": "workspace:*"
   }
 }

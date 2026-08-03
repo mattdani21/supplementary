@@ -101,7 +101,9 @@ interface SpeechToTextEnv {
   readonly GAPOS_STT_PRICE_MILLICENTS_PER_MINUTE?: string;
 }
 
-export const createLiveSpeechToTextFromEnv = (env: SpeechToTextEnv = process.env): SpeechToText => {
+export const createLiveSpeechToTextFromEnv = (
+  env: SpeechToTextEnv = process.env as SpeechToTextEnv,
+): SpeechToText => {
   const apiKey = env.GAPOS_STT_API_KEY;
   if (!apiKey) {
     throw new Error(
