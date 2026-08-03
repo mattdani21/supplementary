@@ -32,4 +32,106 @@ main {
 
 button {
   font: inherit;
+  background: #1e293b;
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 0.45rem 0.9rem;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #334155;
+}
+
+input,
+textarea,
+select {
+  font: inherit;
+  background: #1e293b;
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 0.45rem 0.6rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+label {
+  display: block;
+  margin: 0.6rem 0;
+  color: #94a3b8;
+  font-size: 0.9rem;
+}
+
+h2 {
+  margin-top: 1.5rem;
+}
+
+.card {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  margin: 0.75rem 0;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.muted {
+  color: #94a3b8;
+}
+
+.error {
+  color: #fca5a5;
+}
+
+.ok {
+  color: #86efac;
+}
+
+.statement {
+  border-left: 3px solid #38bdf8;
+  padding-left: 0.75rem;
+  color: #cbd5e1;
+}
+
+.chunk {
+  font-size: 0.85rem;
+  color: #94a3b8;
+  border-left: 2px solid #475569;
+  padding-left: 0.5rem;
+}
+
+.gaps {
+  list-style: none;
+  padding: 0;
+}
+
+.attempt-form {
+  margin: 1rem 0;
+}
+
+.prompt {
+  font-weight: 600;
+}
+
+.hint {
+  color: #fbbf24;
+  margin-left: 0.5rem;
+}
+
+.owner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.owner input {
+  width: 12rem;
 }

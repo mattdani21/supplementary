@@ -389,8 +389,16 @@
       ]
     },
     "GAP-022": {
-      "status": "ready",
-      "notes": "Defined in the next-loop plan; awaiting execution."
+      "status": "done",
+      "notes": "The web application and offline PWA (E14). Next.js app router pages over the API handlers: /gaps (list + create + owner switcher), /gaps/[gapId] (status, transitions, today, sources with chunks, source form), /gaps/[gapId]/study (lesson player: audio player via signed URLs, questions with hint + attempt form posting to /api), /gaps/[gapId]/mastery (objective statuses + ready-to-fill). PWA: manifest route (study start_url), icon, and a stale-while-revalidate service worker that serves the lesson offline after first load; writes always go to the network. Server pages call the handlers in-process; client interactivity uses the /api routes with the owner cookie as X-Owner-Id.",
+      "completedAt": "2026-08-03T15:28:02.000Z",
+      "evidence": [
+        {
+          "command": "pnpm test tests/end-to-end/pwa.test.ts",
+          "result": "pass",
+          "note": "The web application and offline PWA (E14). Next.js app router pages over the API handlers: /gaps (list + create + owner switcher), /gaps/[gapId] (status, transitions, today, sources with chunks, source form), /gaps/[gapId]/study (lesson player: audio player via signed URLs, questions with hint + attempt form posting to /api), /gaps/[gapId]/mastery (objective statuses + ready-to-fill). PWA: manifest route (study start_url), icon, and a stale-while-revalidate service worker that serves the lesson offline after first load; writes always go to the network. Server pages call the handlers in-process; client interactivity uses the /api routes with the owner cookie as X-Owner-Id."
+        }
+      ]
     },
     "GAP-023": {
       "status": "done",
