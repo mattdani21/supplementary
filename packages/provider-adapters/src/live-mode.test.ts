@@ -208,6 +208,65 @@ describe('adapter resilience', () => {
     expect(completion.json).toEqual({ ok: true });
     expect(calls).toBe(2);
   });
+
+  it('retries a 200 with empty message content (the eval_02 live failure)', async () => {
+    let calls = 0;
+    const backend = createLiveLanguageModel({
+      apiKey: 'key',
+      retryDelaysMs: [1],
+      fetchImpl: scriptedFetch(async () => {
+        calls += 1;
+        if (calls === 1) {
+          return {
+            status: 200,
+            body: {
+              choices: [{ message: { content: '' } }],
+              usage: { prompt_tokens: 1, completion_tokens: 1 },
+            },
+          };
+        }
+        return {
+          status: 200,
+          body: {
+            choices: [{ message: { content: JSON.stringify({ ok: true }) } }],
+            usage: { prompt_tokens: 10, completion_tokens: 5 },
+          },
+        };
+      }),
+    });
+
+    const completion = await backend.complete(request);
+    expect(completion.json).toEqual({ ok: true });
+    expect(calls).toBe(2);
+  });
+
+  it('retries a 200 that omitted usage', async () => {
+    let calls = 0;
+    const backend = createLiveLanguageModel({
+      apiKey: 'key',
+      retryDelaysMs: [1],
+      fetchImpl: scriptedFetch(async () => {
+        calls += 1;
+        if (calls === 1) {
+          return {
+            status: 200,
+            body: { choices: [{ message: { content: JSON.stringify({ ok: true }) } }] }, // no usage
+          };
+        }
+        return {
+          status: 200,
+          body: {
+            choices: [{ message: { content: JSON.stringify({ ok: true }) } }],
+            usage: { prompt_tokens: 10, completion_tokens: 5 },
+          },
+        };
+      }),
+    });
+
+    const completion = await backend.complete(request);
+    expect(completion.json).toEqual({ ok: true });
+    expect(calls).toBe(2);
+  });
 });
 
 describe('live-mode factory', () => {

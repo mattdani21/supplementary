@@ -174,9 +174,13 @@ export const createLiveLanguageModel = (
 
         const content = payload.choices?.[0]?.message?.content;
         if (typeof content !== 'string' || content.length === 0) {
+          // Retryable: a 200 with no usable content is a provider anomaly (content filter,
+          // degenerate completion), not a permanent contract failure — the backoff loop
+          // absorbs it like the other unusable-200 shapes.
           throw new LiveProviderError(
             `Live provider returned no message content for ${request.contractName}@${request.contractVersion}`,
             response.status,
+            true,
           );
         }
 
@@ -199,10 +203,13 @@ export const createLiveLanguageModel = (
         const inputTokens = payload.usage?.prompt_tokens;
         const outputTokens = payload.usage?.completion_tokens;
         if (inputTokens === undefined || outputTokens === undefined) {
+          // Retryable for the same reason: a 200 without usage cannot be accounted for, and
+          // the provider can simply omit it on a bad attempt.
           throw new LiveProviderError(
             `Live provider omitted usage for ${request.contractName}@${request.contractVersion}; ` +
               'the wrapper cannot account for a call whose cost it cannot measure',
             response.status,
+            true,
           );
         }
 
