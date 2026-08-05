@@ -22,13 +22,16 @@ import {
   DiagnosticInterpretationContract,
   GapNormalisationContract,
   LessonPackageContract,
+  LessonScriptContract,
   VerificationReportContract,
   type CurriculumPlan,
   type DayPlan,
   type EvidenceItem,
   type LessonPackage,
+  type LessonPackageContractOutput,
+  type LessonScript,
 } from '@gapos/ai-contracts';
-import { detectInjectionAttempts } from '@gapos/ai-contracts';
+import { detectInjectionAttempts, type Contract } from '@gapos/ai-contracts';
 import type { ObjectStore, OwnerId, UnitOfWork } from '@gapos/database';
 import { textOf } from '@gapos/database';
 import {
@@ -709,21 +712,24 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
   let lesson: LessonPackage;
 
   /**
-   * Generate a lesson package with contract retries. The model occasionally drops a field the
-   * schema requires (the live gate caught a free-response question without a rubric); the plan
-   * step repairs violations by quoting them back, and a lesson deserves the same courtesy —
-   * otherwise one bad field fails the whole run. Retries are deterministic (temperature 0).
+   * Generate a structured artefact with contract retries. The model occasionally drops a field
+   * the schema requires (the live gate caught a free-response question without a rubric) and
+   * providers cap structured output, truncating long JSON; the plan step repairs violations by
+   * quoting them back, and every structured artefact gets the same courtesy — otherwise one
+   * bad field fails the whole run. Retries are deterministic (temperature 0).
    */
-  const generateLesson = async (
+  const generateStructured = async (
+    contract: Contract<unknown>,
+    purpose: 'teaching',
     instruction: string,
     temperature: number,
-  ): Promise<LessonPackage> => {
+  ): Promise<unknown> => {
     let previousIssues: readonly string[] = [];
     for (let attempt = 1; attempt <= MAX_LESSON_CONTRACT_ATTEMPTS; attempt += 1) {
       try {
         const response = await providers.languageModel.generate({
-          contract: LessonPackageContract,
-          purpose: 'teaching',
+          contract,
+          purpose,
           temperature: attempt === 1 ? temperature : 0,
           maxOutputTokens: LESSON_MAX_OUTPUT_TOKENS,
           runId,
@@ -736,47 +742,80 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
               : ''),
           evidence,
         });
-        return response.value as LessonPackage;
+        return response.value;
       } catch (error) {
         if (!(error instanceof ProviderContractError)) throw error;
         previousIssues = error.issues;
-        step.logger.warn('Lesson rejected by contract; asking the model to fix the violations', {
+        step.logger.warn('Artefact rejected by contract; asking the model to fix the violations', {
+          contract: contract.name,
           attempt,
           issues: previousIssues.length,
         });
         metrics.increment('repair_attempt_total', { stage: 'lesson_contract' });
       }
     }
-    throw new ProviderContractError(
-      LessonPackageContract.name,
-      LessonPackageContract.version,
-      previousIssues,
-    );
+    throw new ProviderContractError(contract.name, contract.version, previousIssues);
   };
 
-  lesson = await runStep(
+  /** The five-minute spoken rule the product ships: 750 words ≈ 5 minutes. */
+  const minutesForScript = (script: string): number =>
+    Math.min(60, Math.max(1, Math.ceil(script.trim().split(/\s+/).length / 150)));
+
+  /**
+   * Stage E′: the spoken prose first. Providers cap structured output (json_object mode
+   * truncates around 4096 tokens regardless of max_tokens), and a 750-word script plus the
+   * structured package routinely exceeded it — the live gate saw lesson JSON cut mid-string.
+   * Prose is generated alone, then the compact structured package, then assembled.
+   */
+  const scriptBundle = (await runStep(
+    step,
+    { step: 'generate_script', subject: `day-${dayPlan.day}`, inputVersion: planVersion },
+    async () =>
+      (await generateStructured(
+        LessonScriptContract,
+        'teaching',
+        `Write the spoken lesson for Day ${dayPlan.day} against the approved plan. The script ` +
+          'must be written to be spoken aloud — roughly 750 words for five minutes, plain ' +
+          'sentences, no bullet lists, no references to figures. Use the shared glossary ' +
+          `terms: ${glossaryBrief}. Provide the script, its verbatim transcript, and a ` +
+          'one-paragraph summary of what the learner can now do.',
+        0.2,
+      )) as LessonScript,
+  )) as LessonScript;
+
+  const lessonPackage = (await runStep(
     step,
     { step: 'generate_lesson', subject: `day-${dayPlan.day}`, inputVersion: planVersion },
     async () =>
-      generateLesson(
+      (await generateStructured(
+        LessonPackageContract,
+        'teaching',
         `Write the Day ${dayPlan.day} lesson package against the approved plan. The plan, ` +
           'the glossary and the objective identifiers are fixed inputs: use the shared terms ' +
           'for the concepts they name and do not reinterpret an objective. ' +
           `Shared glossary: ${glossaryBrief}. Assessment blueprint for this day's objectives: ` +
           `${blueprintForDay}. Ship at least those item counts across the lesson's questions ` +
-          '(application items may be marked transfer). The script must be written to be spoken ' +
-          'aloud — roughly 750 words for five minutes, plain sentences, no bullet lists, no ' +
-          "references to figures. Set estimatedMinutes to the script's actual listening time " +
-          "(about 5 minutes for 750 words), never the day's total budget. Every question " +
-          'prompt must be unique within the lesson. Every claim drawn from the source ' +
-          'evidence must cite a locator from the evidence. Only multiple-choice questions ' +
-          'carry an options field, with at least three distinct options and the answer among ' +
-          'them; every other question type omits options. Free-response questions MUST carry ' +
-          'a rubric — a non-empty string — and every other question type omits the rubric ' +
-          'field entirely. Never emit null for any field: omit optional fields instead.',
+          '(application items may be marked transfer). The spoken script is generated ' +
+          'separately; estimatedMinutes will be recomputed from it, so give your best ' +
+          "estimate of the listening time (about 5 minutes for 750 words), never the day's " +
+          'total budget. Every question prompt must be unique within the lesson. Every claim ' +
+          'drawn from the source evidence must cite a locator from the evidence. Only ' +
+          'multiple-choice questions carry an options field, with at least three distinct ' +
+          'options and the answer among them; every other question type omits options. ' +
+          'Free-response questions MUST carry a rubric — a non-empty string — and every ' +
+          'other question type omits the rubric field entirely. Never emit null for any ' +
+          'field: omit optional fields instead.',
         0.2,
-      ),
-  );
+      )) as LessonPackageContractOutput,
+  )) as LessonPackageContractOutput;
+
+  lesson = {
+    ...lessonPackage,
+    script: scriptBundle.script,
+    transcript: scriptBundle.transcript,
+    summary: scriptBundle.summary,
+    estimatedMinutes: minutesForScript(scriptBundle.script),
+  };
 
   const verificationContext = {
     glossaryTerms: plan.glossary.map((g) => g.term),
@@ -875,13 +914,34 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
         subject: `${lessonId}:${repairAttempts}`,
         inputVersion: hash([lesson, decision.findings]),
       },
-      async () =>
-        generateLesson(
+      async () => {
+        const findingsBrief = decision.findings
+          .map((f) => `${f.category}: ${f.finding}`)
+          .join(' | ');
+        const repairedScript = (await generateStructured(
+          LessonScriptContract,
+          'teaching',
+          'Repair only the failed items in the spoken lesson; leave everything else ' +
+            'untouched. Findings to address: ' +
+            findingsBrief,
+          0,
+        )) as LessonScript;
+        const repairedPackage = (await generateStructured(
+          LessonPackageContract,
+          'teaching',
           'Repair only the failed items in this lesson; leave everything else untouched. ' +
             'Findings to address: ' +
-            decision.findings.map((f) => `${f.category}: ${f.finding}`).join(' | '),
+            findingsBrief,
           0,
-        ),
+        )) as LessonPackageContractOutput;
+        return {
+          ...repairedPackage,
+          script: repairedScript.script,
+          transcript: repairedScript.transcript,
+          summary: repairedScript.summary,
+          estimatedMinutes: minutesForScript(repairedScript.script),
+        };
+      },
     );
     metrics.increment('repair_success_total', { stage: 'lesson' });
   }

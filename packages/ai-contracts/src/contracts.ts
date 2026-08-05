@@ -227,14 +227,17 @@ export type CurriculumPlan = z.infer<typeof CurriculumPlanContract.schema>;
 
 /* ---------------------------------------------------------- stage E: lesson package */
 
-export const LessonPackageContract = defineContract('lesson_package', '1.0.0', {
+export const LessonPackageContract = defineContract('lesson_package', '2.0.0', {
   day: z.number().int().min(1).max(7),
   title: z.string().min(1),
   objectiveIds: z.array(z.string().min(1)).min(1),
-  /** Written to be spoken: no bullet points, no "as shown in the figure". */
-  script: z.string().min(1),
-  transcript: z.string().min(1),
-  summary: z.string().min(1),
+  /**
+   * v2: the long prose (script, transcript, summary) moved to the `lesson_script` contract.
+   * Providers cap structured output (~4096 tokens in json_object mode), and a 750-word script
+   * plus questions routinely exceeded it — the response truncated mid-JSON and the run died.
+   * The pipeline generates the script first, then this compact package, and assembles the
+   * full lesson (see compile.ts).
+   */
   examples: z.array(z.string().min(1)).default([]),
   /** Prompts embedded in the audio that force a response before continuing. */
   pausePrompts: z
@@ -257,7 +260,27 @@ export const LessonPackageContract = defineContract('lesson_package', '1.0.0', {
     .optional(),
   evidence: EvidenceSchema,
 });
-export type LessonPackage = z.infer<typeof LessonPackageContract.schema>;
+/**
+ * The assembled lesson: the v2 package plus the separately generated spoken prose. Everything
+ * downstream (verification, evaluation, the study surface) consumes this assembled shape.
+ */
+export type LessonPackage = z.infer<typeof LessonPackageContract.schema> & {
+  readonly script: string;
+  readonly transcript: string;
+  readonly summary: string;
+};
+
+/** The spoken prose for one lesson, generated separately from the structured package. */
+export const LessonScriptContract = defineContract('lesson_script', '1.0.0', {
+  day: z.number().int().min(1).max(7),
+  /** Written to be spoken: no bullet points, no "as shown in the figure". */
+  script: z.string().min(1),
+  transcript: z.string().min(1),
+  summary: z.string().min(1),
+});
+export type LessonScript = z.infer<typeof LessonScriptContract.schema>;
+/** The raw v2 package shape (before the pipeline assembles the spoken prose). */
+export type LessonPackageContractOutput = z.infer<typeof LessonPackageContract.schema>;
 
 /* ------------------------------------------------------- stage F: verification report */
 
@@ -329,6 +352,7 @@ export const ALL_CONTRACTS = {
   diagnostic_interpretation: DiagnosticInterpretationContract,
   curriculum_plan: CurriculumPlanContract,
   lesson_package: LessonPackageContract,
+  lesson_script: LessonScriptContract,
   verification_report: VerificationReportContract,
   repair_result: RepairResultContract,
 } as const;

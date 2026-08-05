@@ -7,11 +7,11 @@
  */
 
 import type { LessonPackage, RepairResult, VerificationReport } from '@gapos/ai-contracts';
-import { referenceLesson } from './reference-curriculum.js';
+import { assembleLesson } from './reference-curriculum.js';
 
 /** The answer is visible inside the prompt, so the item measures reading, not knowledge. */
 export const lessonWithAnswerLeakage = (day = 1): LessonPackage => {
-  const lesson = referenceLesson(day);
+  const lesson = assembleLesson(day);
   const [first, ...rest] = lesson.questions;
   if (!first) throw new Error('fixture lesson has no questions');
   return {
@@ -28,7 +28,7 @@ export const lessonWithAnswerLeakage = (day = 1): LessonPackage => {
 
 /** A distractor that is also correct, so the item has two right answers. */
 export const lessonWithInvalidDistractor = (): LessonPackage => {
-  const lesson = referenceLesson(1);
+  const lesson = assembleLesson(1);
   const [first, ...rest] = lesson.questions;
   if (!first || first.type !== 'multiple_choice' || !first.options) {
     throw new Error('fixture question 1 is expected to be multiple choice');
@@ -48,7 +48,7 @@ export const lessonWithInvalidDistractor = (): LessonPackage => {
 
 /** A worked problem whose published answer is mathematically wrong. */
 export const lessonWithWrongAnswer = (): LessonPackage => {
-  const lesson = referenceLesson(3);
+  const lesson = assembleLesson(3);
   return {
     ...lesson,
     questions: lesson.questions.map((q) =>
@@ -59,7 +59,7 @@ export const lessonWithWrongAnswer = (): LessonPackage => {
 
 /** Uses a term the plan's glossary does not define, drifting from the other days. */
 export const lessonWithGlossaryDrift = (): LessonPackage => {
-  const lesson = referenceLesson(2);
+  const lesson = assembleLesson(2);
   return {
     ...lesson,
     script: lesson.script.replace('double inclusion', 'bidirectional containment'),
@@ -68,7 +68,7 @@ export const lessonWithGlossaryDrift = (): LessonPackage => {
 
 /** Malformed output: a multiple-choice answer that is not among its own options. */
 export const structurallyInvalidLesson = (): unknown => {
-  const lesson = referenceLesson(1);
+  const lesson = assembleLesson(1);
   return {
     ...lesson,
     questions: lesson.questions.map((q) =>
@@ -106,7 +106,7 @@ export const verificationWithFindings = (
 });
 
 export const repairForDistractor = (targetId = 'q_d1_r1'): RepairResult => {
-  const lesson = referenceLesson(1);
+  const lesson = assembleLesson(1);
   const question = lesson.questions.find((q) => q.id === targetId);
   if (!question) throw new Error(`no fixture question ${targetId}`);
   return {

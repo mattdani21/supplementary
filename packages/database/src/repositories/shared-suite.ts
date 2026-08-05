@@ -10,7 +10,7 @@
  */
 
 import { beforeEach, describe, expect, it } from 'vitest';
-import { referenceLesson, referencePlan } from '@gapos/test-fixtures';
+import { assembleLesson, referencePlan } from '@gapos/test-fixtures';
 import {
   ConcurrentModificationError,
   NotFoundError,
@@ -279,7 +279,7 @@ export const describeRepositoryContract = (name: string, harness: SuiteHarness):
         plan: referencePlan('gap_alice'),
       });
 
-      const lessonPackage = referenceLesson(1);
+      const lessonPackage = assembleLesson(1);
       await uow.curricula.upsertLesson(ALICE, {
         id: 'lesson_1',
         curriculumId: curriculum.id,
@@ -337,7 +337,7 @@ export const describeRepositoryContract = (name: string, harness: SuiteHarness):
         status: 'published',
         plan: referencePlan('gap_alice'),
       });
-      const lessonPackage = referenceLesson(1);
+      const lessonPackage = assembleLesson(1);
       await uow.curricula.upsertLesson(ALICE, {
         id: 'lesson_1',
         curriculumId: curriculum.id,
@@ -409,7 +409,7 @@ export const describeRepositoryContract = (name: string, harness: SuiteHarness):
       const fetched = await uow.curricula.get(ALICE, created.id);
       expect(fetched?.plan).toEqual(plan);
 
-      const lessonPackage = referenceLesson(2);
+      const lessonPackage = assembleLesson(2);
       await uow.curricula.upsertLesson(ALICE, {
         id: 'lesson_2',
         curriculumId: created.id,
@@ -480,7 +480,7 @@ export const describeRepositoryContract = (name: string, harness: SuiteHarness):
         title: 'Lesson',
         estimatedMinutes: 5,
         objectiveIds: ['obj_a'],
-        package: referenceLesson(1),
+        package: assembleLesson(1),
         version: 1,
         publicationStatus: 'published',
       });
@@ -734,7 +734,7 @@ export const describeRepositoryContract = (name: string, harness: SuiteHarness):
         status: 'published',
         plan: referencePlan('gap_alice'),
       });
-      const lessonPackage = referenceLesson(1);
+      const lessonPackage = assembleLesson(1);
       await uow.curricula.upsertLesson(ALICE, {
         id: 'lesson_1',
         curriculumId: curriculum.id,

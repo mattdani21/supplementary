@@ -10,6 +10,7 @@
 import {
   referenceDiagnostic,
   referenceLesson,
+  referenceLessonScript,
   referenceNormalisation,
   referencePlan,
   referenceVerification,
@@ -46,6 +47,7 @@ export const referenceScript = (): Required<Record<string, FakeHandler>> => ({
     referenceDiagnostic(request.subject === 'skipped' ? { inferred: true } : {}),
   curriculum_plan: (request) => referencePlan(request.subject ?? 'gap_reference'),
   lesson_package: (request) => referenceLesson(dayFromSubject(request.subject)),
+  lesson_script: (request) => referenceLessonScript(dayFromSubject(request.subject)),
   verification_report: (request) =>
     referenceVerification(request.subject ?? 'artefact', dayFromSubject(request.subject)),
   repair_result: (request) => ({

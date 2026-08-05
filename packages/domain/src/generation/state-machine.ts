@@ -95,6 +95,7 @@ export const GENERATION_STEPS = [
   'normalise_gap',
   'interpret_diagnostic',
   'plan_curriculum',
+  'generate_script',
   'generate_lesson',
   'generate_assessment',
   'verify_artefact',

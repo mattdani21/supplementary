@@ -1,13 +1,13 @@
 {
-  "$id": "https://gapos.dev/generation-schemas/lesson_package/1.0.0",
+  "$id": "https://gapos.dev/generation-schemas/lesson_package/2.0.0",
   "title": "lesson_package",
-  "description": "Structured response contract for the \"lesson_package\" model call, version 1.0.0. Generated from packages/ai-contracts; do not edit by hand.",
+  "description": "Structured response contract for the \"lesson_package\" model call, version 2.0.0. Generated from packages/ai-contracts; do not edit by hand.",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "properties": {
     "schemaVersion": {
       "type": "string",
-      "const": "1.0.0"
+      "const": "2.0.0"
     },
     "day": {
       "type": "integer",
@@ -25,18 +25,6 @@
         "type": "string",
         "minLength": 1
       }
-    },
-    "script": {
-      "type": "string",
-      "minLength": 1
-    },
-    "transcript": {
-      "type": "string",
-      "minLength": 1
-    },
-    "summary": {
-      "type": "string",
-      "minLength": 1
     },
     "examples": {
       "default": [],
@@ -269,9 +257,6 @@
     "day",
     "title",
     "objectiveIds",
-    "script",
-    "transcript",
-    "summary",
     "examples",
     "pausePrompts",
     "questions",

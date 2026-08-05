@@ -12,6 +12,8 @@ import type {
   DiagnosticInterpretation,
   GapNormalisation,
   LessonPackage,
+  LessonPackageContractOutput,
+  LessonScript,
   Question,
   VerificationReport,
 } from '@gapos/ai-contracts';
@@ -615,19 +617,17 @@ const SCRIPTS: Record<number, { title: string; script: string; summary: string }
   },
 };
 
-export const referenceLesson = (day: number): LessonPackage => {
+export const referenceLesson = (day: number): LessonPackageContractOutput => {
   const content = SCRIPTS[day];
   if (!content) throw new Error(`No reference lesson fixture for day ${day}`);
   const questions = questionsForDay(day);
 
+  // v2: the spoken prose is generated separately (lesson_script) and assembled by the pipeline.
   return {
-    schemaVersion: '1.0.0',
+    schemaVersion: '2.0.0',
     day,
     title: content.title,
     objectiveIds: [...new Set(questions.map((q) => q.objectiveId))],
-    script: content.script,
-    transcript: content.script,
-    summary: content.summary,
     examples:
       day === 3
         ? ['Remainders modulo 3 on {1,...,6} give the classes {1,4}, {2,5}, {3,6}.']
@@ -642,6 +642,34 @@ export const referenceLesson = (day: number): LessonPackage => {
     questions,
     estimatedMinutes: 5,
     evidence: sourced(`chunk_${day + 1}`, `§${day + 1}`),
+  };
+};
+
+/** The separately generated spoken prose (lesson_script contract). */
+export const referenceLessonScript = (day: number): LessonScript => {
+  const content = SCRIPTS[day] ?? SCRIPTS[1];
+  if (!content) throw new Error(`No reference script fixture for day ${day}`);
+  return {
+    schemaVersion: '1.0.0',
+    day,
+    script: content.script,
+    transcript: content.script,
+    summary: content.summary,
+  };
+};
+
+/** Assemble the full lesson the way compile.ts does: package + prose + computed minutes. */
+export const assembleLesson = (day: number): LessonPackage => {
+  const scriptBundle = referenceLessonScript(day);
+  return {
+    ...referenceLesson(day),
+    script: scriptBundle.script,
+    transcript: scriptBundle.transcript,
+    summary: scriptBundle.summary,
+    estimatedMinutes: Math.min(
+      60,
+      Math.max(1, Math.ceil(scriptBundle.script.trim().split(/\s+/).length / 150)),
+    ),
   };
 };
 

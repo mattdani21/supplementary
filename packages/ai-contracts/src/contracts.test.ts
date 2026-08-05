@@ -4,6 +4,7 @@ import {
   CurriculumPlanContract,
   GapNormalisationContract,
   LessonPackageContract,
+  LessonScriptContract,
   QuestionSchema,
   detectInjectionAttempts,
   renderEvidenceEnvelope,
@@ -181,18 +182,52 @@ describe('plan and lesson contracts', () => {
 
   it('requires a lesson to carry at least one question', () => {
     const parsed = LessonPackageContract.schema.safeParse({
-      schemaVersion: '1.0.0',
+      schemaVersion: '2.0.0',
       day: 1,
       title: 'Relations',
       objectiveIds: ['o1'],
-      script: 'Today we look at relations.',
-      transcript: 'Today we look at relations.',
-      summary: 'Relations introduced.',
+      // v2: the spoken prose lives in the lesson_script contract; the package is compact.
       questions: [],
       estimatedMinutes: 12,
       evidence,
     });
     expect(parsed.success).toBe(false);
+  });
+
+  it('accepts the compact v2 package and the separate spoken script', () => {
+    const packageParsed = LessonPackageContract.schema.safeParse({
+      schemaVersion: '2.0.0',
+      day: 1,
+      title: 'Relations',
+      objectiveIds: ['o1'],
+      questions: [
+        {
+          id: 'q1',
+          objectiveId: 'o1',
+          type: 'multiple_choice',
+          role: 'retrieval',
+          difficulty: 2,
+          prompt: 'What is a set?',
+          options: ['A collection of objects', 'A number', 'A feeling'],
+          answer: 'A collection of objects',
+          evidence,
+        },
+      ],
+      estimatedMinutes: 12,
+      evidence,
+    });
+    expect(packageParsed.success).toBe(true);
+    if (!packageParsed.success) return;
+    expect('script' in packageParsed.data).toBe(false);
+
+    const scriptParsed = LessonScriptContract.schema.safeParse({
+      schemaVersion: '1.0.0',
+      day: 1,
+      script: 'Today we look at relations.',
+      transcript: 'Today we look at relations.',
+      summary: 'Relations introduced.',
+    });
+    expect(scriptParsed.success).toBe(true);
   });
 });
 

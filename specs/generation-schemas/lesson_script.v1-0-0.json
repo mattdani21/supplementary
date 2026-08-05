@@ -1,0 +1,38 @@
+{
+  "$id": "https://gapos.dev/generation-schemas/lesson_script/1.0.0",
+  "title": "lesson_script",
+  "description": "Structured response contract for the \"lesson_script\" model call, version 1.0.0. Generated from packages/ai-contracts; do not edit by hand.",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "day": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 7
+    },
+    "script": {
+      "type": "string",
+      "minLength": 1
+    },
+    "transcript": {
+      "type": "string",
+      "minLength": 1
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "day",
+    "script",
+    "transcript",
+    "summary"
+  ],
+  "additionalProperties": false
+}

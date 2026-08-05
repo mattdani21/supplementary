@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { referenceLesson, referencePlan } from '@gapos/test-fixtures';
+import { assembleLesson, referencePlan } from '@gapos/test-fixtures';
 import {
   MAX_REPAIR_ATTEMPTS,
   assertIndependentVerifier,
@@ -23,7 +23,7 @@ const contextFor = (lesson: VerifiableLesson): VerificationContext => ({
 });
 
 const toVerifiable = (day: number): VerifiableLesson => {
-  const lesson = referenceLesson(day);
+  const lesson = assembleLesson(day);
   return {
     id: `lesson_${day}`,
     day: lesson.day,
