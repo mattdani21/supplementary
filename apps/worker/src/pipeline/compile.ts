@@ -866,6 +866,7 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
       plan.assessmentBlueprint.map((b) => [b.objectiveId, b.targetDifficulty]),
     ),
     plannedObjectiveIds: dayPlan.objectiveIds,
+    evidenceSupplied: evidence.length > 0,
   };
 
   // Another day teaching the same objectives means this one can be dropped without losing

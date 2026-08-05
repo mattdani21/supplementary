@@ -20,6 +20,7 @@ const contextFor = (lesson: VerifiableLesson): VerificationContext => ({
     plan.assessmentBlueprint.map((b) => [b.objectiveId, b.targetDifficulty]),
   ),
   plannedObjectiveIds: lesson.objectiveIds,
+  evidenceSupplied: true,
 });
 
 const toVerifiable = (day: number): VerifiableLesson => {
@@ -156,6 +157,34 @@ describe('coverage, duration and transcript', () => {
     const findings = verifyLesson(lesson, context);
     expect(categories(findings)).toContain('objective_coverage');
     expect(blocksPublication(findings)).toBe(true);
+  });
+
+  it('flags a general-knowledge question when a source was supplied', () => {
+    // The evaluation gate's source_faithfulness rule, enforced at the pipeline: with evidence
+    // present, falling back to general knowledge is ungrounded, not free.
+    const lesson: VerifiableLesson = {
+      ...toVerifiable(1),
+      questions: toVerifiable(1).questions.map((q, index) =>
+        index === 0
+          ? { ...q, evidence: { basis: 'general_knowledge' as const, locators: [] } }
+          : q,
+      ),
+    };
+    const context = { ...contextFor(lesson), evidenceSupplied: true };
+    const findings = verifyLesson(lesson, context).filter(
+      (f) => f.category === 'source_support',
+    );
+    expect(findings.length).toBeGreaterThan(0);
+    expect(findings[0]!.finding).toContain('fell back to general knowledge');
+  });
+
+  it('permits general-knowledge questions when no source was supplied', () => {
+    const lesson = toVerifiable(1);
+    const context = { ...contextFor(lesson), evidenceSupplied: false };
+    const findings = verifyLesson(lesson, context).filter(
+      (f) => f.category === 'source_support',
+    );
+    expect(findings).toEqual([]);
   });
 
   it('rejects a lesson that teaches an objective it never assesses', () => {

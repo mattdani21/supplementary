@@ -73,6 +73,12 @@ export interface VerificationContext {
   readonly targetDifficulty: ReadonlyMap<string, number>;
   /** Objectives the lesson is contracted to teach. */
   readonly plannedObjectiveIds: readonly string[];
+  /**
+   * Whether the gap supplied source evidence for this lesson. When true, every question must
+   * ground its claim in the source (basis 'source' with locators) — the product's promise is
+   * source-grounded courses, and the evaluation gate enforces the same rule.
+   */
+  readonly evidenceSupplied: boolean;
   /** Independent answers obtained from a separately prompted model. */
   readonly independentSolutions?: readonly {
     questionId: string;
@@ -293,8 +299,23 @@ const checkDifficulty = (question: VerifiableQuestion, context: VerificationCont
   ];
 };
 
-const checkSourceSupport = (question: VerifiableQuestion): Finding[] => {
-  if (question.evidence.basis === 'general_knowledge') return [];
+const checkSourceSupport = (question: VerifiableQuestion, context: VerificationContext): Finding[] => {
+  if (question.evidence.basis === 'general_knowledge') {
+    // Mirror of the evaluation gate's source_faithfulness rule: with a source supplied, a
+    // question that falls back to general knowledge is ungrounded, not free.
+    if (context.evidenceSupplied) {
+      return [
+        {
+          category: 'source_support',
+          severity: 'high',
+          targetId: question.id,
+          finding: 'The item fell back to general knowledge although the source was supplied.',
+          suggestedRepair: 'Ground the item in the supplied source and cite a locator.',
+        },
+      ];
+    }
+    return [];
+  }
   if (question.evidence.locators.length > 0) return [];
   return [
     {
@@ -410,7 +431,7 @@ export const verifyLesson = (lesson: VerifiableLesson, context: VerificationCont
       ...checkDistractors(question),
       ...checkRubricTolerance(question),
       ...checkDifficulty(question, context),
-      ...checkSourceSupport(question),
+      ...checkSourceSupport(question, context),
     );
   }
 
