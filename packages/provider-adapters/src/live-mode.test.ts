@@ -164,6 +164,52 @@ describe('provider routing (E17) and the local preset (E18)', () => {
   });
 });
 
+describe('adapter resilience', () => {
+  const request = {
+    instruction: 'Produce the artefact',
+    evidenceBlock: '<evidence/>',
+    contractName: 'curriculum_plan',
+    contractVersion: '1.0.0',
+    purpose: 'planning',
+  };
+
+  it('retries truncated content (unparseable JSON) and succeeds on the next attempt', async () => {
+    let calls = 0;
+    const backend = createLiveLanguageModel({
+      apiKey: 'key',
+      retryDelaysMs: [1],
+      fetchImpl: scriptedFetch(async () => {
+        calls += 1;
+        if (calls === 1) {
+          // A response whose content JSON is cut mid-string — the live gate's eval_03 failure.
+          return {
+            status: 200,
+            body: {
+              choices: [
+                {
+                  message: { content: '{"schemaVersion":"1.0.0","gapId":"prove-both-directions",' },
+                },
+              ],
+              usage: { prompt_tokens: 1, completion_tokens: 1 },
+            },
+          };
+        }
+        return {
+          status: 200,
+          body: {
+            choices: [{ message: { content: JSON.stringify({ ok: true }) } }],
+            usage: { prompt_tokens: 10, completion_tokens: 5 },
+          },
+        };
+      }),
+    });
+
+    const completion = await backend.complete(request);
+    expect(completion.json).toEqual({ ok: true });
+    expect(calls).toBe(2);
+  });
+});
+
 describe('live-mode factory', () => {
   afterEach(() => {
     process.env = { ...ORIGINAL_ENV };

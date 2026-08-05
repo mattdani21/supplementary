@@ -59,6 +59,13 @@ export const PIPELINE_VERSION = '1.0.0';
 export const MAX_PLAN_ATTEMPTS = 2;
 /** Contract retries per lesson package: the model occasionally drops a required field. */
 export const MAX_LESSON_CONTRACT_ATTEMPTS = 3;
+/**
+ * The largest structured payloads (plans, lesson packages) get an explicit output budget:
+ * provider defaults (~4096 tokens) truncate a long JSON mid-string, and truncation parses as
+ * an unparseable-JSON failure that no repair loop can see.
+ */
+export const PLAN_MAX_OUTPUT_TOKENS = 8192;
+export const LESSON_MAX_OUTPUT_TOKENS = 8192;
 
 export interface CompileDeps {
   readonly uow: UnitOfWork;
@@ -615,6 +622,9 @@ const planCurriculum = async (params: {
       contract: CurriculumPlanContract,
       purpose: 'planning',
       temperature: 0,
+      // Plans are the largest structured payload in the pipeline; DeepSeek's default output
+      // cap (4096 tokens) truncates a long plan mid-JSON, which killed live compiles.
+      maxOutputTokens: PLAN_MAX_OUTPUT_TOKENS,
       runId,
       userId: owner,
       subject: gapId,
@@ -715,6 +725,7 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
           contract: LessonPackageContract,
           purpose: 'teaching',
           temperature: attempt === 1 ? temperature : 0,
+          maxOutputTokens: LESSON_MAX_OUTPUT_TOKENS,
           runId,
           userId: owner,
           subject: `day-${dayPlan.day}`,

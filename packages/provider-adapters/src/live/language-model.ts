@@ -185,10 +185,13 @@ export const createLiveLanguageModel = (
           json = JSON.parse(content);
         } catch {
           const excerpt = content.slice(0, 200);
+          // Retryable: truncation (a provider output cap), a proxy slicing the body, or a
+          // model hiccup all resolve on a fresh attempt. The pipeline's step idempotency
+          // absorbs the retry, and the response text travels in the error for diagnosis.
           throw new LiveProviderError(
             `Live provider returned unparseable JSON for ${request.contractName}@${request.contractVersion}: ${excerpt}`,
             response.status,
-            false,
+            true,
             excerpt,
           );
         }

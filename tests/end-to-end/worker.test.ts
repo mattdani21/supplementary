@@ -248,11 +248,17 @@ describe('the durable worker loop (GAP-015)', () => {
       return match?.[1] ? Number(match[1]) : 1;
     };
     let lessonCalls = 0;
+    const observedTokens: number[] = [];
     const { context } = build({
       fake: {
         script: {
-          lesson_package: (request: { subject?: string }) => {
+          curriculum_plan: (request: { subject?: string; maxOutputTokens?: number }) => {
+            observedTokens.push(request.maxOutputTokens ?? 0);
+            return referencePlan(request.subject ?? 'gap_reference');
+          },
+          lesson_package: (request: { subject?: string; maxOutputTokens?: number }) => {
             lessonCalls += 1;
+            observedTokens.push(request.maxOutputTokens ?? 0);
             if (lessonCalls === 1) {
               const lesson = referenceLesson(1);
               return {
@@ -285,6 +291,9 @@ describe('the durable worker loop (GAP-015)', () => {
     // The contract retry happened inside the run: zero job retries, two lesson calls.
     expect(done?.attempts).toBe(0);
     expect(lessonCalls).toBeGreaterThanOrEqual(2);
+    // The big payloads carry an explicit output budget (provider defaults truncate long JSON).
+    expect(observedTokens[0]).toBe(8192); // plan
+    expect(observedTokens.slice(1).every((t) => t === 8192)).toBe(true); // lessons
 
     const curriculum = await context.uow.curricula.getCurrentForGap(LEARNER, gap.id);
     expect(curriculum).toBeDefined();
