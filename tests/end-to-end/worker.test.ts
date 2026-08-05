@@ -12,7 +12,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { referencePlan } from '@gapos/test-fixtures';
+import { referenceLesson, referencePlan } from '@gapos/test-fixtures';
 import type { OwnerId } from '@gapos/database';
 import { createServerContext, type ServerContext } from '../../apps/web/src/server/context.js';
 import { enqueueCompile } from '../../apps/worker/src/queue/enqueue.js';
@@ -236,6 +236,59 @@ describe('the durable worker loop (GAP-015)', () => {
 
     // The dead-lettered job is never claimed again.
     expect(await context.queue.claimDue(clock.now(), 10, 60_000)).toEqual([]);
+  });
+
+  it('repairs a lesson the model shipped against the contract, inside the run', async () => {
+    // The live gate caught the model emitting a free-response question without a rubric, which
+    // fails the lesson contract and previously killed the whole run. The pipeline now retries
+    // contract failures by quoting the violations back (like the plan step does); simulate the
+    // exact failure with a stateful fake: one bad lesson, then healthy content.
+    const dayFromSubject = (subject: string | undefined): number => {
+      const match = /(\d+)/.exec(subject ?? '');
+      return match?.[1] ? Number(match[1]) : 1;
+    };
+    let lessonCalls = 0;
+    const { context } = build({
+      fake: {
+        script: {
+          lesson_package: (request: { subject?: string }) => {
+            lessonCalls += 1;
+            if (lessonCalls === 1) {
+              const lesson = referenceLesson(1);
+              return {
+                ...lesson,
+                questions: lesson.questions.map((question) =>
+                  question.type === 'worked_problem'
+                    ? // Free-response without a rubric: the exact contract violation caught live.
+                      { ...question, type: 'free_response' }
+                    : question,
+                ),
+              };
+            }
+            return referenceLesson(dayFromSubject(request.subject));
+          },
+        },
+      },
+    });
+    await seedLearner(context);
+    const gap = await seedGap(context);
+
+    const job = await enqueueCompile(context, LEARNER, {
+      gapId: gap.id,
+      idempotencyKey: 'worker-contract-retry-1',
+    });
+    const worker = createCompileWorker(context, { leaseDurationMs: 60_000 });
+    await worker.tick();
+
+    const done = await context.queue.get(LEARNER, job.id);
+    expect(done?.state).toBe('succeeded');
+    // The contract retry happened inside the run: zero job retries, two lesson calls.
+    expect(done?.attempts).toBe(0);
+    expect(lessonCalls).toBeGreaterThanOrEqual(2);
+
+    const curriculum = await context.uow.curricula.getCurrentForGap(LEARNER, gap.id);
+    expect(curriculum).toBeDefined();
+    expect(await context.uow.curricula.listLessons(LEARNER, curriculum!.id)).toHaveLength(3);
   });
 
   it('lets the gap fail and retry through the worker path exactly like the API path', async () => {
