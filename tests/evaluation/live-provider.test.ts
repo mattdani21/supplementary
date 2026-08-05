@@ -71,7 +71,11 @@ if (LIVE) {
         const produced = await compileFixture(context, fixture.id);
         scorecards.set(fixture.id, scoreCurriculum(fixture, produced));
       }
-    }, 30 * 60_000);
+      // Measured: a live fixture takes ~7.3 min (eval_05: 435s), so nine fixtures plus the
+      // two standalone compiles need well over an hour; the live gate also spends time on
+      // retry loops (a truncated plan burns four adapter attempts plus a corrective retry),
+      // so 120 minutes is the evidence-based hook.
+    }, 120 * 60_000);
 
     it('scores every fixture, not only eval_01', () => {
       expect(scorecards.size).toBe(floorFixtures.length);
