@@ -114,6 +114,12 @@ epics:
     evidence: A reviewer can approve or repair artefacts
 
 tasks:
+  - id: E20
+    title: HTTP API and deployment surface
+    priority: P0
+    dependencies: [E11, E3, E13]
+    evidence: The product is reachable over HTTP; a deployment boots with env config only
+
   - id: GAP-000
     title: Establish the monorepo, tooling and agent protocol
     epic: E0
@@ -565,3 +571,201 @@ tasks:
       Both implementations currently retrieve on lexical overlap - term matching in memory,
       to_tsvector ranking in Postgres. That is enough to prove the ownership and gap boundaries,
       which is what the contract suite asserts, but it will miss a paraphrase.
+
+  - id: GAP-020
+    title: Worker daemon entrypoint
+    epic: E11
+    priority: P0
+    status: ready
+    goal: The queue loop runs as a process that can be deployed.
+    scope:
+      - an executable entrypoint (env-driven bootstrap: database URL, provider mode, poll interval)
+      - graceful shutdown on SIGTERM/SIGINT (finish the in-flight job, stop claiming, release the lease)
+      - startup and shutdown log lines and health observability
+      - a bin script in apps/worker so deployments can start it directly
+    out_of_scope:
+      - process supervision (systemd/k8s)
+      - horizontal scaling beyond the lease protocol
+    dependencies: [GAP-015]
+    acceptance:
+      - starting the daemon against an in-memory queue, enqueueing a compile, and stopping it
+        completes the job and shuts down cleanly
+      - SIGTERM during a run stops claiming and releases the lease
+  - id: GAP-021
+    title: HTTP API over the service layer
+    epic: E20
+    priority: P0
+    status: ready
+    goal: Every capability of the engine is reachable over HTTP.
+    scope:
+      - Next.js route handlers over the existing services (no second HTTP server)
+      - gaps: create, list, get, transition, compile
+      - sources: register text, upload a file to object storage
+      - learning: curriculum, lesson content, audio URL, submit an attempt, mastery summary
+      - owner scoping via an X-Owner-Id header; zod validation on every body
+    out_of_scope:
+      - authentication beyond the owner header (single-learner deployments)
+      - rate limiting
+    dependencies: [GAP-013, GAP-015]
+    acceptance:
+      - handler logic is tested in-process (no sockets): every endpoint maps errors to HTTP
+      - a compiled gap serves lessons, audio and mastery over HTTP
+  - id: GAP-022
+    title: Web application and offline PWA (E14)
+    epic: E14
+    priority: P1
+    status: ready
+    goal: A learner can run the whole loop in a browser.
+    scope:
+      - Next.js app router pages — gap list, gap detail with source upload and compile, curriculum,
+        lesson player (content, audio, attempt form), mastery view
+      - app manifest and a service worker caching the app shell
+      - the published lesson for the current day works when the network is cut after first load
+    out_of_scope:
+      - native mobile
+      - real-time collaboration
+    dependencies: [GAP-021]
+    acceptance:
+      - next build succeeds in CI
+      - offline: after first load, the lesson page renders with the network disconnected
+  - id: GAP-023
+    title: Live speech-to-text and a real live-mode factory
+    epic: E20
+    priority: P0
+    status: ready
+    goal: Live mode boots through the standard factory instead of throwing.
+    scope:
+      - an OpenAI-compatible /audio/transcriptions backend over plain fetch
+      - "createProviders({ mode: 'live' }) assembles language model, TTS, STT and embeddings"
+      - GAPOS_STT_* env configuration mirroring the other live adapters
+    out_of_scope:
+      - STT streaming
+      - wake-word or diarization
+    dependencies: []
+    acceptance:
+      - the live factory assembles all four adapters with env config and no throw
+      - the STT backend is tested against a scripted fetch (multipart round trip)
+  - id: GAP-024
+    title: Real S3 smoke test in CI
+    epic: E11
+    priority: P0
+    status: ready
+    goal: The SigV4 client is proven against a real S3 endpoint, not just the mock.
+    scope:
+      - a MinIO service in the CI workflow
+      - a smoke test (loud skip without GAPOS_S3_* env): put/get/presign/delete against real MinIO
+    out_of_scope:
+      - a MinIO service for local development (infra/local already has docker compose)
+    dependencies: [GAP-006]
+    acceptance:
+      - the database CI job starts MinIO and the smoke test passes against it
+  - id: GAP-025
+    title: Command-line study client
+    epic: E20
+    priority: P1
+    status: ready
+    goal: The whole loop is usable from a terminal.
+    scope:
+      - a `gapos` bin — gap new, source add (file or stdin), compile, plan, study (lesson + attempt),
+        mastery, status
+      - in-process service layer with Postgres or in-memory storage selected by env
+      - readline prompts; non-interactive flags for scripting
+    out_of_scope:
+      - ncurses/TUI rendering
+      - repl
+    dependencies: [GAP-021]
+    acceptance:
+      - a scripted session (new gap, add source, compile, study) runs end to end without a server
+  - id: GAP-026
+    title: Operations documentation for the deployment surface
+    epic: E20
+    priority: P1
+    status: ready
+    goal: A fresh deployment is startable from the docs.
+    scope:
+      - OPERATIONS.md: API, daemon, UI, MinIO, live-mode env table, CLI usage
+      - README quickstart updated
+    out_of_scope:
+      - hosting-specific runbooks
+    dependencies: [GAP-020, GAP-021, GAP-022, GAP-023, GAP-024, GAP-025]
+    acceptance:
+      - a reader can start the API, the daemon and the UI with env config only
+  - id: GAP-027
+    title: Knowledge map (E15)
+    epic: E15
+    priority: P1
+    status: ready
+    goal: The prerequisite graph is navigable.
+    scope:
+      - a knowledge endpoint: nodes (gaps, capabilities) and edges from mastery and curricula
+      - a map page rendering the graph as SVG with no new dependencies
+      - clicking a node opens the gap
+    out_of_scope:
+      - interactive graph manipulation
+      - layout algorithms beyond a deterministic radial/tree placement
+    dependencies: [GAP-021, GAP-022, GAP-013]
+    acceptance:
+      - after mastering two linked gaps the map shows the edge and both nodes
+  - id: GAP-028
+    title: Voice gap capture (E16)
+    epic: E16
+    priority: P1
+    status: ready
+    goal: Dictation creates an editable draft gap.
+    scope:
+      - POST audio to a voice endpoint that transcribes (provider STT) and drafts a gap
+      - a capture UI (mic record, send, edit the draft, create)
+    out_of_scope:
+      - speaker recognition
+    dependencies: [GAP-021, GAP-022, GAP-023]
+    acceptance:
+      - with the fake STT scripted, a recorded blob becomes a draft whose text matches
+  - id: GAP-029
+    title: Provider routing by policy (E17)
+    epic: E17
+    priority: P2
+    status: ready
+    goal: Call purpose selects the model.
+    scope:
+      - per-purpose model routing in the live language model (classification/planning/teaching/
+        verification get their configured model)
+      - env-driven routing table with a default
+    out_of_scope:
+      - runtime fallback chains
+    dependencies: [GAP-023]
+    acceptance:
+      - with a routing table configured, a teaching call uses the teaching model and a planning
+        call uses the planning model
+  - id: GAP-030
+    title: Local-model execution preset (E18)
+    epic: E18
+    priority: P2
+    status: ready
+    goal: One qualified local model runs the pipeline.
+    scope:
+      - a local preset (Ollama/llama.cpp OpenAI-compatible endpoint, default localhost:11434)
+      - documented model qualification (evaluation pack run)
+    out_of_scope:
+      - quantization tooling
+      - GPU management
+    dependencies: [GAP-029]
+    acceptance:
+      - the live language model assembles against a localhost base URL and is exercised with a
+        scripted fetch
+  - id: GAP-031
+    title: Educator review queue (E19)
+    epic: E19
+    priority: P2
+    status: ready
+    goal: A reviewer can approve or repair artefacts.
+    scope:
+      - review state on lessons/artefacts flagged by audit findings or low verification confidence
+      - review endpoints: list pending, approve, reject with note, request repair
+      - a review page in the UI
+    out_of_scope:
+      - reviewer identity/roles beyond the owner header
+      - collaborative annotations
+    dependencies: [GAP-021, GAP-022]
+    acceptance:
+      - a flagged lesson appears in the queue, is rejected with a note, and the note is visible on
+        the lesson

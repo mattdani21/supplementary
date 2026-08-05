@@ -7,4 +7,5 @@ export * from './fake/speech.js';
 export * from './fake/embeddings.js';
 export * from './live/language-model.js';
 export * from './live/speech.js';
+export * from './live/speech-to-text.js';
 export * from './live/embeddings.js';

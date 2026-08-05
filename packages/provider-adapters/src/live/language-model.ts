@@ -18,12 +18,16 @@ import type {
   RawCompletion,
   RawCompletionRequest,
 } from '../language-model.js';
+import type { CallPurpose } from '@gapos/observability';
 
 export interface LiveLanguageModelOptions {
-  readonly apiKey: string;
+  /** Optional: a local endpoint (Ollama/llama.cpp) needs none; the header is omitted then. */
+  readonly apiKey?: string;
   /** Defaults to DeepSeek's API. Anything OpenAI-compatible works. */
   readonly baseUrl?: string;
   readonly model?: string;
+  /** Per-purpose model routing (E17): purpose → model; unlisted purposes use `model`. */
+  readonly routing?: Readonly<Partial<Record<CallPurpose, string>>>;
   /** Injectable for tests; defaults to the global fetch. */
   readonly fetchImpl?: typeof fetch;
   /** Millicents per million tokens. Defaults track deepseek-chat list prices. */
@@ -75,6 +79,7 @@ export const createLiveLanguageModel = (
     options.priceInputMillicentsPerMToken ?? DEEPSEEK_CHAT_PRICE_INPUT_MILLICENTS_PER_MT;
   const priceOut =
     options.priceOutputMillicentsPerMToken ?? DEEPSEEK_CHAT_PRICE_OUTPUT_MILLICENTS_PER_MT;
+  const modelFor = (purpose: string): string => options.routing?.[purpose as CallPurpose] ?? model;
 
   return {
     name: `live:${model}`,
@@ -96,7 +101,7 @@ export const createLiveLanguageModel = (
       ].join(' ');
 
       const body = {
-        model,
+        model: modelFor(request.purpose),
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: `${request.instruction}\n\n${request.evidenceBlock}` },
@@ -116,7 +121,8 @@ export const createLiveLanguageModel = (
           response = await fetchImpl(`${baseUrl}/chat/completions`, {
             method: 'POST',
             headers: {
-              authorization: `Bearer ${options.apiKey}`,
+              // Local endpoints (Ollama/llama.cpp) need no credentials; omit the header then.
+              ...(options.apiKey ? { authorization: `Bearer ${options.apiKey}` } : {}),
               'content-type': 'application/json',
             },
             body: JSON.stringify(body),
@@ -232,29 +238,53 @@ export interface LiveLanguageModelEnv {
   readonly GAPOS_LLM_MODEL?: string;
   readonly GAPOS_LLM_PRICE_INPUT_MILLICENTS_PER_MT?: string;
   readonly GAPOS_LLM_PRICE_OUTPUT_MILLICENTS_PER_MT?: string;
+  /** 'local' selects the local-model preset (E18): Ollama/llama.cpp, no key required. */
+  readonly GAPOS_LLM_MODE?: string;
+  /** Per-purpose routing (E17): "planning:model-a,teaching:model-b". */
+  readonly GAPOS_MODEL_ROUTING?: string;
 }
 
+/** The local-model preset (E18): Ollama's OpenAI-compatible endpoint, no credentials. */
+export const LOCAL_LLM_BASE_URL = 'http://localhost:11434/v1';
+export const LOCAL_LLM_MODEL = 'qwen2.5:7b-instruct';
+
+const parseRouting = (raw: string | undefined): Record<string, string> | undefined => {
+  if (!raw) return undefined;
+  const routing: Record<string, string> = {};
+  for (const pair of raw.split(',')) {
+    const [purpose, model] = pair.split(':');
+    if (purpose && model) routing[purpose.trim()] = model.trim();
+  }
+  return routing;
+};
+
 /**
- * Build the live backend from the environment. Fails loudly when the key is missing:
- * a staging run must never quietly become a fake run, and spending requires a human gate.
+ * Build the live backend from the environment. Fails loudly when the key is missing — a
+ * staging run must never quietly become a fake run, and spending requires a human gate — but
+ * `GAPOS_LLM_MODE=local` selects the local preset, which needs no key.
  */
 export const createLiveLanguageModelFromEnv = (
-  env: LiveLanguageModelEnv = process.env,
+  env: LiveLanguageModelEnv = process.env as LiveLanguageModelEnv,
   fetchImpl?: typeof fetch,
 ): LanguageModelBackend => {
   const apiKey = env.GAPOS_LLM_API_KEY;
-  if (!apiKey) {
+  const local = env.GAPOS_LLM_MODE === 'local';
+  if (!local && !apiKey) {
     throw new Error(
       'GAPOS_LLM_API_KEY is not set. A live provider is a paid external resource: set the key ' +
-        'and confirm the budget with a human before running (AGENTS.md §5).',
+        'and confirm the budget with a human before running (AGENTS.md §5). For a local model, ' +
+        'set GAPOS_LLM_MODE=local.',
     );
   }
 
   return createLiveLanguageModel({
-    apiKey,
+    ...(apiKey ? { apiKey } : {}),
     ...(fetchImpl ? { fetchImpl } : {}),
-    ...(env.GAPOS_LLM_BASE_URL ? { baseUrl: env.GAPOS_LLM_BASE_URL } : {}),
-    ...(env.GAPOS_LLM_MODEL ? { model: env.GAPOS_LLM_MODEL } : {}),
+    baseUrl: env.GAPOS_LLM_BASE_URL ?? (local ? LOCAL_LLM_BASE_URL : undefined),
+    model: env.GAPOS_LLM_MODEL ?? (local ? LOCAL_LLM_MODEL : undefined),
+    ...(parseRouting(env.GAPOS_MODEL_ROUTING)
+      ? { routing: parseRouting(env.GAPOS_MODEL_ROUTING) }
+      : {}),
     ...(env.GAPOS_LLM_PRICE_INPUT_MILLICENTS_PER_MT
       ? { priceInputMillicentsPerMToken: Number(env.GAPOS_LLM_PRICE_INPUT_MILLICENTS_PER_MT) }
       : {}),

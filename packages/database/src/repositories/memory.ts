@@ -307,6 +307,16 @@ export const createMemoryUnitOfWork = (store: MemoryStore = createMemoryStore())
       return store.lessons.replace({ ...lesson, publicationStatus: 'published', publishedAt: at });
     },
 
+    async setReview(owner, lessonId, reviewStatus, note) {
+      const lesson = store.lessons.get(owner, lessonId);
+      if (!lesson) return undefined;
+      return store.lessons.replace({
+        ...lesson,
+        reviewStatus,
+        ...(note === undefined ? {} : { reviewNote: note }),
+      });
+    },
+
     async upsertQuestions(owner, questions) {
       for (const question of questions) store.questions.replace({ ...question, ownerId: owner });
     },

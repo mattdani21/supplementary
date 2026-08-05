@@ -1,0 +1,483 @@
+/**
+ * The HTTP API over the service layer (GAP-021).
+ *
+ * Handlers are plain functions: (context, owner, params, body) -> JSON-serializable value.
+ * The Next.js route files are thin adapters (parse the request, call a handler, map errors);
+ * tests exercise the handlers directly in-process, which is what the acceptance requires.
+ *
+ * Every body is validated with zod before touching a service; every service error is mapped to
+ * an HTTP status; owner scoping is enforced by the X-Owner-Id header on every learner endpoint.
+ */
+
+import { z } from 'zod';
+import type { GapTransition } from '@gapos/domain';
+import {
+  ConcurrentModificationError,
+  NotFoundError,
+  type Lesson,
+  type OwnerId,
+} from '@gapos/database';
+import { ProviderBudgetError } from '@gapos/provider-adapters';
+import type { ServerContext } from './context.js';
+import {
+  applyTransition,
+  compile as compileGap,
+  createGap as createGapUseCase,
+  registerSource,
+  type RegisterSourceInput,
+} from './services/gap-service.js';
+import {
+  assessMastery,
+  getToday,
+  submitAttempt,
+  type SubmitAttemptInput,
+} from './services/learning-service.js';
+
+/* ------------------------------------------------------------------- errors */
+
+export class ApiError extends Error {
+  constructor(
+    readonly status: number,
+    readonly code: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+export const toHttpError = (error: unknown): { status: number; code: string; message: string } => {
+  if (error instanceof ApiError)
+    return { status: error.status, code: error.code, message: error.message };
+  if (error instanceof NotFoundError)
+    return { status: 404, code: 'not_found', message: error.message };
+  if (error instanceof ConcurrentModificationError)
+    return { status: 409, code: 'conflict', message: error.message };
+  if (error instanceof ProviderBudgetError)
+    return { status: 402, code: 'budget_exhausted', message: error.message };
+  if (error instanceof z.ZodError)
+    return {
+      status: 400,
+      code: 'validation_failed',
+      message: error.issues.map((i) => i.message).join('; '),
+    };
+  if (error instanceof Error && /not found/i.test(error.message))
+    return { status: 404, code: 'not_found', message: error.message };
+  return {
+    status: 500,
+    code: 'internal',
+    message: error instanceof Error ? error.message : 'Internal error',
+  };
+};
+
+export const requireOwner = (headers: Headers): OwnerId => {
+  const owner = headers.get('x-owner-id');
+  if (!owner) throw new ApiError(401, 'owner_required', 'Set the X-Owner-Id header.');
+  return owner as OwnerId;
+};
+
+/* ------------------------------------------------------------------- schemas */
+
+const userSchema = z.object({
+  email: z.string().email(),
+  locale: z.string().min(2),
+  timezone: z.string().min(1),
+});
+
+const createGapSchema = z.object({
+  title: z.string().min(1),
+  rawStatement: z.string().min(10),
+  dailyMinutes: z.number().int().min(5).max(480),
+  deadline: z.string().optional(),
+  sourcePolicy: z.enum(['general_knowledge_allowed', 'sources_only']).optional(),
+});
+
+const TRANSITION_TYPES = [
+  'define',
+  'compile',
+  'retry_compilation',
+  'request_mastery_check',
+  'mastery_rejected',
+  'reopen',
+  'archive',
+] as const;
+
+const transitionSchema = z.object({ type: z.enum(TRANSITION_TYPES) }).passthrough();
+
+const compileSchema = z.object({
+  idempotencyKey: z.string().min(1),
+  audioEnabled: z.boolean().optional(),
+  concurrency: z.number().int().min(1).max(8).optional(),
+});
+
+const registerSourceSchema = z.object({
+  gapId: z.string().min(1),
+  filename: z.string().min(1),
+  mediaType: z.string().min(1),
+  text: z.string().min(1),
+});
+
+const attemptSchema = z.object({
+  questionId: z.string().min(1),
+  sessionId: z.string().min(1),
+  response: z.string().min(1),
+  hintsUsed: z.number().int().min(0).optional(),
+  confidence: z.enum(['low', 'medium', 'high']).optional(),
+  idempotencyKey: z.string().min(1),
+});
+
+/* ------------------------------------------------------------------- handlers */
+
+export const apiHealth = async (
+  context: ServerContext,
+): Promise<{ ok: boolean; time: string }> => ({
+  ok: true,
+  time: context.now().toISOString(),
+});
+
+export const createUser = async (
+  context: ServerContext,
+  owner: OwnerId,
+  body: unknown,
+): Promise<{ user: { id: OwnerId; email: string; locale: string; timezone: string } }> => {
+  const input = userSchema.parse(body);
+  await context.uow.users.create({ id: owner, ...input });
+  return { user: { id: owner, ...input } };
+};
+
+export const listGaps = async (
+  context: ServerContext,
+  owner: OwnerId,
+): Promise<{ gaps: unknown[] }> => ({
+  gaps: await context.uow.gaps.list(owner),
+});
+
+export const createGap = async (
+  context: ServerContext,
+  owner: OwnerId,
+  body: unknown,
+): Promise<{ gap: unknown }> => {
+  const input = createGapSchema.parse(body);
+  const gap = await createGapUseCase(context, owner, input);
+  return { gap };
+};
+
+export const getGap = async (
+  context: ServerContext,
+  owner: OwnerId,
+  gapId: string,
+): Promise<{ gap: unknown }> => {
+  const gap = await context.uow.gaps.get(owner, gapId);
+  if (!gap) throw new ApiError(404, 'gap_not_found', `Gap ${gapId} was not found for this owner.`);
+  return { gap };
+};
+
+export const transitionGap = async (
+  context: ServerContext,
+  owner: OwnerId,
+  gapId: string,
+  body: unknown,
+): Promise<{ gap: unknown }> => {
+  const transition = transitionSchema.parse(body) as GapTransition;
+  const gap = await applyTransition(context, owner, gapId, transition);
+  return { gap };
+};
+
+export const compile = async (
+  context: ServerContext,
+  owner: OwnerId,
+  gapId: string,
+  body: unknown,
+): Promise<{ run: unknown }> => {
+  const input = compileSchema.parse(body);
+  const outcome = await compileGap(context, owner, { gapId, ...input });
+  return {
+    run: {
+      runId: outcome.runId,
+      status: outcome.status,
+      ...(outcome.error === undefined ? {} : { error: outcome.error }),
+    },
+  };
+};
+
+export const registerSourceHandler = async (
+  context: ServerContext,
+  owner: OwnerId,
+  body: unknown,
+): Promise<{ registration: Awaited<ReturnType<typeof registerSource>> }> => {
+  const input = registerSourceSchema.parse(body) as RegisterSourceInput;
+  const registration = await registerSource(context, owner, input);
+  return { registration };
+};
+
+export const listSources = async (
+  context: ServerContext,
+  owner: OwnerId,
+  gapId: string,
+): Promise<{ sources: unknown[] }> => {
+  const sources = await context.uow.sources.listForGap(owner, gapId);
+  return {
+    sources: await Promise.all(
+      sources.map(async (source) => ({
+        ...source,
+        chunks: await context.uow.sources.listChunks(owner, source.id),
+      })),
+    ),
+  };
+};
+
+export const todayView = async (
+  context: ServerContext,
+  owner: OwnerId,
+  gapId: string,
+): Promise<{ today: unknown }> => ({
+  today: await getToday(context, owner, gapId),
+});
+
+export const getCurriculum = async (
+  context: ServerContext,
+  owner: OwnerId,
+  gapId: string,
+): Promise<{ curriculum: unknown; lessons: unknown[] }> => {
+  const curriculum = await context.uow.curricula.getCurrentForGap(owner, gapId);
+  if (!curriculum) throw new ApiError(404, 'no_curriculum', `No curriculum for gap ${gapId}.`);
+  const lessons = await Promise.all(
+    (await context.uow.curricula.listLessons(owner, curriculum.id)).map(async (lesson) => ({
+      ...lesson,
+      questions: await context.uow.curricula.listQuestions(owner, lesson.id),
+      artefacts: await context.uow.curricula.listArtefacts(owner, lesson.id),
+    })),
+  );
+  return { curriculum, lessons };
+};
+
+export const getLesson = async (
+  context: ServerContext,
+  owner: OwnerId,
+  gapId: string,
+  lessonId: string,
+): Promise<{ lesson: unknown }> => {
+  const curriculum = await context.uow.curricula.getCurrentForGap(owner, gapId);
+  if (!curriculum) throw new ApiError(404, 'no_curriculum', `No curriculum for gap ${gapId}.`);
+  const lesson = (await context.uow.curricula.listLessons(owner, curriculum.id)).find(
+    (l) => l.id === lessonId,
+  );
+  if (!lesson) throw new ApiError(404, 'lesson_not_found', `Lesson ${lessonId} was not found.`);
+  return {
+    lesson: {
+      ...lesson,
+      questions: await context.uow.curricula.listQuestions(owner, lesson.id),
+      artefacts: await context.uow.curricula.listArtefacts(owner, lesson.id),
+    },
+  };
+};
+
+export const audioUrl = async (
+  context: ServerContext,
+  owner: OwnerId,
+  gapId: string,
+  artefactId: string,
+): Promise<{ url: string; expiresAt: string }> => {
+  const curriculum = await context.uow.curricula.getCurrentForGap(owner, gapId);
+  if (!curriculum) throw new ApiError(404, 'no_curriculum', `No curriculum for gap ${gapId}.`);
+  const lessons = await context.uow.curricula.listLessons(owner, curriculum.id);
+  let artefact;
+  for (const lesson of lessons) {
+    const artefacts = await context.uow.curricula.listArtefacts(owner, lesson.id);
+    artefact = artefacts.find((a) => a.id === artefactId);
+    if (artefact) break;
+  }
+  if (!artefact)
+    throw new ApiError(404, 'artefact_not_found', `Artefact ${artefactId} was not found.`);
+  const signed = await context.storage.signedUrl(owner, artefact.storageKey, 300);
+  if (!signed)
+    throw new ApiError(404, 'artefact_not_found', `Artefact ${artefactId} has no stored object.`);
+  return { url: signed.url, expiresAt: signed.expiresAt.toISOString() };
+};
+
+export const submitAttemptHandler = async (
+  context: ServerContext,
+  owner: OwnerId,
+  gapId: string,
+  body: unknown,
+): Promise<{ attempt: unknown }> => {
+  const input = attemptSchema.parse(body) as SubmitAttemptInput;
+  const result = await submitAttempt(context, owner, gapId, input);
+  return { attempt: result };
+};
+
+export const masteryView = async (
+  context: ServerContext,
+  owner: OwnerId,
+  gapId: string,
+): Promise<{ mastery: unknown }> => ({
+  mastery: await assessMastery(context, owner, gapId),
+});
+
+export interface ReviewQueueItem {
+  readonly lessonId: string;
+  readonly lessonTitle: string;
+  readonly day: number;
+  readonly gapId: string;
+  readonly gapTitle: string;
+  readonly reviewStatus?: Lesson['reviewStatus'];
+  readonly reviewNote?: string;
+  readonly findings: readonly { category: string; severity: string; finding: string }[];
+}
+
+/**
+ * The educator review queue (E19): lessons from curricula whose generation run recorded audit
+ * findings, plus their review state. A lesson the reviewer has decided on still appears, marked
+ * with the decision and note, so the queue is an audit trail rather than a disappearing list.
+ */
+export const reviewQueue = async (
+  context: ServerContext,
+  owner: OwnerId,
+): Promise<{ items: ReviewQueueItem[] }> => {
+  const gaps = await context.uow.gaps.list(owner);
+  const items: ReviewQueueItem[] = [];
+  for (const gap of gaps) {
+    const curriculum = await context.uow.curricula.getCurrentForGap(owner, gap.id);
+    if (!curriculum?.runId) continue;
+    const findings = await context.uow.generation.listFindings(owner, curriculum.runId);
+    if (findings.length === 0) continue;
+    const lessons = await context.uow.curricula.listLessons(owner, curriculum.id);
+    for (const lesson of lessons) {
+      items.push({
+        lessonId: lesson.id,
+        lessonTitle: lesson.title,
+        day: lesson.day,
+        gapId: gap.id,
+        gapTitle: gap.title,
+        reviewStatus: lesson.reviewStatus,
+        reviewNote: lesson.reviewNote,
+        findings: findings.map((f) => ({
+          category: f.category,
+          severity: f.severity,
+          finding: f.finding,
+        })),
+      });
+    }
+  }
+  return { items };
+};
+
+const reviewDecisionSchema = z.object({
+  decision: z.enum(['approve', 'reject']),
+  note: z.string().max(2000).optional(),
+});
+
+export const reviewLesson = async (
+  context: ServerContext,
+  owner: OwnerId,
+  lessonId: string,
+  body: unknown,
+): Promise<{ lesson: unknown }> => {
+  const { decision, note } = reviewDecisionSchema.parse(body);
+  const lesson = await context.uow.curricula.setReview(
+    owner,
+    lessonId,
+    decision === 'approve' ? 'approved' : 'rejected',
+    note,
+  );
+  if (!lesson) throw new ApiError(404, 'lesson_not_found', `Lesson ${lessonId} was not found.`);
+  return { lesson };
+};
+
+/**
+ * Voice gap capture (E16): transcribe raw audio and return an editable draft. The transcript
+ * becomes the gap's rawStatement; the suggested title is the first words. The learner edits
+ * both in the UI and creates the real gap through the ordinary endpoint.
+ */
+export const voiceGapDraft = async (
+  context: ServerContext,
+  owner: OwnerId,
+  audio: Uint8Array,
+  mediaType: string,
+): Promise<{ transcript: string; suggestedTitle: string }> => {
+  const response = await context.providers.speechToText.transcribe({
+    audio,
+    mediaType,
+    locale: 'en',
+    runId: `voice-${context.newId('run')}`,
+    userId: owner,
+  });
+  const text = response.text.trim();
+  // A dictation usually starts with "I want to be able to …"; that is not a title.
+  const LEAD_INS = [
+    'i want to be able to',
+    'i want to learn',
+    'i would like to',
+    'i need to',
+    'i want to',
+  ] as const;
+  const lower = text.toLowerCase();
+  const lead = LEAD_INS.find((candidate) => lower.startsWith(candidate));
+  const words = (lead ? text.slice(lead.length) : text).trim().split(/\s+/).filter(Boolean);
+  return {
+    transcript: text,
+    suggestedTitle: words.slice(0, 6).join(' '),
+  };
+};
+
+export interface KnowledgeNode {
+  readonly id: string;
+  readonly kind: 'gap' | 'capability';
+  readonly label: string;
+}
+
+export interface KnowledgeEdgeView {
+  readonly from: string;
+  readonly to: string;
+  readonly relationship: 'teaches' | 'prerequisite_of' | 'extends' | 'related';
+}
+
+/**
+ * The knowledge map (E15): the gap, the capabilities its curriculum teaches, their
+ * prerequisites, and any knowledge-graph edges the system has recorded. Deterministic data for
+ * a deterministic SVG layout in the UI.
+ */
+export const knowledgeMap = async (
+  context: ServerContext,
+  owner: OwnerId,
+  gapId: string,
+): Promise<{ nodes: KnowledgeNode[]; edges: KnowledgeEdgeView[] }> => {
+  const gap = await context.uow.gaps.get(owner, gapId);
+  if (!gap) throw new ApiError(404, 'gap_not_found', `Gap ${gapId} was not found for this owner.`);
+
+  const nodes = new Map<string, KnowledgeNode>();
+  const edges: KnowledgeEdgeView[] = [];
+  nodes.set(gapId, { id: gapId, kind: 'gap', label: gap.title });
+
+  const curriculum = await context.uow.curricula.getCurrentForGap(owner, gapId);
+  if (curriculum) {
+    for (const objective of curriculum.plan.objectives) {
+      nodes.set(objective.id, {
+        id: objective.id,
+        kind: 'capability',
+        label: objective.capabilityStatement,
+      });
+      edges.push({ from: gapId, to: objective.id, relationship: 'teaches' });
+      for (const prereq of objective.prerequisiteObjectiveIds ?? []) {
+        nodes.set(prereq, { id: prereq, kind: 'capability', label: prereq });
+        edges.push({ from: prereq, to: objective.id, relationship: 'prerequisite_of' });
+      }
+    }
+  }
+
+  for (const edge of await context.uow.knowledge.listEdges(owner)) {
+    for (const [id, label] of [
+      [edge.fromCapability, edge.fromCapability],
+      [edge.toCapability, edge.toCapability],
+    ] as const) {
+      if (!nodes.has(id)) nodes.set(id, { id, kind: 'capability', label });
+    }
+    edges.push({
+      from: edge.fromCapability,
+      to: edge.toCapability,
+      relationship: edge.relationship,
+    });
+  }
+
+  return { nodes: [...nodes.values()], edges };
+};

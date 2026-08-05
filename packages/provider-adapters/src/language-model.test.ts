@@ -54,15 +54,23 @@ describe('provider mode', () => {
     expect(() => resolveProviderMode('production')).toThrow(/must be one of/);
   });
 
-  it('refuses to build a live provider set until one is deliberately added', () => {
-    expect(() =>
-      createProviders({
-        mode: 'live',
-        costAccountant: new CostAccountant(),
-        metrics: createMetrics(),
-        logger: createLogger({}, { sink: createMemorySink().sink }),
-      }),
-    ).toThrow(/human approval gate/);
+  it('refuses a live provider set without the keys (the AGENTS.md §5 gate)', () => {
+    // Live adapters assemble from env; their constructors refuse to run without the keys, and
+    // the act of configuring the keys is the human approval gate.
+    const previous = { ...process.env };
+    delete process.env.GAPOS_LLM_API_KEY;
+    try {
+      expect(() =>
+        createProviders({
+          mode: 'live',
+          costAccountant: new CostAccountant(),
+          metrics: createMetrics(),
+          logger: createLogger({}, { sink: createMemorySink().sink }),
+        }),
+      ).toThrow(/GAPOS_LLM_API_KEY/);
+    } finally {
+      process.env = previous;
+    }
   });
 });
 

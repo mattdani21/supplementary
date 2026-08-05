@@ -90,6 +90,10 @@ export interface Lesson {
   readonly version: number;
   readonly publicationStatus: 'draft' | 'verified' | 'published' | 'excluded';
   readonly publishedAt?: Date;
+  /** Educator review (E19): a flagged lesson sits in the review queue until decided. */
+  readonly reviewStatus?: 'pending' | 'approved' | 'rejected';
+  /** The reviewer's note; shown on the lesson once set. */
+  readonly reviewNote?: string;
 }
 
 export interface Artefact {
@@ -285,6 +289,13 @@ export interface CurriculumRepository {
   upsertLesson(owner: OwnerId, lesson: Omit<Lesson, 'ownerId'>): Promise<Lesson>;
   listLessons(owner: OwnerId, curriculumId: string): Promise<Lesson[]>;
   publishLesson(owner: OwnerId, lessonId: string, at: Date): Promise<Lesson>;
+  /** Record an educator review decision (E19); the note is shown on the lesson. */
+  setReview(
+    owner: OwnerId,
+    lessonId: string,
+    reviewStatus: NonNullable<Lesson['reviewStatus']>,
+    note?: string,
+  ): Promise<Lesson | undefined>;
 
   upsertQuestions(owner: OwnerId, questions: Omit<StoredQuestion, 'ownerId'>[]): Promise<void>;
   listQuestions(owner: OwnerId, lessonId: string): Promise<StoredQuestion[]>;
