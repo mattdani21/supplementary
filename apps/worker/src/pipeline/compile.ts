@@ -641,7 +641,8 @@ const planCurriculum = async (params: {
           `${params.learnerBrief} Produce a curriculum plan that satisfies every invariant the ` +
           "product enforces: (1) every day's activities fit within the learner's daily minutes; " +
           '(2) every objective is taught on at least one day, and no day teaches an objective the ' +
-          'plan does not declare; (3) the assessment blueprint has exactly one entry per objective, ' +
+          "plan does not declare; cover EVERY distinct capability in the learner's statement — " +
+          'never merge or drop a capability, so every facet is taught; (3) the assessment blueprint has exactly one entry per objective, ' +
           'each with at least 2 retrieval and 1 application items, and no entry for an undeclared ' +
           'objective; (4) the prerequisite graph is acyclic, and every prerequisiteObjectiveId names ' +
           'an objective the plan teaches; (5) every source-grounded objective cites locators from ' +
@@ -812,9 +813,10 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
         'teaching',
         `Write the spoken lesson for Day ${dayPlan.day} against the approved plan. The script ` +
           'must be written to be spoken aloud — roughly 750 words for five minutes, plain ' +
-          'sentences, no bullet lists, no references to figures. Use the shared glossary ' +
-          `terms: ${glossaryBrief}. Provide the script, its verbatim transcript, and a ` +
-          'one-paragraph summary of what the learner can now do.',
+          'sentences, no bullet lists, and no reference to anything the listener cannot ' +
+          'perceive: no figures, screens, buttons, or interface elements. Use the shared ' +
+          `glossary terms: ${glossaryBrief}. Provide the script, its verbatim transcript, and ` +
+          'a one-paragraph summary of what the learner can now do.',
         0.2,
       )) as LessonScript,
   )) as LessonScript;
@@ -835,7 +837,10 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
           'separately; estimatedMinutes will be recomputed from it, so give your best ' +
           "estimate of the listening time (about 5 minutes for 750 words), never the day's " +
           'total budget. Every question prompt must be unique within the lesson. Every claim ' +
-          'drawn from the source evidence must cite a locator from the evidence. Only ' +
+          'drawn from the source evidence must cite a locator from the evidence, and a ' +
+          'question grounded in the source MUST use basis "source" with locators — basis ' +
+          '"general_knowledge" is only permitted when no source evidence exists for the ' +
+          'claim. Only ' +
           'multiple-choice questions carry an options field, with at least three distinct ' +
           'options and the answer among them; every other question type omits options. ' +
           'Free-response questions MUST carry a rubric — a non-empty string — and every ' +
