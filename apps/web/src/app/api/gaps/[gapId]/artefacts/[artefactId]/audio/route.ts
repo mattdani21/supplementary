@@ -11,7 +11,14 @@ export const GET = async (
     const { gapId, artefactId } = await params;
     const context = await getServerContext();
     const owner = requireOwner(request.headers);
-    return NextResponse.json(await audioUrl(context, owner, gapId, artefactId));
+    const result = await audioUrl(context, owner, gapId, artefactId);
+    if ('bytes' in result && result.bytes.length > 0) {
+      // In-memory storage: stream the bytes so a no-S3 deployment still plays audio.
+      return new NextResponse(new Uint8Array(result.bytes), {
+        headers: { 'content-type': result.mediaType },
+      });
+    }
+    return NextResponse.json(result);
   } catch (error) {
     const mapped = toHttpError(error);
     return NextResponse.json({ error: mapped }, { status: mapped.status });
