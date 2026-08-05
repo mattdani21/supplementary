@@ -53,7 +53,7 @@ import {
   type PriorCapability,
 } from '@gapos/domain';
 import type { Logger, Metrics } from '@gapos/observability';
-import { ProviderContractError, type Providers } from '@gapos/provider-adapters';
+import { LiveProviderError, ProviderContractError, type Providers } from '@gapos/provider-adapters';
 import { mapWithConcurrency, runStep, type StepContext } from './step-runner.js';
 
 export const PIPELINE_VERSION = '1.0.0';
@@ -652,15 +652,23 @@ const planCurriculum = async (params: {
           (previousViolations.length > 0
             ? ` The previous plan was rejected for: ${previousViolations.join('; ')}. Fix all of them. ` +
               'Keep the plan terse — capabilityStatements under 25 words, one sentence per daily ' +
-              'activity — so the whole plan fits the output budget.'
+              'activity — and emit the JSON compactly (no line breaks), so the whole plan fits ' +
+              'the output budget.'
             : ''),
         evidence,
       });
     } catch (error) {
-      // A contract failure (typically truncation) is repairable like a violation: retry with
-      // the rejection quoted and an explicit terseness demand.
-      if (!(error instanceof ProviderContractError)) throw error;
-      previousViolations = [...error.issues];
+      // A contract failure or a persistent transport failure (typically truncation: the
+      // provider caps structured output at ~4096 tokens regardless of max_tokens) is
+      // repairable like a violation — retry with the rejection quoted, an explicit terseness
+      // demand, and compact JSON, so the plan fits the output budget.
+      if (error instanceof ProviderContractError) {
+        previousViolations = [...error.issues];
+      } else if (error instanceof LiveProviderError && error.retryable) {
+        previousViolations = [error.message];
+      } else {
+        throw error;
+      }
     }
 
     if (response) {
@@ -752,14 +760,24 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
           instruction:
             instruction +
             (previousIssues.length > 0
-              ? ` The previous response failed validation: ${previousIssues.join('; ')}. Fix all of them.`
+              ? ` The previous response failed validation: ${previousIssues.join('; ')}. Fix all of them. ` +
+                'Emit the JSON compactly (no line breaks) so it fits the output budget.'
               : ''),
           evidence,
         });
         return response.value;
       } catch (error) {
-        if (!(error instanceof ProviderContractError)) throw error;
-        previousIssues = error.issues;
+        // A contract rejection OR a persistent transport failure (unparseable JSON after the
+        // adapter's own retries) is repairable: retry with the rejection quoted back and an
+        // explicit compactness demand, so the artefact fits the provider's structured-output
+        // cap. Anything else is a genuine provider outage — fail loudly.
+        if (error instanceof ProviderContractError) {
+          previousIssues = error.issues;
+        } else if (error instanceof LiveProviderError && error.retryable) {
+          previousIssues = [error.message];
+        } else {
+          throw error;
+        }
         step.logger.warn('Artefact rejected by contract; asking the model to fix the violations', {
           contract: contract.name,
           attempt,

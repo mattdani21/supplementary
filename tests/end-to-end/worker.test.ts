@@ -13,6 +13,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { referenceLesson, referencePlan } from '@gapos/test-fixtures';
+import { LiveProviderError } from '@gapos/provider-adapters';
 import type { OwnerId } from '@gapos/database';
 import { createServerContext, type ServerContext } from '../../apps/web/src/server/context.js';
 import { enqueueCompile } from '../../apps/worker/src/queue/enqueue.js';
@@ -339,6 +340,43 @@ describe('the durable worker loop (GAP-015)', () => {
 
     const curriculum = await context.uow.curricula.getCurrentForGap(LEARNER, gap.id);
     expect(curriculum).toBeDefined();
+  });
+
+  it('treats a persistent transport failure (unparseable JSON) as repairable, not fatal', async () => {
+    // The live gate's fifth run failed because "unparseable JSON" is a LiveProviderError, not
+    // a ProviderContractError, so the plan retry never engaged. The plan step now repairs
+    // retryable transport failures the same way: quote the rejection, demand terseness.
+    let planCalls = 0;
+    const { context } = build({
+      fake: {
+        script: {
+          curriculum_plan: (request: { subject?: string }) => {
+            planCalls += 1;
+            if (planCalls === 1) {
+              throw new LiveProviderError(
+                'Live provider returned unparseable JSON for curriculum_plan@1.0.0: {"schemaVersion":"1.0.0","gapId":"equivalence-classes-partition","objectives":[{"id":"eq_classes_def","capabilityStatement":"Define the equivalen',
+                200,
+                true,
+              );
+            }
+            return referencePlan(request.subject ?? 'gap_reference');
+          },
+        },
+      },
+    });
+    await seedLearner(context);
+    const gap = await seedGap(context);
+
+    const job = await enqueueCompile(context, LEARNER, {
+      gapId: gap.id,
+      idempotencyKey: 'worker-transport-retry-1',
+    });
+    const worker = createCompileWorker(context, { leaseDurationMs: 60_000 });
+    await worker.tick();
+
+    const done = await context.queue.get(LEARNER, job.id);
+    expect(done?.state).toBe('succeeded');
+    expect(planCalls).toBe(2);
   });
 
   it('lets the gap fail and retry through the worker path exactly like the API path', async () => {
