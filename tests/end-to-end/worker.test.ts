@@ -292,9 +292,11 @@ describe('the durable worker loop (GAP-015)', () => {
     // The contract retry happened inside the run: zero job retries, two lesson calls.
     expect(done?.attempts).toBe(0);
     expect(lessonCalls).toBeGreaterThanOrEqual(2);
-    // The big payloads carry an explicit output budget (provider defaults truncate long JSON).
-    expect(observedTokens[0]).toBe(8192); // plan
-    expect(observedTokens.slice(1).every((t) => t === 8192)).toBe(true); // lessons
+    // The big payloads carry an explicit output budget: deepseek-v4-flash's chain of thought
+    // shares the budget, so a small cap can be consumed by reasoning alone (the live gate saw
+    // twelve consecutive empty responses). 32K leaves room for the reasoning AND the JSON.
+    expect(observedTokens[0]).toBe(32768); // plan
+    expect(observedTokens.slice(1).every((t) => t === 32768)).toBe(true); // lessons
 
     const curriculum = await context.uow.curricula.getCurrentForGap(LEARNER, gap.id);
     expect(curriculum).toBeDefined();

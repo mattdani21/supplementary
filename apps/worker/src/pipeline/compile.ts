@@ -63,12 +63,14 @@ export const MAX_PLAN_ATTEMPTS = 3;
 /** Contract retries per lesson package: the model occasionally drops a required field. */
 export const MAX_LESSON_CONTRACT_ATTEMPTS = 3;
 /**
- * The largest structured payloads (plans, lesson packages) get an explicit output budget:
- * provider defaults (~4096 tokens) truncate a long JSON mid-string, and truncation parses as
- * an unparseable-JSON failure that no repair loop can see.
+ * The largest structured payloads (plans, lesson packages) get an explicit output budget.
+ * deepseek-v4-flash is a reasoning model: its chain of thought (reasoning_content) shares the
+ * output budget, and an 8K cap could be consumed entirely by reasoning — the live gate saw
+ * twelve consecutive "no message content" responses where the model thought for the full
+ * budget and never wrote the JSON. 32K leaves room for both the reasoning and the artefact.
  */
-export const PLAN_MAX_OUTPUT_TOKENS = 8192;
-export const LESSON_MAX_OUTPUT_TOKENS = 8192;
+export const PLAN_MAX_OUTPUT_TOKENS = 32768;
+export const LESSON_MAX_OUTPUT_TOKENS = 32768;
 
 export interface CompileDeps {
   readonly uow: UnitOfWork;
