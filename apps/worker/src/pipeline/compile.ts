@@ -50,13 +50,22 @@ import {
   type PriorCapability,
 } from '@gapos/domain';
 import type { Logger, Metrics } from '@gapos/observability';
-import type { Providers } from '@gapos/provider-adapters';
+import { ProviderContractError, type Providers } from '@gapos/provider-adapters';
 import { mapWithConcurrency, runStep, type StepContext } from './step-runner.js';
 
 export const PIPELINE_VERSION = '1.0.0';
 
 /** How many times the planner is asked again after a rejected plan. */
 export const MAX_PLAN_ATTEMPTS = 2;
+/** Contract retries per lesson package: the model occasionally drops a required field. */
+export const MAX_LESSON_CONTRACT_ATTEMPTS = 3;
+/**
+ * The largest structured payloads (plans, lesson packages) get an explicit output budget:
+ * provider defaults (~4096 tokens) truncate a long JSON mid-string, and truncation parses as
+ * an unparseable-JSON failure that no repair loop can see.
+ */
+export const PLAN_MAX_OUTPUT_TOKENS = 8192;
+export const LESSON_MAX_OUTPUT_TOKENS = 8192;
 
 export interface CompileDeps {
   readonly uow: UnitOfWork;
@@ -613,6 +622,9 @@ const planCurriculum = async (params: {
       contract: CurriculumPlanContract,
       purpose: 'planning',
       temperature: 0,
+      // Plans are the largest structured payload in the pipeline; DeepSeek's default output
+      // cap (4096 tokens) truncates a long plan mid-JSON, which killed live compiles.
+      maxOutputTokens: PLAN_MAX_OUTPUT_TOKENS,
       runId,
       userId: owner,
       subject: gapId,
@@ -694,38 +706,76 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
       ? plan.glossary.map((g) => `${g.term}: ${g.definition}`).join('; ')
       : 'none';
 
-  let lesson: LessonPackage = await runStep(
-    step,
-    { step: 'generate_lesson', subject: `day-${dayPlan.day}`, inputVersion: planVersion },
-    async () =>
-      (
-        await providers.languageModel.generate({
+  let lesson: LessonPackage;
+
+  /**
+   * Generate a lesson package with contract retries. The model occasionally drops a field the
+   * schema requires (the live gate caught a free-response question without a rubric); the plan
+   * step repairs violations by quoting them back, and a lesson deserves the same courtesy —
+   * otherwise one bad field fails the whole run. Retries are deterministic (temperature 0).
+   */
+  const generateLesson = async (
+    instruction: string,
+    temperature: number,
+  ): Promise<LessonPackage> => {
+    let previousIssues: readonly string[] = [];
+    for (let attempt = 1; attempt <= MAX_LESSON_CONTRACT_ATTEMPTS; attempt += 1) {
+      try {
+        const response = await providers.languageModel.generate({
           contract: LessonPackageContract,
           purpose: 'teaching',
-          // Prose benefits from a little variance; everything structural stays fixed.
-          temperature: 0.2,
+          temperature: attempt === 1 ? temperature : 0,
+          maxOutputTokens: LESSON_MAX_OUTPUT_TOKENS,
           runId,
           userId: owner,
           subject: `day-${dayPlan.day}`,
           instruction:
-            `Write the Day ${dayPlan.day} lesson package against the approved plan. The plan, ` +
-            'the glossary and the objective identifiers are fixed inputs: use the shared terms ' +
-            'for the concepts they name and do not reinterpret an objective. ' +
-            `Shared glossary: ${glossaryBrief}. Assessment blueprint for this day's objectives: ` +
-            `${blueprintForDay}. Ship at least those item counts across the lesson's questions ` +
-            '(application items may be marked transfer). The script must be written to be spoken ' +
-            'aloud — roughly 750 words for five minutes, plain sentences, no bullet lists, no ' +
-            "references to figures. Set estimatedMinutes to the script's actual listening time " +
-            "(about 5 minutes for 750 words), never the day's total budget. Every question " +
-            'prompt must be unique within the lesson. Every claim drawn from the source ' +
-            'evidence must cite a locator from the evidence. Only multiple-choice questions ' +
-            'carry an options field, with at least three distinct options and the answer among ' +
-            'them; every other question type omits options. Free-response questions MUST carry ' +
-            'a rubric — a non-empty string — and every other question type omits the rubric ' +
-            'field entirely. Never emit null for any field: omit optional fields instead.',
+            instruction +
+            (previousIssues.length > 0
+              ? ` The previous response failed validation: ${previousIssues.join('; ')}. Fix all of them.`
+              : ''),
           evidence,
-        })
-      ).value,
+        });
+        return response.value as LessonPackage;
+      } catch (error) {
+        if (!(error instanceof ProviderContractError)) throw error;
+        previousIssues = error.issues;
+        step.logger.warn('Lesson rejected by contract; asking the model to fix the violations', {
+          attempt,
+          issues: previousIssues.length,
+        });
+        metrics.increment('repair_attempt_total', { stage: 'lesson_contract' });
+      }
+    }
+    throw new ProviderContractError(
+      LessonPackageContract.name,
+      LessonPackageContract.version,
+      previousIssues,
+    );
+  };
+
+  lesson = await runStep(
+    step,
+    { step: 'generate_lesson', subject: `day-${dayPlan.day}`, inputVersion: planVersion },
+    async () =>
+      generateLesson(
+        `Write the Day ${dayPlan.day} lesson package against the approved plan. The plan, ` +
+          'the glossary and the objective identifiers are fixed inputs: use the shared terms ' +
+          'for the concepts they name and do not reinterpret an objective. ' +
+          `Shared glossary: ${glossaryBrief}. Assessment blueprint for this day's objectives: ` +
+          `${blueprintForDay}. Ship at least those item counts across the lesson's questions ` +
+          '(application items may be marked transfer). The script must be written to be spoken ' +
+          'aloud — roughly 750 words for five minutes, plain sentences, no bullet lists, no ' +
+          "references to figures. Set estimatedMinutes to the script's actual listening time " +
+          "(about 5 minutes for 750 words), never the day's total budget. Every question " +
+          'prompt must be unique within the lesson. Every claim drawn from the source ' +
+          'evidence must cite a locator from the evidence. Only multiple-choice questions ' +
+          'carry an options field, with at least three distinct options and the answer among ' +
+          'them; every other question type omits options. Free-response questions MUST carry ' +
+          'a rubric — a non-empty string — and every other question type omits the rubric ' +
+          'field entirely. Never emit null for any field: omit optional fields instead.',
+        0.2,
+      ),
   );
 
   const verificationContext = {
@@ -826,21 +876,12 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
         inputVersion: hash([lesson, decision.findings]),
       },
       async () =>
-        (
-          await providers.languageModel.generate({
-            contract: LessonPackageContract,
-            purpose: 'teaching',
-            temperature: 0,
-            runId,
-            userId: owner,
-            subject: `day-${dayPlan.day}`,
-            instruction:
-              'Repair only the failed items in this lesson; leave everything else untouched. ' +
-              'Findings to address: ' +
-              decision.findings.map((f) => `${f.category}: ${f.finding}`).join(' | '),
-            evidence,
-          })
-        ).value,
+        generateLesson(
+          'Repair only the failed items in this lesson; leave everything else untouched. ' +
+            'Findings to address: ' +
+            decision.findings.map((f) => `${f.category}: ${f.finding}`).join(' | '),
+          0,
+        ),
     );
     metrics.increment('repair_success_total', { stage: 'lesson' });
   }
