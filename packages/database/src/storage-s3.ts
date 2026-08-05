@@ -119,7 +119,12 @@ export const createS3ObjectStore = (options: S3ObjectStoreOptions): ObjectStore 
   const fetchImpl = options.fetchImpl ?? fetch;
   const baseUrl = `${endpoint.replace(/\/+$/, '')}/${bucket}`;
 
-  const authHeaders = (method: string, path: string, body: Uint8Array | undefined) => {
+  const authHeaders = (
+    method: string,
+    path: string,
+    body: Uint8Array | undefined,
+    query: URLSearchParams = new URLSearchParams(),
+  ) => {
     const date = now();
     const payloadHash = body ? sha256Hex(body) : PAYLOAD_HASH_EMPTY;
     const host = new URL(baseUrl).host;
@@ -131,7 +136,7 @@ export const createS3ObjectStore = (options: S3ObjectStoreOptions): ObjectStore 
     const signature = sign({
       method,
       path,
-      query: new URLSearchParams(),
+      query,
       headers,
       payloadHash,
       date,
@@ -225,8 +230,11 @@ export const createS3ObjectStore = (options: S3ObjectStoreOptions): ObjectStore 
         secretAccessKey,
       });
       query.set('X-Amz-Signature', signature);
+      // The wire query is the canonical query string (SigV4-encoded, sorted) with the
+      // signature appended last — never URLSearchParams.toString(), whose escaping differs.
+      const wireQuery = `${canonicalQuery(query)}&X-Amz-Signature=${signature}`;
       return {
-        url: `${baseUrl}/${fullKey}?${query.toString()}`,
+        url: `${baseUrl}/${fullKey}?${wireQuery}`,
         expiresAt: new Date(date.getTime() + expires * 1000),
       };
     },
@@ -242,12 +250,9 @@ export const createS3ObjectStore = (options: S3ObjectStoreOptions): ObjectStore 
 
     async deleteOwnedBy(owner) {
       const prefix = `${owner}/`;
-      const { headers } = authHeaders(
-        'GET',
-        `/?list-type=2&prefix=${uriEncode(prefix)}`,
-        undefined,
-      );
-      const response = await fetchImpl(`${baseUrl}?list-type=2&prefix=${uriEncode(prefix)}`, {
+      const query = new URLSearchParams({ 'list-type': '2', prefix });
+      const { headers } = authHeaders('GET', `/${bucket}`, undefined, query);
+      const response = await fetchImpl(`${baseUrl}?${canonicalQuery(query)}`, {
         headers,
       });
       if (!response.ok) {
@@ -257,8 +262,16 @@ export const createS3ObjectStore = (options: S3ObjectStoreOptions): ObjectStore 
       const keys = [...xml.matchAll(/<Key>([^<]+)<\/Key>/g)].map((match) => match[1]!);
       await Promise.all(
         keys.map(async (fullKey) => {
-          const delHeaders = authHeaders('DELETE', `/${fullKey}`, undefined).headers;
-          await fetchImpl(`${baseUrl}/${fullKey}`, { method: 'DELETE', headers: delHeaders });
+          // The signed path carries the bucket: baseUrl already includes it, so the request
+          // URL and the signed path must both be /bucket/key.
+          const delHeaders = authHeaders('DELETE', `/${bucket}/${fullKey}`, undefined).headers;
+          const delResponse = await fetchImpl(`${baseUrl}/${fullKey}`, {
+            method: 'DELETE',
+            headers: delHeaders,
+          });
+          if (!delResponse.ok && delResponse.status !== 404) {
+            throw new Error(`S3 delete failed: ${delResponse.status} ${await delResponse.text()}`);
+          }
         }),
       );
     },
