@@ -58,8 +58,8 @@ import { mapWithConcurrency, runStep, type StepContext } from './step-runner.js'
 
 export const PIPELINE_VERSION = '1.0.0';
 
-/** How many times the planner is asked again after a rejected plan. */
-export const MAX_PLAN_ATTEMPTS = 2;
+/** How many times the planner is asked again after a rejected or truncated plan. */
+export const MAX_PLAN_ATTEMPTS = 3;
 /** Contract retries per lesson package: the model occasionally drops a required field. */
 export const MAX_LESSON_CONTRACT_ATTEMPTS = 3;
 /**
@@ -621,46 +621,60 @@ const planCurriculum = async (params: {
   let previousViolations: string[] = [];
 
   for (let attempt = 1; attempt <= MAX_PLAN_ATTEMPTS; attempt++) {
-    const response = await deps.providers.languageModel.generate({
-      contract: CurriculumPlanContract,
-      purpose: 'planning',
-      temperature: 0,
-      // Plans are the largest structured payload in the pipeline; DeepSeek's default output
-      // cap (4096 tokens) truncates a long plan mid-JSON, which killed live compiles.
-      maxOutputTokens: PLAN_MAX_OUTPUT_TOKENS,
-      runId,
-      userId: owner,
-      subject: gapId,
-      instruction:
-        `${params.learnerBrief} Produce a curriculum plan that satisfies every invariant the ` +
-        "product enforces: (1) every day's activities fit within the learner's daily minutes; " +
-        '(2) every objective is taught on at least one day, and no day teaches an objective the ' +
-        'plan does not declare; (3) the assessment blueprint has exactly one entry per objective, ' +
-        'each with at least 2 retrieval and 1 application items, and no entry for an undeclared ' +
-        'objective; (4) the prerequisite graph is acyclic, and every prerequisiteObjectiveId names ' +
-        'an objective the plan teaches; (5) every source-grounded objective cites locators from ' +
-        'the evidence; (6) externalPrerequisites must be copied verbatim from the list of what ' +
-        'the learner is assumed to already hold — never invent a prerequisite outside it; teach ' +
-        'it as an objective instead, or remove the dependency; (7) an audio lesson is a ' +
-        'five-minute listening activity (~750 spoken words), scheduled alongside practice ' +
-        'activities that together fit the daily budget; (8) targetDifficulty must not decrease ' +
-        'across the course — later objectives are harder than earlier ones.' +
-        (previousViolations.length > 0
-          ? ` The previous plan was rejected for: ${previousViolations.join('; ')}. Fix all of them.`
-          : ''),
-      evidence,
-    });
+    let response;
+    try {
+      response = await deps.providers.languageModel.generate({
+        contract: CurriculumPlanContract,
+        purpose: 'planning',
+        temperature: 0,
+        // Plans are the largest structured payload in the pipeline; the provider caps
+        // structured output (~4096 tokens regardless of max_tokens), which truncated a long
+        // plan mid-JSON and killed live compiles. Terseness is a free variable of the
+        // contract, so retries demand it explicitly.
+        maxOutputTokens: PLAN_MAX_OUTPUT_TOKENS,
+        runId,
+        userId: owner,
+        subject: gapId,
+        instruction:
+          `${params.learnerBrief} Produce a curriculum plan that satisfies every invariant the ` +
+          "product enforces: (1) every day's activities fit within the learner's daily minutes; " +
+          '(2) every objective is taught on at least one day, and no day teaches an objective the ' +
+          'plan does not declare; (3) the assessment blueprint has exactly one entry per objective, ' +
+          'each with at least 2 retrieval and 1 application items, and no entry for an undeclared ' +
+          'objective; (4) the prerequisite graph is acyclic, and every prerequisiteObjectiveId names ' +
+          'an objective the plan teaches; (5) every source-grounded objective cites locators from ' +
+          'the evidence; (6) externalPrerequisites must be copied verbatim from the list of what ' +
+          'the learner is assumed to already hold — never invent a prerequisite outside it; teach ' +
+          'it as an objective instead, or remove the dependency; (7) an audio lesson is a ' +
+          'five-minute listening activity (~750 spoken words), scheduled alongside practice ' +
+          'activities that together fit the daily budget; (8) targetDifficulty must not decrease ' +
+          'across the course — later objectives are harder than earlier ones.' +
+          (previousViolations.length > 0
+            ? ` The previous plan was rejected for: ${previousViolations.join('; ')}. Fix all of them. ` +
+              'Keep the plan terse — capabilityStatements under 25 words, one sentence per daily ' +
+              'activity — so the whole plan fits the output budget.'
+            : ''),
+        evidence,
+      });
+    } catch (error) {
+      // A contract failure (typically truncation) is repairable like a violation: retry with
+      // the rejection quoted and an explicit terseness demand.
+      if (!(error instanceof ProviderContractError)) throw error;
+      previousViolations = [...error.issues];
+    }
 
-    const violations = findPlanViolations(response.value, {
-      satisfiedExternalPrerequisites: params.satisfiedExternalPrerequisites,
-    });
-    if (violations.length === 0) return response.value;
+    if (response) {
+      const violations = findPlanViolations(response.value, {
+        satisfiedExternalPrerequisites: params.satisfiedExternalPrerequisites,
+      });
+      if (violations.length === 0) return response.value;
+      previousViolations = violations.map((v) => v.message);
+    }
 
-    previousViolations = violations.map((v) => v.message);
     deps.metrics.increment('repair_attempt_total', { stage: 'planning' });
     logger.warn('Plan rejected; asking the planner to repair every violation at once', {
       attempt,
-      violations: violations.length,
+      violations: previousViolations.length,
     });
   }
 

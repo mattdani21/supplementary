@@ -300,6 +300,47 @@ describe('the durable worker loop (GAP-015)', () => {
     expect(await context.uow.curricula.listLessons(LEARNER, curriculum!.id)).toHaveLength(3);
   });
 
+  it('retries a truncated plan with a terseness demand and succeeds', async () => {
+    // The provider's structured-output cap truncates a long plan mid-JSON (the live gate saw
+    // eval_02's plan cut inside an objective). The plan step now treats a contract failure as
+    // repairable: the retry quotes the rejection and demands terseness. Simulate the exact
+    // failure: the first plan response is cut JSON, the retry is healthy.
+    let planCalls = 0;
+    const planInstructions: string[] = [];
+    const { context } = build({
+      fake: {
+        script: {
+          curriculum_plan: (request: { instruction: string; subject?: string }) => {
+            planCalls += 1;
+            planInstructions.push(request.instruction);
+            if (planCalls === 1) {
+              return '{"schemaVersion":"1.0.0","gapId":"truncated","objectives":[{"id":"o1","capabilityStatement":"State the theorem that the equivalence classes of an e';
+            }
+            return referencePlan(request.subject ?? 'gap_reference');
+          },
+        },
+      },
+    });
+    await seedLearner(context);
+    const gap = await seedGap(context);
+
+    const job = await enqueueCompile(context, LEARNER, {
+      gapId: gap.id,
+      idempotencyKey: 'worker-truncated-plan-1',
+    });
+    const worker = createCompileWorker(context, { leaseDurationMs: 60_000 });
+    await worker.tick();
+
+    const done = await context.queue.get(LEARNER, job.id);
+    expect(done?.state).toBe('succeeded');
+    expect(planCalls).toBe(2);
+    // The retry demanded terseness so the plan fits the provider's output budget.
+    expect(planInstructions[1]).toContain('Keep the plan terse');
+
+    const curriculum = await context.uow.curricula.getCurrentForGap(LEARNER, gap.id);
+    expect(curriculum).toBeDefined();
+  });
+
   it('lets the gap fail and retry through the worker path exactly like the API path', async () => {
     const { context } = build({
       fake: {
