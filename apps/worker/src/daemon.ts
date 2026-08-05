@@ -82,7 +82,7 @@ export const bootstrapDaemon = async (
     context = createServerContext({
       uow: createPostgresUnitOfWork(pool),
       queue: createPostgresJobQueue(pool),
-      storage: createStorage(env, logger),
+      storage: await createStorage(env, logger),
       budget: budgetFromEnv(env),
       logLevel: (env.GAPOS_LOG_LEVEL as LoggerLevel) ?? 'info',
     });
@@ -94,7 +94,7 @@ export const bootstrapDaemon = async (
     context = createServerContext({
       uow: createMemoryUnitOfWork(),
       queue: createMemoryJobQueue(),
-      storage: createStorage(env, logger),
+      storage: await createStorage(env, logger),
       budget: budgetFromEnv(env),
       logLevel: (env.GAPOS_LOG_LEVEL as LoggerLevel) ?? 'info',
     });
@@ -119,7 +119,7 @@ export const bootstrapDaemon = async (
 
 type LoggerLevel = 'debug' | 'info' | 'warn' | 'error';
 
-const createStorage = (env: DaemonEnv, logger: Logger): ObjectStore => {
+const createStorage = async (env: DaemonEnv, logger: Logger): Promise<ObjectStore> => {
   const kind = env.GAPOS_STORAGE ?? 'memory';
   if (kind === 'memory') {
     logger.warn('GAPOS_STORAGE is not set to s3; using in-memory object storage.');
@@ -139,13 +139,15 @@ const createStorage = (env: DaemonEnv, logger: Logger): ObjectStore => {
       `GAPOS_STORAGE=s3 requires ${missing.join(', ')} to be set.`,
     );
   }
-  return createS3ObjectStore({
+  const store = createS3ObjectStore({
     endpoint: env.GAPOS_S3_ENDPOINT!,
     region: env.GAPOS_S3_REGION ?? 'us-east-1',
     bucket: env.GAPOS_S3_BUCKET!,
     accessKeyId: env.GAPOS_S3_ACCESS_KEY_ID!,
     secretAccessKey: env.GAPOS_S3_SECRET_ACCESS_KEY!,
   });
+  await store.ensureBucket?.();
+  return store;
 };
 
 const numberFromEnv = (raw: string | undefined, fallback: number, name: string): number => {

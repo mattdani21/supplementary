@@ -155,6 +155,44 @@ export const createS3ObjectStore = (options: S3ObjectStoreOptions): ObjectStore 
   };
 
   return {
+    /** Create the bucket if it does not exist (409 = already there). Idempotent, so a
+     *  deployment boots without an out-of-band bucket step. */
+    async ensureBucket() {
+      const date = now();
+      const payloadHash = PAYLOAD_HASH_EMPTY;
+      const host = new URL(baseUrl).host;
+      const headers: Record<string, string> = {
+        host,
+        'x-amz-content-sha256': payloadHash,
+        'x-amz-date': amzDateOf(date),
+      };
+      const signature = sign({
+        method: 'PUT',
+        path: `/${bucket}`,
+        query: new URLSearchParams(),
+        headers,
+        payloadHash,
+        date,
+        region,
+        accessKeyId,
+        secretAccessKey,
+      });
+      headers.Authorization =
+        `AWS4-HMAC-SHA256 Credential=${accessKeyId}/${amzDateOf(date).slice(0, 8)}/${region}/${SERVICE}/aws4_request, ` +
+        `SignedHeaders=${Object.keys(headers)
+          .map((name) => name.toLowerCase())
+          .sort()
+          .join(';')}, ` +
+        `Signature=${signature}`;
+      const response = await fetchImpl(`${endpoint}/${bucket}`, {
+        method: 'PUT',
+        headers,
+      });
+      if (!response.ok && response.status !== 409 && response.status !== 200) {
+        throw new Error(`S3 bucket create failed: ${response.status} ${await response.text()}`);
+      }
+    },
+
     async put(owner, key, bytes, mediaType) {
       const fullKey = scopedKey(owner, key);
       const { headers } = authHeaders('PUT', `/${bucket}/${fullKey}`, bytes);

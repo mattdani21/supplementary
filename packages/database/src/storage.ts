@@ -26,6 +26,8 @@ export interface SignedUrl {
 }
 
 export interface ObjectStore {
+  /** Idempotent: create the bucket if missing (a no-op for the memory store). */
+  ensureBucket?(): Promise<void>;
   put(owner: OwnerId, key: string, bytes: Uint8Array, mediaType: string): Promise<StoredObject>;
   get(owner: OwnerId, key: string): Promise<StoredObject | undefined>;
   /** Short-lived by construction: docs/SECURITY.md requires signed access to expire. */
@@ -77,7 +79,6 @@ export const createMemoryObjectStore = (now: () => Date = () => new Date()): Obj
     },
   };
 };
-
 export const textOf = (object: StoredObject): string => new TextDecoder().decode(object.bytes);
 
 export const bytesOfText = (text: string): Uint8Array => new TextEncoder().encode(text);
