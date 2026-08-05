@@ -761,7 +761,9 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
             instruction +
             (previousIssues.length > 0
               ? ` The previous response failed validation: ${previousIssues.join('; ')}. Fix all of them. ` +
-                'Emit the JSON compactly (no line breaks) so it fits the output budget.'
+                'Emit the JSON compactly (no line breaks), keep every question prompt under 20 ' +
+                'words, options under 6 words, answers under 10 words and rubrics under 30 ' +
+                'words, so the whole artefact fits the output budget.'
               : ''),
           evidence,
         });
@@ -836,7 +838,9 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
           'options and the answer among them; every other question type omits options. ' +
           'Free-response questions MUST carry a rubric — a non-empty string — and every ' +
           'other question type omits the rubric field entirely. Never emit null for any ' +
-          'field: omit optional fields instead.',
+          'field: omit optional fields instead. Keep the package compact so it fits the ' +
+          'output budget: every question prompt under 20 words, options under 6 words, ' +
+          'answers under 10 words, rubrics under 30 words.',
         0.2,
       )) as LessonPackageContractOutput,
   )) as LessonPackageContractOutput;
