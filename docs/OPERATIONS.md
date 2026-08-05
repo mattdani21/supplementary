@@ -40,6 +40,41 @@ missing, 402 budget, 409 conflict, 422 screening).
 first load the current lesson renders with the network cut. Writes never cache — offline they
 fail loudly.
 
+## Deploying on Railway
+
+The repo ships `Dockerfile` + `railway.json` (Docker builder, healthcheck `/api/health` on
+`$PORT`). The stack is four services in one project:
+
+| Service | Image / source | Command | Notes |
+| --- | --- | --- | --- |
+| web | this repo (Dockerfile) | default CMD (`next start`) | the UI + API |
+| worker | this repo (Dockerfile) | `pnpm --filter @gapos/worker start` | the compile loop; custom start command |
+| postgres | Railway Postgres plugin | — | `GAPOS_DATABASE_URL` comes from the plugin |
+| minio | `minio/minio` image | `server /data` | shared object storage; add a volume |
+
+Variables on web **and** worker (identical, so either process can be the first boot):
+
+    GAPOS_DATABASE_URL=<from the postgres plugin>
+    GAPOS_PROVIDER_MODE=live
+    GAPOS_LLM_API_KEY / GAPOS_LLM_MODEL
+    GAPOS_STORAGE=s3
+    GAPOS_S3_ENDPOINT=http://minio:9000
+    GAPOS_S3_REGION=us-east-1
+    GAPOS_S3_BUCKET=gapos
+    GAPOS_S3_ACCESS_KEY_ID / GAPOS_S3_SECRET_ACCESS_KEY
+    GAPOS_BUDGET_PER_RUN_CENTS / GAPOS_BUDGET_PER_USER_DAILY_CENTS
+
+Both processes migrate on boot and self-provision the bucket (`ensureBucket`), so the
+deploy order is: postgres + minio up, then web and worker (either first). The worker polls
+the Postgres queue, so compiles enqueued through the web run in the worker and audio lands
+in MinIO where the web's signed URLs reach it. No-S3 trial deploys work too: leave
+`GAPOS_STORAGE` unset and audio is proxied through the API (bytes are served from the same
+container that generated them — fine for one replica, not for horizontal scale).
+
+The gate before flipping a deployed instance to real learners is the live-provider
+evaluation (GAP-014b): `GAPOS_PROVIDER_MODE=live GAPOS_LLM_API_KEY=… pnpm test
+tests/evaluation/live-provider.test.ts` against the exact model the instance runs.
+
 ## Environments
 
 | Environment | Providers | Data |
