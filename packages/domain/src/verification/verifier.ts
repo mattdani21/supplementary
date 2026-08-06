@@ -299,7 +299,10 @@ const checkDifficulty = (question: VerifiableQuestion, context: VerificationCont
   ];
 };
 
-const checkSourceSupport = (question: VerifiableQuestion, context: VerificationContext): Finding[] => {
+const checkSourceSupport = (
+  question: VerifiableQuestion,
+  context: VerificationContext,
+): Finding[] => {
   if (question.evidence.basis === 'general_knowledge') {
     // Mirror of the evaluation gate's source_faithfulness rule: with a source supplied, a
     // question that falls back to general knowledge is ungrounded, not free.

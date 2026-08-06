@@ -1,0 +1,56 @@
+{
+  "$id": "https://gapos.dev/generation-schemas/plan_self_review/1.0.0",
+  "title": "plan_self_review",
+  "description": "Structured response contract for the \"plan_self_review\" model call, version 1.0.0. Generated from packages/ai-contracts; do not edit by hand.",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "statementCapabilities": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "capability": {
+            "type": "string",
+            "minLength": 1
+          },
+          "coveredByObjectiveId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "capability",
+          "coveredByObjectiveId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "extraObjectives": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "statementCapabilities",
+    "extraObjectives"
+  ],
+  "additionalProperties": false
+}

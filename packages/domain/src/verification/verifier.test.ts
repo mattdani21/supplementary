@@ -165,15 +165,11 @@ describe('coverage, duration and transcript', () => {
     const lesson: VerifiableLesson = {
       ...toVerifiable(1),
       questions: toVerifiable(1).questions.map((q, index) =>
-        index === 0
-          ? { ...q, evidence: { basis: 'general_knowledge' as const, locators: [] } }
-          : q,
+        index === 0 ? { ...q, evidence: { basis: 'general_knowledge' as const, locators: [] } } : q,
       ),
     };
     const context = { ...contextFor(lesson), evidenceSupplied: true };
-    const findings = verifyLesson(lesson, context).filter(
-      (f) => f.category === 'source_support',
-    );
+    const findings = verifyLesson(lesson, context).filter((f) => f.category === 'source_support');
     expect(findings.length).toBeGreaterThan(0);
     expect(findings[0]!.finding).toContain('fell back to general knowledge');
   });
@@ -181,9 +177,7 @@ describe('coverage, duration and transcript', () => {
   it('permits general-knowledge questions when no source was supplied', () => {
     const lesson = toVerifiable(1);
     const context = { ...contextFor(lesson), evidenceSupplied: false };
-    const findings = verifyLesson(lesson, context).filter(
-      (f) => f.category === 'source_support',
-    );
+    const findings = verifyLesson(lesson, context).filter((f) => f.category === 'source_support');
     expect(findings).toEqual([]);
   });
 

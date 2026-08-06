@@ -225,6 +225,31 @@ export const CurriculumPlanContract = defineContract('curriculum_plan', '1.0.0',
 });
 export type CurriculumPlan = z.infer<typeof CurriculumPlanContract.schema>;
 
+/**
+ * The planner's own check of its plan against the learner's statement. Coverage and scope are
+ * semantic: no structural invariant can verify them, so a second model pass enumerates every
+ * distinct capability the statement demands and checks the plan against that enumeration —
+ * anchoring the plan to the only spec production has (the learner's words). The evaluation
+ * gate's objective_coverage/scope_discipline floors measure the same property.
+ */
+export const PlanSelfReviewContract = defineContract('plan_self_review', '1.0.0', {
+  statementCapabilities: z
+    .array(
+      z
+        .object({
+          /** One distinct capability the learner's statement demands, in their words. */
+          capability: z.string().min(1),
+          /** The plan objective that teaches it, or null when the plan misses it. */
+          coveredByObjectiveId: z.string().min(1).nullable(),
+        })
+        .strict(),
+    )
+    .min(1),
+  /** Plan objectives that teach nothing the learner's statement demands. */
+  extraObjectives: z.array(z.string().min(1)).default([]),
+});
+export type PlanSelfReview = z.infer<typeof PlanSelfReviewContract.schema>;
+
 /* ---------------------------------------------------------- stage E: lesson package */
 
 export const LessonPackageContract = defineContract('lesson_package', '2.0.0', {
@@ -351,6 +376,7 @@ export const ALL_CONTRACTS = {
   gap_normalisation: GapNormalisationContract,
   diagnostic_interpretation: DiagnosticInterpretationContract,
   curriculum_plan: CurriculumPlanContract,
+  plan_self_review: PlanSelfReviewContract,
   lesson_package: LessonPackageContract,
   lesson_script: LessonScriptContract,
   verification_report: VerificationReportContract,

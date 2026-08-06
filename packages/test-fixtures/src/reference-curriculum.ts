@@ -14,6 +14,7 @@ import type {
   LessonPackage,
   LessonPackageContractOutput,
   LessonScript,
+  PlanSelfReview,
   Question,
   VerificationReport,
 } from '@gapos/ai-contracts';
@@ -672,6 +673,15 @@ export const assembleLesson = (day: number): LessonPackage => {
     ),
   };
 };
+
+/** A clean self-review: every statement capability is taught, nothing extra. */
+export const referencePlanSelfReview = (): PlanSelfReview => ({
+  schemaVersion: '1.0.0',
+  statementCapabilities: [
+    { capability: 'the capabilities the learner statement demands', coveredByObjectiveId: 'obj-1' },
+  ],
+  extraObjectives: [],
+});
 
 export const REFERENCE_DAY_COUNT = 3;
 

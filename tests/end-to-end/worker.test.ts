@@ -12,7 +12,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { referenceLesson, referencePlan } from '@gapos/test-fixtures';
+import { referenceLesson, referencePlan, referencePlanSelfReview } from '@gapos/test-fixtures';
 import { LiveProviderError } from '@gapos/provider-adapters';
 import type { OwnerId } from '@gapos/database';
 import { createServerContext, type ServerContext } from '../../apps/web/src/server/context.js';
@@ -379,6 +379,61 @@ describe('the durable worker loop (GAP-015)', () => {
     const done = await context.queue.get(LEARNER, job.id);
     expect(done?.state).toBe('succeeded');
     expect(planCalls).toBe(2);
+  });
+
+  it('repairs a plan the self-review flags as missing a statement capability', async () => {
+    // Coverage and scope are semantic, so the plan step now runs a self-review pass: the model
+    // enumerates the statement's capabilities and checks the plan against them. A dropped
+    // capability must flow back into the plan retry like any violation — the live gate saw
+    // eval_04/05 plans miss an objective (coverage 0.67/0.75) and eval_04 add an out-of-scope
+    // one (scope_discipline 0).
+    let reviewCalls = 0;
+    const planInstructions: string[] = [];
+    const { context } = build({
+      fake: {
+        script: {
+          curriculum_plan: (request: { instruction: string; subject?: string }) => {
+            planInstructions.push(request.instruction);
+            return referencePlan(request.subject ?? 'gap_reference');
+          },
+          plan_self_review: () => {
+            reviewCalls += 1;
+            if (reviewCalls === 1) {
+              return {
+                schemaVersion: '1.0.0',
+                statementCapabilities: [
+                  {
+                    capability: 'knowing when a loop terminates',
+                    coveredByObjectiveId: null,
+                  },
+                ],
+                extraObjectives: ['obj-extra-escalation'],
+              };
+            }
+            return referencePlanSelfReview();
+          },
+        },
+      },
+    });
+    await seedLearner(context);
+    const gap = await seedGap(context);
+
+    const job = await enqueueCompile(context, LEARNER, {
+      gapId: gap.id,
+      idempotencyKey: 'worker-self-review-1',
+    });
+    const worker = createCompileWorker(context, { leaseDurationMs: 60_000 });
+    await worker.tick();
+
+    const done = await context.queue.get(LEARNER, job.id);
+    expect(done?.state).toBe('succeeded');
+    expect(reviewCalls).toBe(2);
+    // The retry quoted both findings back to the planner.
+    expect(planInstructions[1]).toContain('knowing when a loop terminates');
+    expect(planInstructions[1]).toContain('obj-extra-escalation');
+
+    const curriculum = await context.uow.curricula.getCurrentForGap(LEARNER, gap.id);
+    expect(curriculum).toBeDefined();
   });
 
   it('lets the gap fail and retry through the worker path exactly like the API path', async () => {

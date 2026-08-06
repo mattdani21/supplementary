@@ -13,6 +13,7 @@ import {
   referenceLessonScript,
   referenceNormalisation,
   referencePlan,
+  referencePlanSelfReview,
   referenceVerification,
 } from '@gapos/test-fixtures';
 import type {
@@ -46,6 +47,7 @@ export const referenceScript = (): Required<Record<string, FakeHandler>> => ({
   diagnostic_interpretation: (request) =>
     referenceDiagnostic(request.subject === 'skipped' ? { inferred: true } : {}),
   curriculum_plan: (request) => referencePlan(request.subject ?? 'gap_reference'),
+  plan_self_review: () => referencePlanSelfReview(),
   lesson_package: (request) => referenceLesson(dayFromSubject(request.subject)),
   lesson_script: (request) => referenceLessonScript(dayFromSubject(request.subject)),
   verification_report: (request) =>

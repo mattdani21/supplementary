@@ -14,6 +14,7 @@ export type DomainErrorCode =
   | 'plan_exceeds_time_budget'
   | 'objective_not_assessed'
   | 'objective_not_taught'
+  | 'planning_failed'
   | 'prerequisite_cycle'
   | 'prerequisite_unmet'
   | 'unsupported_source'

@@ -23,6 +23,7 @@ import {
   GapNormalisationContract,
   LessonPackageContract,
   LessonScriptContract,
+  PlanSelfReviewContract,
   VerificationReportContract,
   type CurriculumPlan,
   type DayPlan,
@@ -30,6 +31,7 @@ import {
   type LessonPackage,
   type LessonPackageContractOutput,
   type LessonScript,
+  type PlanSelfReview,
 } from '@gapos/ai-contracts';
 import { detectInjectionAttempts, type Contract } from '@gapos/ai-contracts';
 import type { ObjectStore, OwnerId, UnitOfWork } from '@gapos/database';
@@ -608,6 +610,45 @@ const ingestSources = async (params: {
 
 /* --------------------------------------------------------------------- stage D */
 
+/**
+ * The plan's self-review: enumerate the learner statement's capabilities and check the plan
+ * against that enumeration. Runs after the structural invariants pass; retried once (the
+ * review itself is a structured call and can be rejected by the contract).
+ */
+const runSelfReview = async (
+  params: Parameters<typeof planCurriculum>[0],
+  plan: CurriculumPlan,
+  deps: CompileDeps,
+): Promise<PlanSelfReview> => {
+  const { runId, owner, gapId, learnerBrief, evidence } = params;
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      const response = await deps.providers.languageModel.generate({
+        contract: PlanSelfReviewContract,
+        purpose: 'planning',
+        temperature: 0,
+        maxOutputTokens: PLAN_MAX_OUTPUT_TOKENS,
+        runId,
+        userId: owner,
+        subject: gapId,
+        instruction:
+          `The learner said: ${learnerBrief} Here is the curriculum plan: ` +
+          `${JSON.stringify(plan)}. Enumerate EVERY distinct capability the learner's ` +
+          'statement demands — including implicit ones (for example, "never know when to use ' +
+          'a while loop instead of a for loop" implies understanding what makes a loop stop) — ' +
+          'and for each, name the plan objective that teaches it, or null when the plan ' +
+          'misses it. Also list any plan objective that teaches nothing the statement demands.',
+        evidence,
+      });
+      return response.value as PlanSelfReview;
+    } catch (error) {
+      if (!(error instanceof ProviderContractError)) throw error;
+      if (attempt === 2) throw error;
+    }
+  }
+  throw new DomainError('planning_failed', 'The plan self-review could not be produced.');
+};
+
 const planCurriculum = async (params: {
   runId: string;
   owner: OwnerId;
@@ -678,8 +719,30 @@ const planCurriculum = async (params: {
       const violations = findPlanViolations(response.value, {
         satisfiedExternalPrerequisites: params.satisfiedExternalPrerequisites,
       });
-      if (violations.length === 0) return response.value;
-      previousViolations = violations.map((v) => v.message);
+      if (violations.length > 0) {
+        previousViolations = violations.map((v) => v.message);
+      } else {
+        // Structural invariants passed; now check coverage and scope against the learner's
+        // statement. These are semantic, so a second model pass enumerates the statement's
+        // capabilities and checks the plan against its own enumeration — the plan loop can
+        // then repair a dropped capability or an out-of-scope objective like any violation.
+        const review = await runSelfReview(params, response.value, deps);
+        const reviewViolations: string[] = [];
+        for (const capability of review.statementCapabilities) {
+          if (!capability.coveredByObjectiveId) {
+            reviewViolations.push(
+              `the statement capability "${capability.capability}" is not taught by any objective`,
+            );
+          }
+        }
+        for (const extra of review.extraObjectives) {
+          reviewViolations.push(
+            `objective "${extra}" teaches nothing the learner's statement demands`,
+          );
+        }
+        if (reviewViolations.length === 0) return response.value;
+        previousViolations = reviewViolations;
+      }
     }
 
     deps.metrics.increment('repair_attempt_total', { stage: 'planning' });
