@@ -204,10 +204,15 @@ describe('the learner journey over the API', () => {
     const audio = lessons.flatMap((l) => l.artefacts).find((a) => a.kind === 'audio');
     if (!audio) return; // fixture runs may be text-only; the endpoint contract is covered below
     const served = await audioUrl(context, OWNER, gapId, audio.id);
-    // In-memory storage returns an opaque memory:// locator; real storage returns a presigned
-    // https URL (proven in the S3 suite). The contract is a non-empty URL plus an expiry.
-    expect(served.url.length).toBeGreaterThan(0);
-    expect(served.expiresAt).toBeTruthy();
+    // In-memory storage returns the bytes (the no-S3 proxy path); real storage returns a
+    // presigned https URL (proven in the S3 suite). The contract is one or the other.
+    if ('bytes' in served) {
+      expect(served.bytes.length).toBeGreaterThan(0);
+      expect(served.mediaType).toMatch(/^audio\//);
+    } else {
+      expect(served.url.startsWith('http')).toBe(true);
+      expect(served.expiresAt).toBeTruthy();
+    }
   });
 
   it('rejects a source that fails screening', async () => {

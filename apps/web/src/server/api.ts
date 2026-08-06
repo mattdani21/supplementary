@@ -277,7 +277,10 @@ export const audioUrl = async (
   owner: OwnerId,
   gapId: string,
   artefactId: string,
-): Promise<{ url: string; expiresAt: string }> => {
+): Promise<
+  | { url: string; expiresAt: string }
+  | { url: ''; expiresAt: ''; bytes: number[]; mediaType: string }
+> => {
   const curriculum = await context.uow.curricula.getCurrentForGap(owner, gapId);
   if (!curriculum) throw new ApiError(404, 'no_curriculum', `No curriculum for gap ${gapId}.`);
   const lessons = await context.uow.curricula.listLessons(owner, curriculum.id);
@@ -290,8 +293,19 @@ export const audioUrl = async (
   if (!artefact)
     throw new ApiError(404, 'artefact_not_found', `Artefact ${artefactId} was not found.`);
   const signed = await context.storage.signedUrl(owner, artefact.storageKey, 300);
-  if (!signed)
-    throw new ApiError(404, 'artefact_not_found', `Artefact ${artefactId} has no stored object.`);
+  if (!signed) throw new ApiError(404, 'artefact_unavailable', 'The artefact is not in storage.');
+  if (!signed.url.startsWith('http')) {
+    // In-memory storage returns an opaque locator a browser cannot fetch. Serve the bytes
+    // through the API instead, so a single-node deployment without S3 still plays audio.
+    const stored = await context.storage.get(owner, artefact.storageKey);
+    if (!stored) throw new ApiError(404, 'artefact_unavailable', 'The artefact is not in storage.');
+    return {
+      url: '',
+      expiresAt: '',
+      bytes: [...stored.bytes],
+      mediaType: stored.mediaType,
+    };
+  }
   return { url: signed.url, expiresAt: signed.expiresAt.toISOString() };
 };
 

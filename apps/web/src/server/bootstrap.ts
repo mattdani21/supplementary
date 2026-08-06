@@ -44,7 +44,7 @@ const buildContext = async (): Promise<ServerContext> => {
     pool = pgPool;
     return createServerContext({
       uow: createPostgresUnitOfWork(pgPool),
-      storage: createStorage(logger),
+      storage: await createStorage(logger),
       logLevel,
     });
   }
@@ -52,7 +52,7 @@ const buildContext = async (): Promise<ServerContext> => {
   logger.warn('GAPOS_DATABASE_URL is not set; using in-memory repositories (data is ephemeral).');
   return createServerContext({
     uow: createMemoryUnitOfWork(),
-    storage: createStorage(logger),
+    storage: await createStorage(logger),
     logLevel,
   });
 };
@@ -63,7 +63,7 @@ export const closeServerContext = async (): Promise<void> => {
   pool = undefined;
 };
 
-const createStorage = (log: ReturnType<typeof createLogger>): ObjectStore => {
+const createStorage = async (log: ReturnType<typeof createLogger>): Promise<ObjectStore> => {
   const kind = process.env.GAPOS_STORAGE ?? 'memory';
   if (kind === 'memory') {
     log.warn('GAPOS_STORAGE is not set to s3; using in-memory object storage.');
@@ -78,11 +78,13 @@ const createStorage = (log: ReturnType<typeof createLogger>): ObjectStore => {
   ].filter((name) => !process.env[name]);
   if (missing.length > 0)
     throw new Error(`GAPOS_STORAGE=s3 requires ${missing.join(', ')} to be set.`);
-  return createS3ObjectStore({
+  const store = createS3ObjectStore({
     endpoint: process.env.GAPOS_S3_ENDPOINT!,
     region: process.env.GAPOS_S3_REGION ?? 'us-east-1',
     bucket: process.env.GAPOS_S3_BUCKET!,
     accessKeyId: process.env.GAPOS_S3_ACCESS_KEY_ID!,
     secretAccessKey: process.env.GAPOS_S3_SECRET_ACCESS_KEY!,
   });
+  await store.ensureBucket?.();
+  return store;
 };

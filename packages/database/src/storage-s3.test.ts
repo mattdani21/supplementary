@@ -136,6 +136,13 @@ const createMockS3 = async (
         }
       }
 
+      if (request.method === 'PUT' && key === '') {
+        // Bucket creation (ensureBucket): the bucket now exists; idempotent.
+        response.writeHead(200);
+        response.end();
+        return;
+      }
+
       if (request.method === 'HEAD') {
         const object = objects.get(key);
         if (!object) {
@@ -238,6 +245,13 @@ describe('the S3 object store (GAP-006)', () => {
 
   it('returns undefined for a missing object', async () => {
     expect(await store.get('user_a', 'nope')).toBeUndefined();
+  });
+
+  it('ensures the bucket idempotently (deployment self-provisioning)', async () => {
+    await store.ensureBucket?.();
+    await store.ensureBucket?.(); // second boot: 200/409, never a throw
+    const stored = await store.put('user_a', 'after-bucket.bin', bytesOfText('x'), 'text/plain');
+    expect(stored.key).toBe('after-bucket.bin');
   });
 
   it('issues a presigned URL that opens the object and expires server-side', async () => {

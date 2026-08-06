@@ -19,8 +19,16 @@ export function AudioPlayer({ gapId, artefactId }: { gapId: string; artefactId: 
     })
       .then(async (response) => {
         if (!response.ok) throw new Error(`Audio unavailable (${response.status})`);
-        const body = (await response.json()) as { url: string };
-        if (!cancelled && audioRef.current) audioRef.current.src = body.url;
+        if (!audioRef.current) return;
+        const contentType = response.headers.get('content-type') ?? '';
+        if (contentType.startsWith('audio')) {
+          // No-S3 deployments stream the bytes through the API.
+          const blob = await response.blob();
+          if (!cancelled) audioRef.current.src = URL.createObjectURL(blob);
+        } else {
+          const body = (await response.json()) as { url: string };
+          if (!cancelled) audioRef.current.src = body.url;
+        }
       })
       .catch((cause) => setError(cause instanceof Error ? cause.message : String(cause)));
 
