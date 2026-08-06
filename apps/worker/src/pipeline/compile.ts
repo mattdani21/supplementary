@@ -619,6 +619,7 @@ const runSelfReview = async (
   params: Parameters<typeof planCurriculum>[0],
   plan: CurriculumPlan,
   deps: CompileDeps,
+  previousReview?: PlanSelfReview,
 ): Promise<PlanSelfReview> => {
   const { runId, owner, gapId, learnerBrief, evidence } = params;
   for (let attempt = 1; attempt <= 2; attempt += 1) {
@@ -637,7 +638,13 @@ const runSelfReview = async (
           'statement demands — including implicit ones (for example, "never know when to use ' +
           'a while loop instead of a for loop" implies understanding what makes a loop stop) — ' +
           'and for each, name the plan objective that teaches it, or null when the plan ' +
-          'misses it. Also list any plan objective that teaches nothing the statement demands.',
+          'misses it. Also list any plan objective that teaches nothing the statement demands.' +
+          (previousReview
+            ? ` The previous review enumerated exactly these capabilities: ${JSON.stringify(
+                previousReview.statementCapabilities.map((c) => c.capability),
+              )}. Do NOT enumerate new ones — verify each is taught by the new plan, and keep ` +
+              'the same extraObjectives check against this fixed list.'
+            : ''),
         evidence,
       });
       return response.value as PlanSelfReview;
@@ -661,7 +668,9 @@ const planCurriculum = async (params: {
   logger: Logger;
 }): Promise<CurriculumPlan> => {
   const { runId, owner, gapId, evidence, deps, logger } = params;
+  const { uow } = deps;
   let previousViolations: string[] = [];
+  let previousReview: PlanSelfReview | undefined;
 
   for (let attempt = 1; attempt <= MAX_PLAN_ATTEMPTS; attempt++) {
     let response;
@@ -726,7 +735,8 @@ const planCurriculum = async (params: {
         // statement. These are semantic, so a second model pass enumerates the statement's
         // capabilities and checks the plan against its own enumeration — the plan loop can
         // then repair a dropped capability or an out-of-scope objective like any violation.
-        const review = await runSelfReview(params, response.value, deps);
+        const review = await runSelfReview(params, response.value, deps, previousReview);
+        previousReview = review;
         const reviewViolations: string[] = [];
         for (const capability of review.statementCapabilities) {
           if (!capability.coveredByObjectiveId) {
@@ -741,7 +751,29 @@ const planCurriculum = async (params: {
           );
         }
         if (reviewViolations.length === 0) return response.value;
-        previousViolations = reviewViolations;
+        if (attempt < MAX_PLAN_ATTEMPTS) {
+          previousViolations = reviewViolations;
+        } else {
+          // The reviewer and the planner disagree after every attempt. The reviewer must
+          // guide, not kill: publishing with a recorded finding lets the evaluation gate's
+          // objective_coverage/scope_discipline floors judge the outcome — a review
+          // disagreement must never turn a course into no course.
+          await uow.generation.addFinding(owner, {
+            id: deps.newId('finding'),
+            runId,
+            targetId: gapId,
+            category: 'objective_coverage',
+            severity: 'high',
+            finding: `Plan self-review unresolved: ${reviewViolations.join('; ')}`,
+            repairStatus: 'open',
+            repairAttempts: 0,
+          });
+          logger.warn(
+            'Plan self-review disagreements unresolved; publishing the plan with a finding',
+            { attempt, violations: reviewViolations.length },
+          );
+          return response.value;
+        }
       }
     }
 

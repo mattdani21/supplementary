@@ -436,6 +436,51 @@ describe('the durable worker loop (GAP-015)', () => {
     expect(curriculum).toBeDefined();
   });
 
+  it('publishes with a finding when the self-review cannot be satisfied, instead of failing', async () => {
+    // The reviewer must guide, not kill: an unresolvable disagreement (the reviewer keeps
+    // enumerating capabilities the planner cannot satisfy) must never turn a course into no
+    // course — the gate's floors judge the outcome instead. Regression for the recording
+    // run where eval_01/eval_03 compiles died on exactly this loop.
+    let reviewCalls = 0;
+    const { context } = build({
+      fake: {
+        script: {
+          plan_self_review: () => {
+            reviewCalls += 1;
+            return {
+              schemaVersion: '1.0.0',
+              statementCapabilities: [
+                { capability: 'an ever-finer capability the planner can never satisfy', coveredByObjectiveId: null },
+              ],
+              extraObjectives: ['obj-extra'],
+            };
+          },
+        },
+      },
+    });
+    await seedLearner(context);
+    const gap = await seedGap(context);
+
+    const job = await enqueueCompile(context, LEARNER, {
+      gapId: gap.id,
+      idempotencyKey: 'worker-self-review-disagreement-1',
+    });
+    const worker = createCompileWorker(context, { leaseDurationMs: 60_000 });
+    await worker.tick();
+
+    const done = await context.queue.get(LEARNER, job.id);
+    expect(done?.state).toBe('succeeded');
+    expect(reviewCalls).toBe(3); // one per plan attempt, all flagging
+
+    // The disagreement is recorded as a finding, and the course still exists.
+    const curriculum = await context.uow.curricula.getCurrentForGap(LEARNER, gap.id);
+    expect(curriculum).toBeDefined();
+    const findings = await context.uow.generation.listFindings(LEARNER, curriculum!.runId!);
+    expect(
+      findings.some((f) => f.category === 'objective_coverage' && f.finding.includes('self-review')),
+    ).toBe(true);
+  });
+
   it('lets the gap fail and retry through the worker path exactly like the API path', async () => {
     const { context } = build({
       fake: {
