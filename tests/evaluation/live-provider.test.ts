@@ -115,7 +115,9 @@ if (LIVE) {
         expect(outcome.error).toBe('clarification_required');
         expect(outcome.curriculumId).toBeUndefined();
       },
-      15 * 60_000,
+      // Standalone compiles are slower than floor fixtures when repairs engage (each call
+      // carries the reasoning model's full chain of thought); 30 minutes is the hook.
+      30 * 60_000,
     );
 
     it(
@@ -138,7 +140,9 @@ if (LIVE) {
         });
         expect(scorecard.passed, formatScorecard(scorecard)).toBe(true);
       },
-      15 * 60_000,
+      // Standalone compiles are slower than floor fixtures when repairs engage (each call
+      // carries the reasoning model's full chain of thought); 30 minutes is the hook.
+      30 * 60_000,
     );
   });
 } else {
