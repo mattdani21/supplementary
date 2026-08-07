@@ -13,7 +13,7 @@
  * `costMillicents`, never the estimate.
  */
 import type { Logger, Metrics } from '@gapos/observability';
-import { CostAccountant } from '@gapos/observability';
+import type { CostAccountant } from '@gapos/observability';
 import type { SynthesisRequest, SynthesisResponse, TextToSpeech } from './interfaces.js';
 import { ProviderBudgetError } from './interfaces.js';
 
