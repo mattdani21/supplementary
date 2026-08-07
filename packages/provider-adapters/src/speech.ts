@@ -26,10 +26,7 @@ export interface TextToSpeechDeps {
   readonly now?: () => Date;
 }
 
-export const createTextToSpeech = (
-  backend: TextToSpeech,
-  deps: TextToSpeechDeps,
-): TextToSpeech => {
+export const createTextToSpeech = (backend: TextToSpeech, deps: TextToSpeechDeps): TextToSpeech => {
   const now = deps.now ?? (() => new Date());
   const estimate = deps.estimateMillicents ?? (() => 0);
 

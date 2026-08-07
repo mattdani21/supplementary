@@ -12,11 +12,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { REFERENCE_GAP_STATEMENT, SET_THEORY_SOURCE } from '@gapos/test-fixtures';
 import type { OwnerId } from '@gapos/database';
-import {
-  CostAccountant,
-  createLogger,
-  createMetrics,
-} from '@gapos/observability';
+import { CostAccountant, createLogger, createMetrics } from '@gapos/observability';
 import {
   checksumFor,
   createEmbeddings,

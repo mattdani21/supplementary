@@ -54,11 +54,14 @@ export const createProviders = (options: ProviderFactoryOptions): Providers => {
         logger: options.logger,
       }),
       speechToText: createLiveSpeechToTextFromEnv(),
-      textToSpeech: createTextToSpeech(createLiveTextToSpeech({ engine: createGoogleTranslateTtsEngine() }), {
-        costAccountant: options.costAccountant,
-        metrics: options.metrics,
-        logger: options.logger,
-      }),
+      textToSpeech: createTextToSpeech(
+        createLiveTextToSpeech({ engine: createGoogleTranslateTtsEngine() }),
+        {
+          costAccountant: options.costAccountant,
+          metrics: options.metrics,
+          logger: options.logger,
+        },
+      ),
       embeddings: createEmbeddings(createLiveEmbeddingsFromEnv(), {
         costAccountant: options.costAccountant,
         metrics: options.metrics,
