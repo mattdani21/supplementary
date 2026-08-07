@@ -13,9 +13,9 @@ Launch GapOS publicly and get real learners completing verified audio courses
 
 ### M2 — Live-mode production hardening
 - [ ] Live provider smoke against recorded baselines (tests/evaluation/live-provider.test.ts vs GAP-014b evidence in tasks/status.json)
-- [ ] Verify budgets on live runs (GAPOS_BUDGET_PER_RUN_MILLICENTS / GAPOS_BUDGET_DAILY_MILLICENTS) degrade to text-only instead of overspending (GAP-015)
+- [x] Verify budgets on live runs (GAPOS_BUDGET_PER_RUN_MILLICENTS / GAPOS_BUDGET_DAILY_MILLICENTS) degrade to text-only instead of overspending (GAP-015)
 - [ ] Worker daemon deployed alongside web with graceful SIGTERM shutdown (GAP-020)
-- [ ] Telemetry + cost accounting for every stage (packages/observability)
+- [x] Telemetry + cost accounting for every stage (packages/observability)
 *Definition of done:* a live compile completes within budget and scores at or above the recorded baselines (eval_02–10, 9/9 PASS in GAP-014b).
 
 ### M3 — Public multi-user launch surface
