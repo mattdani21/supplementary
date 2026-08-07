@@ -372,9 +372,12 @@
      "attemptedFixes": [
       "Prompt rule: \"cover EVERY distinct capability in the learner's statement\" (plan step) \u2014 helps, does not reliably reach 1.0.",
       "Plan terseness + compact-JSON retries (structured-output cap) \u2014 infrastructure, not coverage.",
-      "Verifier grounding rule: general-knowledge questions flagged + directed repair when evidence supplied \u2014 proven by probe (eval_03 15/15 grounded) but model resistance on other runs leaves residual ungrounded items."
+      "Verifier grounding rule: general-knowledge questions flagged + directed repair when evidence supplied \u2014 proven by probe (eval_03 15/15 grounded) but model resistance on other runs leaves residual ungrounded items.",
+      "Plan self-review loop (plan_self_review contract): after structural invariants pass, a second model pass enumerates the statement's capabilities and maps them to objectives. Recording run 2: eval_04 coverage 0.667->1.0, scope 0->1.0; eval_05 coverage 0.75->1.0. WORKS.",
+      "Review-disagreement fix: the reviewer's open-ended enumeration could never be satisfied (eval_01/03 compiles died); retries now verify against the FIRST review's fixed list, and unresolved disagreements publish with a recorded objective_coverage finding instead of failing the compile (the gate's floors remain the backstop)."
      ],
-     "recommendedDecision": "Choose: (a) plan self-review loop \u2014 after planning, ask the model to enumerate every distinct capability in the learner statement and rewrite the plan to cover all and nothing more (structural, keeps floors at 1.0); (b) align fixture statements to enumerate their expectedObjectiveKeywords so the model can mirror the spec (spec coherence); (c) accept stochasticity: record current baselines and gate on regression only (weakens the 1.0 floors \u2014 needs human sign-off per AGENTS.md \u00a74/\u00a75); or (d) defer full-floor clearance to a backlog task and ship the proven-resilient pipeline."
+     "recommendedDecision": "Choose: (a) plan self-review loop \u2014 after planning, ask the model to enumerate every distinct capability in the learner statement and rewrite the plan to cover all and nothing more (structural, keeps floors at 1.0); (b) align fixture statements to enumerate their expectedObjectiveKeywords so the model can mirror the spec (spec coherence); (c) accept stochasticity: record current baselines and gate on regression only (weakens the 1.0 floors \u2014 needs human sign-off per AGENTS.md \u00a74/\u00a75); or (d) defer full-floor clearance to a backlog task and ship the proven-resilient pipeline.",
+     "notes": "Self-review loop landed (commits f7bb3e5, d4cf1e6). eval_01/03 compile failures predate the self-review (also failed in run 12) \u2014 cause still under investigation; recording run 3 in flight."
     }
    ]
   },
