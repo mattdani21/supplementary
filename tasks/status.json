@@ -1,550 +1,554 @@
 {
-  "schemaVersion": 1,
-  "updatedAt": "2026-08-03T15:39:20.000Z",
-  "controller": "gapos-controller",
-  "tasks": {
-    "GAP-000": {
-      "status": "done",
-      "startedAt": "2026-08-02T04:12:00.000Z",
-      "completedAt": "2026-08-02T04:23:00.000Z",
-      "evidence": [
-        {
-          "command": "pnpm install",
-          "result": "pass",
-          "note": "273 packages resolved, clean checkout"
-        },
-        {
-          "command": "pnpm typecheck",
-          "result": "pass"
-        },
-        {
-          "command": "pnpm lint",
-          "result": "pass"
-        },
-        {
-          "command": "pnpm format:check",
-          "result": "pass"
-        },
-        {
-          "command": "pnpm test tests/architecture",
-          "result": "pass",
-          "note": "7 tests: the domain-purity and provider-boundary lint rules are asserted through the real ESLint config, so the constraint fails the build rather than living in prose"
-        }
-      ],
-      "notes": "Monorepo, quality gate, AGENTS.md, PRODUCT/ARCHITECTURE/SECURITY/OPERATIONS, ADRs 0001-0003, backlog schema, CI with a separate Postgres migration job."
+ "schemaVersion": 1,
+ "updatedAt": "2026-08-03T15:39:20.000Z",
+ "controller": "gapos-controller",
+ "tasks": {
+  "GAP-000": {
+   "status": "done",
+   "startedAt": "2026-08-02T04:12:00.000Z",
+   "completedAt": "2026-08-02T04:23:00.000Z",
+   "evidence": [
+    {
+     "command": "pnpm install",
+     "result": "pass",
+     "note": "273 packages resolved, clean checkout"
     },
-    "GAP-001": {
-      "status": "done",
-      "startedAt": "2026-08-02T04:19:00.000Z",
-      "completedAt": "2026-08-02T04:22:00.000Z",
-      "evidence": [
-        {
-          "command": "pnpm test:domain",
-          "result": "pass",
-          "note": "18 tests. Full transition matrix asserted against the declared table; every status proven reachable from draft; filled unreachable from any status except mastery_check and review_due; mastery_confirmed refused when a required objective is unmastered or when there are no required objectives at all"
-        },
-        {
-          "command": "pnpm typecheck",
-          "result": "pass"
-        }
-      ],
-      "notes": "Acceptance 'consumption cannot directly set filled' is covered by the test that iterates every status and asserts the mastery_confirmed transition is refused."
+    {
+     "command": "pnpm typecheck",
+     "result": "pass"
     },
-    "GAP-002": {
-      "status": "done",
-      "startedAt": "2026-08-02T04:22:00.000Z",
-      "completedAt": "2026-08-02T04:23:00.000Z",
-      "evidence": [
-        {
-          "command": "pnpm test:domain",
-          "result": "pass",
-          "note": "18 tests. Terminal statuses reject all transitions; partial is reachable only from repairing, synthesising_audio and publishing; decideStep reuses recorded output rather than recomputing, re-runs an expired lease, and abandons after 3 attempts carrying the last error"
-        }
-      ],
-      "notes": "Step identity is (run, step, subject, inputVersion). The subject field separates concurrent instances of the same step, which is what makes per-day lesson generation safe to retry independently."
+    {
+     "command": "pnpm lint",
+     "result": "pass"
     },
-    "GAP-003": {
-      "status": "done",
-      "startedAt": "2026-08-02T04:24:00.000Z",
-      "completedAt": "2026-08-02T04:33:00.000Z",
-      "evidence": [
-        {
-          "command": "pnpm test packages/ai-contracts",
-          "result": "pass",
-          "note": "22 tests. Wrong schemaVersion rejected; unknown fields rejected rather than dropped; multiple-choice answer must be among distinct options; free response must ship a rubric; a source-grounded item must cite a locator; the evidence fence cannot be forged by a document"
-        },
-        {
-          "command": "pnpm test packages/provider-adapters",
-          "result": "pass",
-          "note": "17 tests. A structurally invalid response is rejected at the boundary and never returned; the failing field names are reported so a repair can be targeted; a rejected response is still charged for; source text never enters the instruction or the log; the budget check happens before the provider is reached (backend.calls is empty)"
-        },
-        {
-          "command": "pnpm test packages/observability",
-          "result": "pass",
-          "note": "13 tests. Budgets refuse pre-call at both run and per-user-daily scope; spend does not cross users or days; cost is integer millicents so 300 sub-cent calls do not drift"
-        }
-      ],
-      "notes": "GAPOS_PROVIDER_MODE defaults to fake, and mode=live throws pointing at the human approval gate rather than silently falling back \u2014 a staging run cannot quietly be a fake run."
+    {
+     "command": "pnpm format:check",
+     "result": "pass"
     },
-    "GAP-004": {
-      "status": "done",
-      "startedAt": "2026-08-02T04:34:00.000Z",
-      "completedAt": "2026-08-02T04:38:00.000Z",
-      "evidence": [
-        {
-          "command": "pnpm test packages/database",
-          "result": "pass",
-          "note": "16 tests. Owner A cannot read, list, update or re-status a row owned by B; retrieval is bounded by owner AND gap; account deletion removes every owned row and leaves the other learner intact; a repeated compile or attempt idempotency key returns the original row instead of creating a second"
-        },
-        {
-          "command": "pnpm test packages/database -t 'no repository method that reads without an owner'",
-          "result": "pass",
-          "note": "Structural guard: reflects over every repository method and asserts the first parameter is the owner, so a future findById(id) fails here rather than shipping"
-        },
-        {
-          "command": "pnpm test packages/database -t migrations",
-          "result": "pass",
-          "note": "Migration drift check refuses to run when a shipped migration file has been edited; applying twice is a no-op; every learner-owned table in the schema is asserted to carry owner_id"
-        }
-      ],
-      "notes": "The schema, the forward-only runner with checksum drift detection, and the in-memory UnitOfWork are complete and are what the application uses today. The Postgres implementation of the repository interfaces is NOT yet written and is tracked as GAP-004b (ready, not blocked) with the ownership suite to be parameterised across both implementations. Recorded rather than stubbed."
-    },
-    "GAP-006": {
-      "status": "done",
-      "completedAt": "2026-08-03T14:18:59.000Z",
-      "notes": "Closed. Chunking, locators, screening and the checksum-addressed cache were already done and tested; the missing production piece was a real object store. createS3ObjectStore speaks AWS Signature Version 4 over plain fetch (no SDK, matching the provider-adapters rule) against MinIO or any S3 endpoint: owner-scoped keys (<owner>/<key>), presigned GET URLs with server-side expiry, delete and deleteOwnedBy via LIST. The signing math is pinned against the battle-tested aws4 reference implementation, and the client is exercised against an in-process S3-compatible mock that independently recomputes presign signatures and enforces expiry. Upload registration was already wired through the ObjectStore interface (gap-service.registerSource).",
-      "evidence": [
-        {
-          "command": "pnpm test packages/database/src/storage-s3.test.ts",
-          "result": "pass",
-          "note": "5 tests: owner-scoped put/get round trip (wrong owner and wrong key return nothing), presigned URL opens the object and is refused after expiry by the mock's independent signature recomputation, delete + deleteOwnedBy scoped to the prefix, and the SigV4 reference vector matching aws4 output exactly."
-        },
-        {
-          "command": "pnpm verify",
-          "result": "pass",
-          "note": "Full gate green with the S3 backend in place."
-        }
-      ]
-    },
-    "GAP-008": {
-      "status": "done",
-      "completedAt": "2026-08-02T04:42:00.000Z",
-      "notes": "Violations are collected together rather than thrown one at a time, so a planner repair prompt can fix all of them in one round against the ten-minute budget.",
-      "evidence": [
-        {
-          "command": "pnpm test packages/domain/src/curriculum",
-          "result": "pass",
-          "note": "14 tests. Rejects a day over the learner's minutes, an objective never taught, an objective never assessed, an objective assessed by too few items, a prerequisite cycle (naming it), a dependency on an untaught objective, an unmet external prerequisite, and a source claim with no locator. Permits an objective explicitly labelled general knowledge"
-        }
-      ]
-    },
-    "GAP-010": {
-      "status": "done",
-      "completedAt": "2026-08-03T14:10:48.000Z",
-      "notes": "Closed a stale 'partial': the note claimed the pipeline was not yet written, but compile.ts stages F-G run verify_artefact with independent solutions from the model, verifyLesson, decideRepair (repair->repair->exclude, never a third attempt), and partial publication when coverage does not survive. The end-to-end and security suites exercise it (a generator that obeys injection is caught structurally).",
-      "evidence": [
-        {
-          "command": "pnpm test packages/domain/src/verification packages/domain/src/mastery tests/end-to-end",
-          "result": "pass",
-          "note": "24 verifier tests + 31 mastery tests + e2e journey/security suites: independent solutions, leakage rejection, repair ladder, partial publication all green."
-        }
-      ]
-    },
-    "GAP-012": {
-      "status": "done",
-      "completedAt": "2026-08-03T14:10:48.000Z",
-      "notes": "Closed a stale 'partial': learning-service.ts persists attempts, evidence, reviews and mastery checks through the API (submitAttempt, completeReview, runMasteryCheck), records knowledge edges on fill, and the journey proves two-session evidence fills a gap while consumption alone cannot.",
-      "evidence": [
-        {
-          "command": "pnpm test packages/domain/src/mastery tests/end-to-end",
-          "result": "pass",
-          "note": "31 mastery tests; journey tests cover listening-without-practice refusal, single-session refusal, two-session fill, review ladder scheduling."
-        }
-      ]
-    },
-    "GAP-005": {
-      "status": "done",
-      "completedAt": "2026-08-02T04:57:00.000Z",
-      "evidence": [
-        {
-          "command": "pnpm test tests/end-to-end",
-          "result": "pass",
-          "note": "22 tests covering the whole \u00a716.1 journey on deterministic fakes: create account, define gap, upload the reference source, skip the diagnostic, compile, Day 1 published first, playable audio artefact with a signed expiring URL, practice submission, corrective feedback, mastery check, capability search"
-        },
-        {
-          "command": "pnpm test",
-          "result": "pass",
-          "note": "219 tests across 13 files, no network and no API key"
-        }
-      ],
-      "notes": "Two real defects were found by writing this test and fixed in the code, not the test. (1) Day 1 did not publish first: with bounded concurrency the publication order of concurrent days was arbitrary, so Day 1 now runs to completion before the rest fan out. (2) The published questions did not satisfy the plan's own assessment blueprint, which would have left obj_relation_properties permanently unmasterable with nothing to point at; findAssessmentGaps now checks published items against the blueprint and marks the run partial."
-    },
-    "GAP-007": {
-      "status": "done",
-      "completedAt": "2026-08-02T04:57:00.000Z",
-      "evidence": [
-        {
-          "command": "pnpm test tests/end-to-end",
-          "result": "pass",
-          "note": "A blocking ambiguity stops the run for clarification instead of guessing; a skipped diagnostic records a labelled assumption on the gap and lowers the starting difficulty; normalisation output is contract-validated before it is persisted"
-        }
-      ],
-      "notes": "Stages A and C are wired through the guarded adapter, so an invalid normalisation cannot reach the database."
-    },
-    "GAP-009": {
-      "status": "done",
-      "completedAt": "2026-08-02T04:57:00.000Z",
-      "evidence": [
-        {
-          "command": "pnpm test tests/end-to-end",
-          "result": "pass",
-          "note": "Lessons generate against the frozen plan with bounded concurrency; the plan, glossary and objective ids are immutable inputs; artefacts are versioned and frozen once an attempt references them"
-        }
-      ]
-    },
-    "GAP-011": {
-      "status": "done",
-      "completedAt": "2026-08-02T04:57:00.000Z",
-      "evidence": [
-        {
-          "command": "pnpm test tests/end-to-end",
-          "result": "pass",
-          "note": "Day 1 publishes before later days; audio failure falls back to transcript and the curriculum survives with every objective intact; segment checksums are verified against the spoken text before publication"
-        }
-      ]
-    },
-    "GAP-015": {
-      "status": "done",
-      "completedAt": "2026-08-03T14:10:48.000Z",
-      "notes": "The durable job queue and worker loop are implemented. jobs table (already in 001) now has code: JobQueue (memory + Postgres) with atomic lease (FOR UPDATE SKIP LOCKED), lease-expiry re-claim, exponential backoff and dead-lettering; createCompileWorker polls, leases, runs compileGap and records outcomes; enqueueCompile moves the gap to compiling at request time. Budget degradation was already proven end-to-end. Two design gaps were found and fixed while building the retry path: (1) compileGap deduplicated ANY existing run, so a job retry with the same idempotency key could never re-run the pipeline and a crashed in-flight run would be 'completed' prematurely \u2014 added resumeExisting semantics (re-enter the run, reuse recorded steps, skip stages already reached) and attempt-scoped keys (user key for attempt 1, K#attempt-N after); (2) curricula now carry run_id (migration 003) so a resumed run re-enters its own curriculum instead of creating a second course, and artefact ids are deterministic (lesson:kind:segment:version) with addArtefact idempotent on them, so no audio is duplicated across a restart.",
-      "evidence": [
-        {
-          "command": "pnpm test tests/end-to-end/worker.test.ts",
-          "result": "pass",
-          "note": "7 tests: enqueue->lease->complete lifecycle; leased-job return after worker death without duplication; retry-after-failure under a fresh attempt key; mid-run crash resume re-entering the run's curriculum (one course); dead-letter with last error + reproduction context; gap fail/retry parity with the API path; tenant scoping of jobs."
-        },
-        {
-          "command": "pnpm test packages/database/src/repositories/ownership.test.ts",
-          "result": "pass",
-          "note": "shared contract suite extended: getForRun owner-scoping and addArtefact idempotency on deterministic ids (both implementations)."
-        },
-        {
-          "command": "pnpm verify",
-          "result": "pass",
-          "note": "352 passed + 14 loud skips. Full gate green with the resume path and queue in place."
-        },
-        {
-          "command": "GAPOS_TEST_DATABASE_URL=... pnpm test tests/end-to-end/postgres-worker.test.ts",
-          "result": "pending",
-          "note": "SQL-level verification (atomic lease, lease-expiry re-claim, JSONB round-trip, resume against real Postgres) runs in CI where the pgvector service lives; skipped loudly locally without the URL."
-        }
-      ]
-    },
-    "GAP-014": {
-      "status": "done",
-      "completedAt": "2026-08-02T05:04:00.000Z",
-      "evidence": [
-        {
-          "command": "pnpm test tests/evaluation",
-          "result": "pass",
-          "note": "42 tests. All ten fixtures declared with expected objectives, prohibited content, sample questions, failure traps, expert rubric and latency class; every declared trap names a dimension that can catch it; the reference curriculum clears all ten floors"
-        },
-        {
-          "command": "pnpm test tests/evaluation -t 'detects poor education'",
-          "result": "pass",
-          "note": "11 degradation tests prove the scorer discriminates: a dropped objective, abandoning the source for general knowledge, prohibited scope, an unanswerable item, a missing rubric, a backwards difficulty ramp, a script written to be read rather than heard, a false duration, a duplicated prompt, a leaked answer, and an invented objective are each caught by the dimension that is supposed to catch them. A merely reworded curriculum still passes"
-        }
-      ],
-      "notes": "Writing the gate found two real defects. (1) The scorer measured objective coverage over the plan's promises as well as the lessons, so dropping a whole day still scored 1.0 \u2014 coverage now means taught, over lesson titles, summaries and scripts only. (2) The reference lesson scripts claimed twelve to fourteen minutes of audio and ran about one; they are now ~750 words each, matching a five-minute audio activity, with the plan's day budgets adjusted to keep 35 minutes. The nine fixtures that need a live provider are tracked as GAP-014b, blocked on a human approval gate rather than skipped."
-    },
-    "GAP-016": {
-      "status": "done",
-      "completedAt": "2026-08-02T05:11:00.000Z",
-      "evidence": [
-        {
-          "command": "pnpm test tests/architecture/specs.test.ts",
-          "result": "pass",
-          "note": "11 tests. Every contract has a published JSON Schema; the checked-in files must match what the zod contracts generate byte for byte, so changing a contract without regenerating fails the build; a deleted contract cannot leave a published schema behind; every published schema carries its version as a const and sets additionalProperties:false. The OpenAPI document declares all 14 essential routes, requires an idempotency key on both writes that need one, lists every DomainErrorCode and every gap and generation status, and is asserted never to expose prompts or reasoning"
-        }
-      ],
-      "notes": "Added outside the original backlog: specs/openapi.yaml and specs/generation-schemas/ were Phase 0 deliverables that had not been written. The schemas are generated from the zod contracts rather than hand-written, so the published form cannot drift from the code."
-    },
-    "GAP-017": {
-      "status": "done",
-      "completedAt": "2026-08-02T05:11:00.000Z",
-      "evidence": [
-        {
-          "command": "pnpm test tests/end-to-end/security.test.ts",
-          "result": "pass",
-          "note": "13 tests. A source carrying an injection payload still compiles (reading untrusted input safely is the requirement, not refusing it); the attempt is recorded as an audit finding and counted in telemetry; the payload never enters a published lesson; a wrong answer is still wrong despite the payload asking for every answer to be marked correct; a forged evidence fence is redacted; a generator that DID obey the injection is caught structurally by the transcript mismatch. Plus tenant isolation across curricula, lessons, questions, artefacts, runs and findings; storage refuses a known key to a non-owner; signed URLs expire; deletion removes owned rows and storage objects; no source text, instruction or lesson content reaches the logs"
-        }
-      ],
-      "notes": "Found a real defect: injection detection ran over the RETRIEVED evidence, and retrieval selects chunks by relevance to the learner's question \u2014 a hostile paragraph is typically about nothing, so it scored zero and was never scanned. The payload would have gone unreported on this run and could have reached a model on a later query that happened to match it. The scan now runs over every ingested chunk."
-    },
-    "GAP-004b": {
-      "status": "done",
-      "completedAt": "2026-08-02T05:30:00.000Z",
-      "evidence": [
-        {
-          "command": "GAPOS_TEST_DATABASE_URL=... pnpm test packages/database",
-          "result": "pass",
-          "note": "55 tests. The identical contract suite runs against memory and Postgres: 24 Postgres tests each taking 130-540ms of real database round trips. Cross-tenant reads return nothing at the SQL level; every statement filters on owner_id; setStatus is a single-statement compare-and-set that distinguishes not-found from a lost race; the unique constraint on (owner_id, idempotency_key) makes attempt and run dedupe safe under concurrent replay; a curriculum plan and lesson package round-trip through JSONB unchanged"
-        },
-        {
-          "command": "GAPOS_TEST_DATABASE_URL=... pnpm test tests/end-to-end/postgres-journey.test.ts",
-          "result": "pass",
-          "note": "10 tests. The whole product journey on the SQL implementation: compile to complete, Day 1 published first, chunks keep their locators and contiguous ordinals, a DATE deadline round-trips as the calendar day it was given rather than shifting timezone, repeated idempotency key returns one run, wrong answers schedule remediation, the gap fills only on two-session evidence and becomes searchable, and generation steps record the output a restarting worker reuses"
-        },
-        {
-          "command": "pnpm test packages/database (no database url)",
-          "result": "pass",
-          "note": "The Postgres block is skipped via an explicitly skipped test naming the missing variable, so an absent suite cannot be mistaken for a passing one"
-        }
-      ],
-      "notes": "The contract lives in shared-suite.ts and both implementations are held to it, so a test that passes for one and fails for the other is a bug in one of them rather than two suites drifting apart. A structural test also asserts both expose the same method names. createPool is exported from the database package so nothing outside it imports pg. Retrieval is still lexical in both implementations - full-text ranking in SQL, term overlap in memory - which is enough to prove the owner and gap boundaries; the vector index is tracked as GAP-018."
-    },
-    "GAP-019": {
-      "status": "done",
-      "completedAt": "2026-08-02T11:45:00.000Z",
-      "evidence": [
-        {
-          "command": "GAPOS_TEST_DATABASE_URL=... pnpm test",
-          "result": "pass",
-          "note": "337 tests, stable over three consecutive runs. The Postgres journey now asserts audio actually publishes: every day has more than one audio artefact, segment ordinals come back in playback order, and textOnly is false"
-        },
-        {
-          "command": "psql -c \"SELECT lesson_id, kind, count(*) FROM artefacts GROUP BY 1,2\"",
-          "result": "pass",
-          "note": "6-7 audio rows per lesson where previously exactly 1 persisted before the constraint rejected the rest"
-        }
-      ],
-      "notes": "Found by reading a GREEN CI run's Postgres server log. Migration 001 declared UNIQUE (lesson_id, kind, version) on artefacts, encoding the assumption that a lesson has one artefact per kind. True for a transcript, false for audio: a script is synthesised as several segments, all kind='audio' at version 1, so the second insert violated the constraint. The insert threw, the pipeline's audio fallback caught it and degraded the lesson to transcript-only, and the run still reported success \u2014 an audio-first product shipping without audio, with only a warning line. The in-memory store has no constraints, so the memory journey passed throughout. Fixed by forward-only migration 002 adding segment_ordinal and a segment-aware unique constraint; the shared contract suite now stores four audio segments for one lesson so memory and SQL are held to the same behaviour, and both journeys assert audio publishes rather than only that the compile succeeded."
-    },
-    "GAP-013": {
-      "status": "done",
-      "completedAt": "2026-08-03T14:10:48.000Z",
-      "notes": "The capability library is now wired into compilation. classifyPriorCapabilities (domain) splits prior filled gaps' objectives + target capability into satisfied (>= 0.6 reuse threshold) and decayed. compile.ts recalls prior capabilities (stage B), passes satisfied into the planner's satisfiedExternalPrerequisites AND the learner brief (so the planner can copy them verbatim), and hands decayed capabilities to the diagnostic as material to re-demonstrate. Step input versions include the new inputs so retries stay idempotent. Search was already done; edges were already written on fill \u2014 the read side was missing.",
-      "evidence": [
-        {
-          "command": "pnpm test packages/domain/src/mastery",
-          "result": "pass",
-          "note": "5 new tests for classifyPriorCapabilities: fresh reuse, decay, mixed history, reinforcement extension, threshold crossing."
-        },
-        {
-          "command": "pnpm test tests/end-to-end/capability-reuse.test.ts",
-          "result": "pass",
-          "note": "5 tests. A strict provider (normalisation assumes nothing, diagnostic demonstrates nothing) makes the reference plan's 'set-builder notation' prerequisite only satisfiable via prior mastery: refused without it; satisfied by a fresh filled capability; refused again once 195 days of decay pass, with the decayed capability visible in the diagnostic instruction; per-learner scoping holds."
-        }
-      ]
-    },
-    "GAP-018": {
-      "status": "done",
-      "completedAt": "2026-08-03T14:27:54.000Z",
-      "notes": "Vector retrieval replaces lexical-only chunk search. Migration 004 adds a pgvector embedding column (vector(384), HNSW index); searchChunks takes an optional query embedding and ranks by cosine (pgvector <=> on SQL, cosineSimilarity on memory), falling back to full-text/term retrieval when the deployment has no embedding capability. New guarded Embeddings adapter in provider-adapters (budget check before the call, usage recorded, undefined = no capability), a scripted deterministic fake, and a live OpenAI-compatible backend. The pipeline embeds each source's chunks (embed_chunk step) and the query (embed_query step, keyed so a resumed run reuses the vector instead of re-charging) and passes the vector to retrieval. The e2e proves a chunk that shares no words with the learner's statement is retrieved when its embedding is nearest, and that the default (no capability) stays lexical.",
-      "evidence": [
-        {
-          "command": "pnpm test packages/database/src/repositories/ownership.test.ts",
-          "result": "pass",
-          "note": "Shared contract suite (memory + Postgres in CI) gained the vector-retrieval test: a query embedding ranks the semantically nearest chunk over chunks the query shares no words with, bounded by owner and gap exactly like lexical retrieval; setChunkEmbeddings is owner-scoped."
-        },
-        {
-          "command": "pnpm test tests/end-to-end/embedding-retrieval.test.ts",
-          "result": "pass",
-          "note": "2 tests: with a scripted embedding capability, a real compile embeds chunks + query, records embed_chunk/embed_query steps, and retrieval returns the target chunk by meaning alone; without the capability, no vectors are stored and retrieval stays lexical (the primary journey's behaviour is unchanged)."
-        },
-        {
-          "command": "pnpm verify",
-          "result": "pass",
-          "note": "360 passed + 20 loud skips. Full gate green with the vector path in place."
-        }
-      ]
-    },
-    "GAP-014b": {
-      "status": "done",
-      "completedAt": "2026-08-03T14:28:14.000Z",
-      "notes": " Closed: the nine-fixture live scoring run completed and the baselines were recorded (commits f65270d + 1b6426e on the branch: 9/9 PASS \u2014 eval_02 0.9957, eval_03-05/09-10 1.0, eval_06 0.9739, eval_07 0.9742 with the injection recorded as a finding, eval_08 clarified rather than guessing). The live gate test now has baselines to compare against."
-    },
-    "GAP-020": {
-      "status": "done",
-      "notes": "Worker daemon entrypoint. bootstrapDaemon resolves env (GAPOS_DATABASE_URL -> Postgres pool + migrate + Postgres queue, else memory; GAPOS_STORAGE memory|s3 with GAPOS_S3_*; poll/lease/batch; budgets) and returns a ready worker. daemon-main.ts starts the loop, holds the process open with a ref'd heartbeat (the poll timer is unref'd for tests), and shuts down cleanly on SIGTERM/SIGINT: stop claiming, finish in-flight, release the pool. apps/worker now has scripts.start + a gapos-worker bin. Found and fixed a real bug: with only the unref'd poll timer the daemon process exited immediately after boot.",
-      "completedAt": "2026-08-03T15:05:48.000Z",
-      "evidence": [
-        {
-          "command": "pnpm test apps/worker/src/daemon.test.ts",
-          "result": "pass",
-          "note": "Worker daemon entrypoint. bootstrapDaemon resolves env (GAPOS_DATABASE_URL -> Postgres pool + migrate + Postgres queue, else memory; GAPOS_STORAGE memory|s3 with GAPOS_S3_*; poll/lease/batch; budgets) and returns a ready worker. daemon-main.ts starts the loop, holds the process open with a ref'd heartbeat (the poll timer is unref'd for tests), and shuts down cleanly on SIGTERM/SIGINT: stop claiming, finish in-flight, release the pool. apps/worker now has scripts.start + a gapos-worker bin. Found and fixed a real bug: with only the unref'd poll timer the daemon process exited immediately after boot."
-        }
-      ]
-    },
-    "GAP-021": {
-      "status": "done",
-      "notes": "The HTTP API over the service layer. Handlers are plain functions (context, owner, params, body) in server/api.ts with zod validation and an error map (400 validation, 401 owner header, 404 missing, 409 conflict, 402 budget, 422 screening); Next.js route handlers are thin adapters. Owner scoping is enforced by X-Owner-Id on every learner endpoint. Endpoints: health, users, gaps (list/create/get/transition/compile), sources (list with chunks/register), today, curriculum, lesson, artefact audio URL, attempts, mastery. The web process bootstraps from env (Postgres + migrate when GAPOS_DATABASE_URL, else memory; storage + providers by env). next build compiles; the repo's extension-alias webpack config makes the .js-specifier workspace imports resolve. CI now builds the web app.",
-      "completedAt": "2026-08-03T15:19:44.000Z",
-      "evidence": [
-        {
-          "command": "pnpm test apps/web/src/server/api.test.ts",
-          "result": "pass",
-          "note": "The HTTP API over the service layer. Handlers are plain functions (context, owner, params, body) in server/api.ts with zod validation and an error map (400 validation, 401 owner header, 404 missing, 409 conflict, 402 budget, 422 screening); Next.js route handlers are thin adapters. Owner scoping is enforced by X-Owner-Id on every learner endpoint. Endpoints: health, users, gaps (list/create/get/transition/compile), sources (list with chunks/register), today, curriculum, lesson, artefact audio URL, attempts, mastery. The web process bootstraps from env (Postgres + migrate when GAPOS_DATABASE_URL, else memory; storage + providers by env). next build compiles; the repo's extension-alias webpack config makes the .js-specifier workspace imports resolve. CI now builds the web app."
-        }
-      ]
-    },
-    "GAP-022": {
-      "status": "done",
-      "notes": "The web application and offline PWA (E14). Next.js app router pages over the API handlers: /gaps (list + create + owner switcher), /gaps/[gapId] (status, transitions, today, sources with chunks, source form), /gaps/[gapId]/study (lesson player: audio player via signed URLs, questions with hint + attempt form posting to /api), /gaps/[gapId]/mastery (objective statuses + ready-to-fill). PWA: manifest route (study start_url), icon, and a stale-while-revalidate service worker that serves the lesson offline after first load; writes always go to the network. Server pages call the handlers in-process; client interactivity uses the /api routes with the owner cookie as X-Owner-Id.",
-      "completedAt": "2026-08-03T15:28:02.000Z",
-      "evidence": [
-        {
-          "command": "pnpm test tests/end-to-end/pwa.test.ts",
-          "result": "pass",
-          "note": "The web application and offline PWA (E14). Next.js app router pages over the API handlers: /gaps (list + create + owner switcher), /gaps/[gapId] (status, transitions, today, sources with chunks, source form), /gaps/[gapId]/study (lesson player: audio player via signed URLs, questions with hint + attempt form posting to /api), /gaps/[gapId]/mastery (objective statuses + ready-to-fill). PWA: manifest route (study start_url), icon, and a stale-while-revalidate service worker that serves the lesson offline after first load; writes always go to the network. Server pages call the handlers in-process; client interactivity uses the /api routes with the owner cookie as X-Owner-Id."
-        }
-      ]
-    },
-    "GAP-023": {
-      "status": "done",
-      "notes": "Live speech-to-text and a real live-mode factory. createLiveSpeechToText speaks OpenAI-compatible /audio/transcriptions over plain fetch (multipart form, bearer auth, typed errors, cost from env price/minute with a floor). createLiveSpeechToTextFromEnv + createLiveEmbeddingsFromEnv assemble from GAPOS_* env. createProviders({mode:'live'}) now boots all four adapters instead of throwing; constructors still refuse without keys, which is the AGENTS.md \u00a75 human gate.",
-      "completedAt": "2026-08-03T14:57:43.000Z",
-      "evidence": [
-        {
-          "command": "pnpm test packages/provider-adapters/src/live-mode.test.ts",
-          "result": "pass",
-          "note": "Live speech-to-text and a real live-mode factory. createLiveSpeechToText speaks OpenAI-compatible /audio/transcriptions over plain fetch (multipart form, bearer auth, typed errors, cost from env price/minute with a floor). createLiveSpeechToTextFromEnv + createLiveEmbeddingsFromEnv assemble from GAPOS_* env. createProviders({mode:'live'}) now boots all four adapters instead of throwing; constructors still refuse without keys, which is the AGENTS.md \u00a75 human gate."
-        }
-      ]
-    },
-    "GAP-024": {
-      "status": "done",
-      "notes": "The SigV4 client is proven against a real S3 endpoint: tests/end-to-end/s3-smoke.test.ts round-trips put/get/presigned-URL/delete/deleteOwnedBy against real MinIO, skipping loudly without GAPOS_S3_* env (mirroring the Postgres suites). The CI MinIO service + bucket setup are staged in the final workflow commit, which needs a workflow-scoped token to push.",
-      "completedAt": "2026-08-03T15:28:02.000Z",
-      "evidence": [
-        {
-          "command": "pnpm test tests/end-to-end/s3-smoke.test.ts",
-          "result": "pass",
-          "note": "The SigV4 client is proven against a real S3 endpoint: tests/end-to-end/s3-smoke.test.ts round-trips put/get/presigned-URL/delete/deleteOwnedBy against real MinIO, skipping loudly without GAPOS_S3_* env (mirroring the Postgres suites). The CI MinIO service + bucket setup are staged in the final workflow commit, which needs a workflow-scoped token to push."
-        }
-      ]
-    },
-    "GAP-025": {
-      "status": "done",
-      "notes": "The command-line study client. apps/cli exposes : gap new (flags or prompts), gap list/show, source add (--file or --text), compile, plan, study (interactive answer loop with graded feedback), mastery. Commands are plain functions over the service layer with injectable IO; main.ts builds the context from env (Postgres or in-memory with a loud warning) and dispatches. The acceptance is proven in-process: a scripted session (gap new -> source add -> compile -> plan -> study -> mastery) runs end to end without a server or database.",
-      "completedAt": "2026-08-03T15:38:36.000Z",
-      "evidence": [
-        {
-          "command": "pnpm test apps/cli/src/cli.test.ts",
-          "result": "pass",
-          "note": "The command-line study client. apps/cli exposes : gap new (flags or prompts), gap list/show, source add (--file or --text), compile, plan, study (interactive answer loop with graded feedback), mastery. Commands are plain functions over the service layer with injectable IO; main.ts builds the context from env (Postgres or in-memory with a loud warning) and dispatches. The acceptance is proven in-process: a scripted session (gap new -> source add -> compile -> plan -> study -> mastery) runs end to end without a server or database."
-        }
-      ]
-    },
-    "GAP-026": {
-      "status": "done",
-      "notes": "Operations documentation for the deployment surface. OPERATIONS.md gains a Deployment surface section: the three processes (web/worker/CLI) with commands, boot order, worker shutdown semantics, live-mode + local-preset configuration, S3/MinIO storage, the full HTTP API map, and the PWA offline contract. README's quickstart now shows how to run the UI, worker and CLI, plus the complete GAPOS_* environment table.",
-      "completedAt": "2026-08-03T15:39:20.000Z",
-      "evidence": [
-        {
-          "command": "pnpm verify",
-          "result": "pass",
-          "note": "Operations documentation for the deployment surface. OPERATIONS.md gains a Deployment surface section: the three processes (web/worker/CLI) with commands, boot order, worker shutdown semantics, live-mode + local-preset configuration, S3/MinIO storage, the full HTTP API map, and the PWA offline contract. README's quickstart now shows how to run the UI, worker and CLI, plus the complete GAPOS_* environment table."
-        }
-      ]
-    },
-    "GAP-027": {
-      "status": "done",
-      "notes": "The knowledge map (E15). knowledgeMap handler builds nodes (the gap + every capability its curriculum teaches + their prerequisites + knowledge-graph edges) and edges (teaches / prerequisite_of / extends / related), owner-scoped. A /gaps/[gapId]/map page renders it as a deterministic BFS-ring SVG with no new dependencies; gap nodes are links, capability nodes carry tooltips. API tests cover the map contents and owner isolation; next build compiles the page.",
-      "completedAt": "2026-08-03T15:29:52.000Z",
-      "evidence": [
-        {
-          "command": "pnpm test apps/web/src/server/api.test.ts",
-          "result": "pass",
-          "note": "The knowledge map (E15). knowledgeMap handler builds nodes (the gap + every capability its curriculum teaches + their prerequisites + knowledge-graph edges) and edges (teaches / prerequisite_of / extends / related), owner-scoped. A /gaps/[gapId]/map page renders it as a deterministic BFS-ring SVG with no new dependencies; gap nodes are links, capability nodes carry tooltips. API tests cover the map contents and owner isolation; next build compiles the page."
-        }
-      ]
-    },
-    "GAP-028": {
-      "status": "done",
-      "notes": "Voice gap capture (E16). POST /api/gaps/voice accepts raw audio bytes, transcribes through the provider STT (fake scriptable in tests, live via GAP-023), and returns an editable draft: the full transcript plus a suggested title with common lead-ins (I want to be able to\u2026) stripped. The VoiceCapture component records with MediaRecorder, posts the blob, and shows a confirm form that creates the real gap through the ordinary endpoint. Tests cover the draft shape and the confirm->create flow.",
-      "completedAt": "2026-08-03T15:31:49.000Z",
-      "evidence": [
-        {
-          "command": "pnpm test apps/web/src/server/api.test.ts",
-          "result": "pass",
-          "note": "Voice gap capture (E16). POST /api/gaps/voice accepts raw audio bytes (audio/webm) in the body, transcribes via the provider STT, and returns an editable draft gap; POST /api/gaps creates the real gap from the draft. The capture component records with MediaRecorder, sends the blob, and hands the transcript to a confirm form. With the fake STT scripted, a recorded blob becomes a draft whose text matches. Route handlers + capture UI + tests."
-        },
-        {
-          "command": "pnpm test apps/web/src/server/api.test.ts",
-          "result": "pass",
-          "note": "Voice gap capture (E16). POST /api/gaps/voice accepts raw audio bytes, transcribes through the provider STT (fake scriptable in tests, live via GAP-023), and returns an editable draft: the full transcript plus a suggested title with common lead-ins (I want to be able to\u2026) stripped. The VoiceCapture component records with MediaRecorder, posts the blob, and shows a confirm form that creates the real gap through the ordinary endpoint. Tests cover the draft shape and the confirm->create flow."
-        }
-      ]
-    },
-    "GAP-029": {
-      "status": "done",
-      "notes": "Provider routing by policy (E17). The live language model accepts a per-purpose routing table (purpose -> model); unlisted purposes fall back to the default model. createLiveLanguageModelFromEnv parses GAPOS_MODEL_ROUTING ('planning:model-a,teaching:model-b'). Tests prove a teaching call uses the teaching model, a planning call the planning model, and an unlisted purpose the default, plus env parsing.",
-      "completedAt": "2026-08-03T15:37:02.000Z",
-      "evidence": [
-        {
-          "command": "pnpm test packages/provider-adapters/src/live-mode.test.ts",
-          "result": "pass",
-          "note": "Provider routing by policy (E17). The live language model accepts a per-purpose routing table (purpose -> model); unlisted purposes fall back to the default model. createLiveLanguageModelFromEnv parses GAPOS_MODEL_ROUTING ('planning:model-a,teaching:model-b'). Tests prove a teaching call uses the teaching model, a planning call the planning model, and an unlisted purpose the default, plus env parsing."
-        }
-      ]
-    },
-    "GAP-030": {
-      "status": "done",
-      "notes": "Local-model execution preset (E18). GAPOS_LLM_MODE=local assembles the live backend against Ollama/llama.cpp's OpenAI-compatible endpoint (default http://localhost:11434/v1, model qwen2.5:7b-instruct) with no API key \u2014 the Authorization header is omitted when no key is set. The remote gate still applies without local mode (GAPOS_LLM_API_KEY required). Tested with a scripted fetch; model qualification against the evaluation pack is documented in OPERATIONS.md.",
-      "completedAt": "2026-08-03T15:37:02.000Z",
-      "evidence": [
-        {
-          "command": "pnpm test packages/provider-adapters/src/live-mode.test.ts",
-          "result": "pass",
-          "note": "Local-model execution preset (E18). GAPOS_LLM_MODE=local assembles the live backend against Ollama/llama.cpp's OpenAI-compatible endpoint (default http://localhost:11434/v1, model qwen2.5:7b-instruct) with no API key \u2014 the Authorization header is omitted when no key is set. The remote gate still applies without local mode (GAPOS_LLM_API_KEY required). Tested with a scripted fetch; model qualification against the evaluation pack is documented in OPERATIONS.md."
-        }
-      ]
-    },
-    "GAP-031": {
-      "status": "done",
-      "notes": "The educator review queue (E19). Migration 005 adds review_status + review_note to lessons; CurriculumRepository.setReview records the decision owner-scoped. GET /api/review lists lessons whose generation run recorded audit findings (with their findings and any decision), POST /api/review/:lessonId approves or rejects with a note, and the note is visible on the lesson. /review page renders the queue with severity-coloured findings and approve/reject controls; the gaps header links to it. Tests cover flag -> reject-with-note -> visible-note, and owner isolation.",
-      "completedAt": "2026-08-03T15:35:05.000Z",
-      "evidence": [
-        {
-          "command": "pnpm test apps/web/src/server/api.test.ts",
-          "result": "pass",
-          "note": "The educator review queue (E19). Migration 005 adds review_status + review_note to lessons; CurriculumRepository.setReview records the decision owner-scoped. GET /api/review lists lessons whose generation run recorded audit findings (with their findings and any decision), POST /api/review/:lessonId approves or rejects with a note, and the note is visible on the lesson. /review page renders the queue with severity-coloured findings and approve/reject controls; the gaps header links to it. Tests cover flag -> reject-with-note -> visible-note, and owner isolation."
-        }
-      ]
+    {
+     "command": "pnpm test tests/architecture",
+     "result": "pass",
+     "note": "7 tests: the domain-purity and provider-boundary lint rules are asserted through the real ESLint config, so the constraint fails the build rather than living in prose"
     }
+   ],
+   "notes": "Monorepo, quality gate, AGENTS.md, PRODUCT/ARCHITECTURE/SECURITY/OPERATIONS, ADRs 0001-0003, backlog schema, CI with a separate Postgres migration job."
+  },
+  "GAP-001": {
+   "status": "done",
+   "startedAt": "2026-08-02T04:19:00.000Z",
+   "completedAt": "2026-08-02T04:22:00.000Z",
+   "evidence": [
+    {
+     "command": "pnpm test:domain",
+     "result": "pass",
+     "note": "18 tests. Full transition matrix asserted against the declared table; every status proven reachable from draft; filled unreachable from any status except mastery_check and review_due; mastery_confirmed refused when a required objective is unmastered or when there are no required objectives at all"
+    },
+    {
+     "command": "pnpm typecheck",
+     "result": "pass"
+    }
+   ],
+   "notes": "Acceptance 'consumption cannot directly set filled' is covered by the test that iterates every status and asserts the mastery_confirmed transition is refused."
+  },
+  "GAP-002": {
+   "status": "done",
+   "startedAt": "2026-08-02T04:22:00.000Z",
+   "completedAt": "2026-08-02T04:23:00.000Z",
+   "evidence": [
+    {
+     "command": "pnpm test:domain",
+     "result": "pass",
+     "note": "18 tests. Terminal statuses reject all transitions; partial is reachable only from repairing, synthesising_audio and publishing; decideStep reuses recorded output rather than recomputing, re-runs an expired lease, and abandons after 3 attempts carrying the last error"
+    }
+   ],
+   "notes": "Step identity is (run, step, subject, inputVersion). The subject field separates concurrent instances of the same step, which is what makes per-day lesson generation safe to retry independently."
+  },
+  "GAP-003": {
+   "status": "done",
+   "startedAt": "2026-08-02T04:24:00.000Z",
+   "completedAt": "2026-08-02T04:33:00.000Z",
+   "evidence": [
+    {
+     "command": "pnpm test packages/ai-contracts",
+     "result": "pass",
+     "note": "22 tests. Wrong schemaVersion rejected; unknown fields rejected rather than dropped; multiple-choice answer must be among distinct options; free response must ship a rubric; a source-grounded item must cite a locator; the evidence fence cannot be forged by a document"
+    },
+    {
+     "command": "pnpm test packages/provider-adapters",
+     "result": "pass",
+     "note": "17 tests. A structurally invalid response is rejected at the boundary and never returned; the failing field names are reported so a repair can be targeted; a rejected response is still charged for; source text never enters the instruction or the log; the budget check happens before the provider is reached (backend.calls is empty)"
+    },
+    {
+     "command": "pnpm test packages/observability",
+     "result": "pass",
+     "note": "13 tests. Budgets refuse pre-call at both run and per-user-daily scope; spend does not cross users or days; cost is integer millicents so 300 sub-cent calls do not drift"
+    }
+   ],
+   "notes": "GAPOS_PROVIDER_MODE defaults to fake, and mode=live throws pointing at the human approval gate rather than silently falling back \u2014 a staging run cannot quietly be a fake run."
+  },
+  "GAP-004": {
+   "status": "done",
+   "startedAt": "2026-08-02T04:34:00.000Z",
+   "completedAt": "2026-08-02T04:38:00.000Z",
+   "evidence": [
+    {
+     "command": "pnpm test packages/database",
+     "result": "pass",
+     "note": "16 tests. Owner A cannot read, list, update or re-status a row owned by B; retrieval is bounded by owner AND gap; account deletion removes every owned row and leaves the other learner intact; a repeated compile or attempt idempotency key returns the original row instead of creating a second"
+    },
+    {
+     "command": "pnpm test packages/database -t 'no repository method that reads without an owner'",
+     "result": "pass",
+     "note": "Structural guard: reflects over every repository method and asserts the first parameter is the owner, so a future findById(id) fails here rather than shipping"
+    },
+    {
+     "command": "pnpm test packages/database -t migrations",
+     "result": "pass",
+     "note": "Migration drift check refuses to run when a shipped migration file has been edited; applying twice is a no-op; every learner-owned table in the schema is asserted to carry owner_id"
+    }
+   ],
+   "notes": "The schema, the forward-only runner with checksum drift detection, and the in-memory UnitOfWork are complete and are what the application uses today. The Postgres implementation of the repository interfaces is NOT yet written and is tracked as GAP-004b (ready, not blocked) with the ownership suite to be parameterised across both implementations. Recorded rather than stubbed."
+  },
+  "GAP-006": {
+   "status": "done",
+   "completedAt": "2026-08-03T14:18:59.000Z",
+   "notes": "Closed. Chunking, locators, screening and the checksum-addressed cache were already done and tested; the missing production piece was a real object store. createS3ObjectStore speaks AWS Signature Version 4 over plain fetch (no SDK, matching the provider-adapters rule) against MinIO or any S3 endpoint: owner-scoped keys (<owner>/<key>), presigned GET URLs with server-side expiry, delete and deleteOwnedBy via LIST. The signing math is pinned against the battle-tested aws4 reference implementation, and the client is exercised against an in-process S3-compatible mock that independently recomputes presign signatures and enforces expiry. Upload registration was already wired through the ObjectStore interface (gap-service.registerSource).",
+   "evidence": [
+    {
+     "command": "pnpm test packages/database/src/storage-s3.test.ts",
+     "result": "pass",
+     "note": "5 tests: owner-scoped put/get round trip (wrong owner and wrong key return nothing), presigned URL opens the object and is refused after expiry by the mock's independent signature recomputation, delete + deleteOwnedBy scoped to the prefix, and the SigV4 reference vector matching aws4 output exactly."
+    },
+    {
+     "command": "pnpm verify",
+     "result": "pass",
+     "note": "Full gate green with the S3 backend in place."
+    }
+   ]
+  },
+  "GAP-008": {
+   "status": "done",
+   "completedAt": "2026-08-02T04:42:00.000Z",
+   "notes": "Violations are collected together rather than thrown one at a time, so a planner repair prompt can fix all of them in one round against the ten-minute budget.",
+   "evidence": [
+    {
+     "command": "pnpm test packages/domain/src/curriculum",
+     "result": "pass",
+     "note": "14 tests. Rejects a day over the learner's minutes, an objective never taught, an objective never assessed, an objective assessed by too few items, a prerequisite cycle (naming it), a dependency on an untaught objective, an unmet external prerequisite, and a source claim with no locator. Permits an objective explicitly labelled general knowledge"
+    }
+   ]
+  },
+  "GAP-010": {
+   "status": "done",
+   "completedAt": "2026-08-03T14:10:48.000Z",
+   "notes": "Closed a stale 'partial': the note claimed the pipeline was not yet written, but compile.ts stages F-G run verify_artefact with independent solutions from the model, verifyLesson, decideRepair (repair->repair->exclude, never a third attempt), and partial publication when coverage does not survive. The end-to-end and security suites exercise it (a generator that obeys injection is caught structurally).",
+   "evidence": [
+    {
+     "command": "pnpm test packages/domain/src/verification packages/domain/src/mastery tests/end-to-end",
+     "result": "pass",
+     "note": "24 verifier tests + 31 mastery tests + e2e journey/security suites: independent solutions, leakage rejection, repair ladder, partial publication all green."
+    }
+   ]
+  },
+  "GAP-012": {
+   "status": "done",
+   "completedAt": "2026-08-03T14:10:48.000Z",
+   "notes": "Closed a stale 'partial': learning-service.ts persists attempts, evidence, reviews and mastery checks through the API (submitAttempt, completeReview, runMasteryCheck), records knowledge edges on fill, and the journey proves two-session evidence fills a gap while consumption alone cannot.",
+   "evidence": [
+    {
+     "command": "pnpm test packages/domain/src/mastery tests/end-to-end",
+     "result": "pass",
+     "note": "31 mastery tests; journey tests cover listening-without-practice refusal, single-session refusal, two-session fill, review ladder scheduling."
+    }
+   ]
+  },
+  "GAP-005": {
+   "status": "done",
+   "completedAt": "2026-08-02T04:57:00.000Z",
+   "evidence": [
+    {
+     "command": "pnpm test tests/end-to-end",
+     "result": "pass",
+     "note": "22 tests covering the whole \u00a716.1 journey on deterministic fakes: create account, define gap, upload the reference source, skip the diagnostic, compile, Day 1 published first, playable audio artefact with a signed expiring URL, practice submission, corrective feedback, mastery check, capability search"
+    },
+    {
+     "command": "pnpm test",
+     "result": "pass",
+     "note": "219 tests across 13 files, no network and no API key"
+    }
+   ],
+   "notes": "Two real defects were found by writing this test and fixed in the code, not the test. (1) Day 1 did not publish first: with bounded concurrency the publication order of concurrent days was arbitrary, so Day 1 now runs to completion before the rest fan out. (2) The published questions did not satisfy the plan's own assessment blueprint, which would have left obj_relation_properties permanently unmasterable with nothing to point at; findAssessmentGaps now checks published items against the blueprint and marks the run partial."
+  },
+  "GAP-007": {
+   "status": "done",
+   "completedAt": "2026-08-02T04:57:00.000Z",
+   "evidence": [
+    {
+     "command": "pnpm test tests/end-to-end",
+     "result": "pass",
+     "note": "A blocking ambiguity stops the run for clarification instead of guessing; a skipped diagnostic records a labelled assumption on the gap and lowers the starting difficulty; normalisation output is contract-validated before it is persisted"
+    }
+   ],
+   "notes": "Stages A and C are wired through the guarded adapter, so an invalid normalisation cannot reach the database."
+  },
+  "GAP-009": {
+   "status": "done",
+   "completedAt": "2026-08-02T04:57:00.000Z",
+   "evidence": [
+    {
+     "command": "pnpm test tests/end-to-end",
+     "result": "pass",
+     "note": "Lessons generate against the frozen plan with bounded concurrency; the plan, glossary and objective ids are immutable inputs; artefacts are versioned and frozen once an attempt references them"
+    }
+   ]
+  },
+  "GAP-011": {
+   "status": "done",
+   "completedAt": "2026-08-02T04:57:00.000Z",
+   "evidence": [
+    {
+     "command": "pnpm test tests/end-to-end",
+     "result": "pass",
+     "note": "Day 1 publishes before later days; audio failure falls back to transcript and the curriculum survives with every objective intact; segment checksums are verified against the spoken text before publication"
+    }
+   ]
+  },
+  "GAP-015": {
+   "status": "done",
+   "completedAt": "2026-08-03T14:10:48.000Z",
+   "notes": "The durable job queue and worker loop are implemented. jobs table (already in 001) now has code: JobQueue (memory + Postgres) with atomic lease (FOR UPDATE SKIP LOCKED), lease-expiry re-claim, exponential backoff and dead-lettering; createCompileWorker polls, leases, runs compileGap and records outcomes; enqueueCompile moves the gap to compiling at request time. Budget degradation was already proven end-to-end. Two design gaps were found and fixed while building the retry path: (1) compileGap deduplicated ANY existing run, so a job retry with the same idempotency key could never re-run the pipeline and a crashed in-flight run would be 'completed' prematurely \u2014 added resumeExisting semantics (re-enter the run, reuse recorded steps, skip stages already reached) and attempt-scoped keys (user key for attempt 1, K#attempt-N after); (2) curricula now carry run_id (migration 003) so a resumed run re-enters its own curriculum instead of creating a second course, and artefact ids are deterministic (lesson:kind:segment:version) with addArtefact idempotent on them, so no audio is duplicated across a restart.",
+   "evidence": [
+    {
+     "command": "pnpm test tests/end-to-end/worker.test.ts",
+     "result": "pass",
+     "note": "7 tests: enqueue->lease->complete lifecycle; leased-job return after worker death without duplication; retry-after-failure under a fresh attempt key; mid-run crash resume re-entering the run's curriculum (one course); dead-letter with last error + reproduction context; gap fail/retry parity with the API path; tenant scoping of jobs."
+    },
+    {
+     "command": "pnpm test packages/database/src/repositories/ownership.test.ts",
+     "result": "pass",
+     "note": "shared contract suite extended: getForRun owner-scoping and addArtefact idempotency on deterministic ids (both implementations)."
+    },
+    {
+     "command": "pnpm verify",
+     "result": "pass",
+     "note": "352 passed + 14 loud skips. Full gate green with the resume path and queue in place."
+    },
+    {
+     "command": "GAPOS_TEST_DATABASE_URL=... pnpm test tests/end-to-end/postgres-worker.test.ts",
+     "result": "pending",
+     "note": "SQL-level verification (atomic lease, lease-expiry re-claim, JSONB round-trip, resume against real Postgres) runs in CI where the pgvector service lives; skipped loudly locally without the URL."
+    }
+   ]
+  },
+  "GAP-014": {
+   "status": "done",
+   "completedAt": "2026-08-02T05:04:00.000Z",
+   "evidence": [
+    {
+     "command": "pnpm test tests/evaluation",
+     "result": "pass",
+     "note": "42 tests. All ten fixtures declared with expected objectives, prohibited content, sample questions, failure traps, expert rubric and latency class; every declared trap names a dimension that can catch it; the reference curriculum clears all ten floors"
+    },
+    {
+     "command": "pnpm test tests/evaluation -t 'detects poor education'",
+     "result": "pass",
+     "note": "11 degradation tests prove the scorer discriminates: a dropped objective, abandoning the source for general knowledge, prohibited scope, an unanswerable item, a missing rubric, a backwards difficulty ramp, a script written to be read rather than heard, a false duration, a duplicated prompt, a leaked answer, and an invented objective are each caught by the dimension that is supposed to catch them. A merely reworded curriculum still passes"
+    }
+   ],
+   "notes": "Writing the gate found two real defects. (1) The scorer measured objective coverage over the plan's promises as well as the lessons, so dropping a whole day still scored 1.0 \u2014 coverage now means taught, over lesson titles, summaries and scripts only. (2) The reference lesson scripts claimed twelve to fourteen minutes of audio and ran about one; they are now ~750 words each, matching a five-minute audio activity, with the plan's day budgets adjusted to keep 35 minutes. The nine fixtures that need a live provider are tracked as GAP-014b, blocked on a human approval gate rather than skipped."
+  },
+  "GAP-016": {
+   "status": "done",
+   "completedAt": "2026-08-02T05:11:00.000Z",
+   "evidence": [
+    {
+     "command": "pnpm test tests/architecture/specs.test.ts",
+     "result": "pass",
+     "note": "11 tests. Every contract has a published JSON Schema; the checked-in files must match what the zod contracts generate byte for byte, so changing a contract without regenerating fails the build; a deleted contract cannot leave a published schema behind; every published schema carries its version as a const and sets additionalProperties:false. The OpenAPI document declares all 14 essential routes, requires an idempotency key on both writes that need one, lists every DomainErrorCode and every gap and generation status, and is asserted never to expose prompts or reasoning"
+    }
+   ],
+   "notes": "Added outside the original backlog: specs/openapi.yaml and specs/generation-schemas/ were Phase 0 deliverables that had not been written. The schemas are generated from the zod contracts rather than hand-written, so the published form cannot drift from the code."
+  },
+  "GAP-017": {
+   "status": "done",
+   "completedAt": "2026-08-02T05:11:00.000Z",
+   "evidence": [
+    {
+     "command": "pnpm test tests/end-to-end/security.test.ts",
+     "result": "pass",
+     "note": "13 tests. A source carrying an injection payload still compiles (reading untrusted input safely is the requirement, not refusing it); the attempt is recorded as an audit finding and counted in telemetry; the payload never enters a published lesson; a wrong answer is still wrong despite the payload asking for every answer to be marked correct; a forged evidence fence is redacted; a generator that DID obey the injection is caught structurally by the transcript mismatch. Plus tenant isolation across curricula, lessons, questions, artefacts, runs and findings; storage refuses a known key to a non-owner; signed URLs expire; deletion removes owned rows and storage objects; no source text, instruction or lesson content reaches the logs"
+    }
+   ],
+   "notes": "Found a real defect: injection detection ran over the RETRIEVED evidence, and retrieval selects chunks by relevance to the learner's question \u2014 a hostile paragraph is typically about nothing, so it scored zero and was never scanned. The payload would have gone unreported on this run and could have reached a model on a later query that happened to match it. The scan now runs over every ingested chunk."
+  },
+  "GAP-004b": {
+   "status": "done",
+   "completedAt": "2026-08-02T05:30:00.000Z",
+   "evidence": [
+    {
+     "command": "GAPOS_TEST_DATABASE_URL=... pnpm test packages/database",
+     "result": "pass",
+     "note": "55 tests. The identical contract suite runs against memory and Postgres: 24 Postgres tests each taking 130-540ms of real database round trips. Cross-tenant reads return nothing at the SQL level; every statement filters on owner_id; setStatus is a single-statement compare-and-set that distinguishes not-found from a lost race; the unique constraint on (owner_id, idempotency_key) makes attempt and run dedupe safe under concurrent replay; a curriculum plan and lesson package round-trip through JSONB unchanged"
+    },
+    {
+     "command": "GAPOS_TEST_DATABASE_URL=... pnpm test tests/end-to-end/postgres-journey.test.ts",
+     "result": "pass",
+     "note": "10 tests. The whole product journey on the SQL implementation: compile to complete, Day 1 published first, chunks keep their locators and contiguous ordinals, a DATE deadline round-trips as the calendar day it was given rather than shifting timezone, repeated idempotency key returns one run, wrong answers schedule remediation, the gap fills only on two-session evidence and becomes searchable, and generation steps record the output a restarting worker reuses"
+    },
+    {
+     "command": "pnpm test packages/database (no database url)",
+     "result": "pass",
+     "note": "The Postgres block is skipped via an explicitly skipped test naming the missing variable, so an absent suite cannot be mistaken for a passing one"
+    }
+   ],
+   "notes": "The contract lives in shared-suite.ts and both implementations are held to it, so a test that passes for one and fails for the other is a bug in one of them rather than two suites drifting apart. A structural test also asserts both expose the same method names. createPool is exported from the database package so nothing outside it imports pg. Retrieval is still lexical in both implementations - full-text ranking in SQL, term overlap in memory - which is enough to prove the owner and gap boundaries; the vector index is tracked as GAP-018."
+  },
+  "GAP-019": {
+   "status": "done",
+   "completedAt": "2026-08-02T11:45:00.000Z",
+   "evidence": [
+    {
+     "command": "GAPOS_TEST_DATABASE_URL=... pnpm test",
+     "result": "pass",
+     "note": "337 tests, stable over three consecutive runs. The Postgres journey now asserts audio actually publishes: every day has more than one audio artefact, segment ordinals come back in playback order, and textOnly is false"
+    },
+    {
+     "command": "psql -c \"SELECT lesson_id, kind, count(*) FROM artefacts GROUP BY 1,2\"",
+     "result": "pass",
+     "note": "6-7 audio rows per lesson where previously exactly 1 persisted before the constraint rejected the rest"
+    }
+   ],
+   "notes": "Found by reading a GREEN CI run's Postgres server log. Migration 001 declared UNIQUE (lesson_id, kind, version) on artefacts, encoding the assumption that a lesson has one artefact per kind. True for a transcript, false for audio: a script is synthesised as several segments, all kind='audio' at version 1, so the second insert violated the constraint. The insert threw, the pipeline's audio fallback caught it and degraded the lesson to transcript-only, and the run still reported success \u2014 an audio-first product shipping without audio, with only a warning line. The in-memory store has no constraints, so the memory journey passed throughout. Fixed by forward-only migration 002 adding segment_ordinal and a segment-aware unique constraint; the shared contract suite now stores four audio segments for one lesson so memory and SQL are held to the same behaviour, and both journeys assert audio publishes rather than only that the compile succeeded."
+  },
+  "GAP-013": {
+   "status": "done",
+   "completedAt": "2026-08-03T14:10:48.000Z",
+   "notes": "The capability library is now wired into compilation. classifyPriorCapabilities (domain) splits prior filled gaps' objectives + target capability into satisfied (>= 0.6 reuse threshold) and decayed. compile.ts recalls prior capabilities (stage B), passes satisfied into the planner's satisfiedExternalPrerequisites AND the learner brief (so the planner can copy them verbatim), and hands decayed capabilities to the diagnostic as material to re-demonstrate. Step input versions include the new inputs so retries stay idempotent. Search was already done; edges were already written on fill \u2014 the read side was missing.",
+   "evidence": [
+    {
+     "command": "pnpm test packages/domain/src/mastery",
+     "result": "pass",
+     "note": "5 new tests for classifyPriorCapabilities: fresh reuse, decay, mixed history, reinforcement extension, threshold crossing."
+    },
+    {
+     "command": "pnpm test tests/end-to-end/capability-reuse.test.ts",
+     "result": "pass",
+     "note": "5 tests. A strict provider (normalisation assumes nothing, diagnostic demonstrates nothing) makes the reference plan's 'set-builder notation' prerequisite only satisfiable via prior mastery: refused without it; satisfied by a fresh filled capability; refused again once 195 days of decay pass, with the decayed capability visible in the diagnostic instruction; per-learner scoping holds."
+    }
+   ]
+  },
+  "GAP-018": {
+   "status": "done",
+   "completedAt": "2026-08-03T14:27:54.000Z",
+   "notes": "Vector retrieval replaces lexical-only chunk search. Migration 004 adds a pgvector embedding column (vector(384), HNSW index); searchChunks takes an optional query embedding and ranks by cosine (pgvector <=> on SQL, cosineSimilarity on memory), falling back to full-text/term retrieval when the deployment has no embedding capability. New guarded Embeddings adapter in provider-adapters (budget check before the call, usage recorded, undefined = no capability), a scripted deterministic fake, and a live OpenAI-compatible backend. The pipeline embeds each source's chunks (embed_chunk step) and the query (embed_query step, keyed so a resumed run reuses the vector instead of re-charging) and passes the vector to retrieval. The e2e proves a chunk that shares no words with the learner's statement is retrieved when its embedding is nearest, and that the default (no capability) stays lexical.",
+   "evidence": [
+    {
+     "command": "pnpm test packages/database/src/repositories/ownership.test.ts",
+     "result": "pass",
+     "note": "Shared contract suite (memory + Postgres in CI) gained the vector-retrieval test: a query embedding ranks the semantically nearest chunk over chunks the query shares no words with, bounded by owner and gap exactly like lexical retrieval; setChunkEmbeddings is owner-scoped."
+    },
+    {
+     "command": "pnpm test tests/end-to-end/embedding-retrieval.test.ts",
+     "result": "pass",
+     "note": "2 tests: with a scripted embedding capability, a real compile embeds chunks + query, records embed_chunk/embed_query steps, and retrieval returns the target chunk by meaning alone; without the capability, no vectors are stored and retrieval stays lexical (the primary journey's behaviour is unchanged)."
+    },
+    {
+     "command": "pnpm verify",
+     "result": "pass",
+     "note": "360 passed + 20 loud skips. Full gate green with the vector path in place."
+    }
+   ]
   },
   "GAP-014b": {
-    "status": "in_progress",
-    "startedAt": "2026-08-02T19:40:00.000Z",
-    "evidence": [
-      {
-        "command": "pnpm vitest run packages/provider-adapters/src/live/language-model.test.ts",
-        "result": "pass",
-        "note": "13 tests. The live backend speaks OpenAI-compatible chat-completions over plain fetch (no SDK): bearer auth, response_format json_object, the contract named in the system prompt, evidence passed through inside the fence, temperature/max_tokens/timeout forwarded. Failures are typed LiveProviderErrors with a retryable flag (429/5xx/network retryable; 400/JSON/usage failures not). Usage is required because the wrapper cannot account for a call whose cost it cannot measure; cost is integer millicents rounded up from an env-overridable price table (defaults track deepseek-chat list prices)."
-      },
-      {
-        "command": "pnpm vitest run packages/provider-adapters/src/live/speech.test.ts",
-        "result": "pass",
-        "note": "14 tests. The live TTS wrapper computes the transcript-linked checksum (identical to the fake's, so memory/SQL/pipeline integrity checks hold for live runs), estimates duration with the same 14-characters-per-second heuristic the domain segmenter uses, forwards text/voice/locale verbatim, wraps engine failures in LiveSynthesisError naming the segment, and charges 0 by default (free endpoint) with an optional per-thousand-characters price. The Google Translate TTS engine is plain fetch with the gTTS query shape, chunks long segments at word boundaries under the endpoint cap, hard-splits overlong words, maps regional locales to language codes, and throws typed errors on HTTP and network failure."
-      },
-      {
-        "command": "pnpm verify",
-        "result": "pass",
-        "note": "330 passed + 14 skipped (Postgres block and the live-provider pack, both skipping loudly with the missing variable named). Format, lint, typecheck and the full suite are green with the pipeline hardening in place."
-      },
-      {
-        "command": "GAPOS_PROVIDER_MODE=live ... pnpm tsx scripts/record-eval-baselines.ts (run 3, final)",
-        "result": "pass",
-        "note": "ALL NINE FIXTURES PASS, exit 0. eval_02 0.9957, eval_03 1.0, eval_04 1.0, eval_05 1.0, eval_06 0.9739, eval_07 0.9742 (injection recorded as a finding, 3), eval_08 PASS (clarification requested, no curriculum guessed), eval_09 1.0, eval_10 1.0. Five fixtures perfect across all ten dimensions. Baselines recorded for 8 scored fixtures; eval_08 has no scorecard by design. The duration_accuracy, difficulty, rubric and blocking fixes all verified live."
-      },
-      {
-        "command": "pnpm verify",
-        "result": "pass",
-        "note": "333 passed + 14 skipped (Postgres block and the live-provider pack, both skipping loudly). Green on the committed state with the real baselines file."
-      }
-    ],
-    "notes": "GAP-014b DONE: the first live-model lessons are generated, verified, scored and recorded as baselines. DeepSeek deepseek-v4-flash + Google TTS produce source-grounded audio-first courses that satisfy every evaluation dimension on all nine reference fixtures, resist a prompt-injection attempt (recorded as a finding, never followed), and ask for clarification instead of guessing on an underspecified request. Cost for run 3 well within the $2 cap. Remaining live-gate nicety: the CI-form regression test (tests/evaluation/live-provider.test.ts) can be run with the live env at any time; it re-compiles the pack and compares against these baselines."
+   "status": "done",
+   "completedAt": "2026-08-03T14:28:14.000Z",
+   "notes": " Closed: the nine-fixture live scoring run completed and the baselines were recorded (commits f65270d + 1b6426e on the branch: 9/9 PASS \u2014 eval_02 0.9957, eval_03-05/09-10 1.0, eval_06 0.9739, eval_07 0.9742 with the injection recorded as a finding, eval_08 clarified rather than guessing). The live gate test now has baselines to compare against."
   },
-  "blockers": []
+  "GAP-020": {
+   "status": "done",
+   "notes": "Worker daemon entrypoint. bootstrapDaemon resolves env (GAPOS_DATABASE_URL -> Postgres pool + migrate + Postgres queue, else memory; GAPOS_STORAGE memory|s3 with GAPOS_S3_*; poll/lease/batch; budgets) and returns a ready worker. daemon-main.ts starts the loop, holds the process open with a ref'd heartbeat (the poll timer is unref'd for tests), and shuts down cleanly on SIGTERM/SIGINT: stop claiming, finish in-flight, release the pool. apps/worker now has scripts.start + a gapos-worker bin. Found and fixed a real bug: with only the unref'd poll timer the daemon process exited immediately after boot.",
+   "completedAt": "2026-08-03T15:05:48.000Z",
+   "evidence": [
+    {
+     "command": "pnpm test apps/worker/src/daemon.test.ts",
+     "result": "pass",
+     "note": "Worker daemon entrypoint. bootstrapDaemon resolves env (GAPOS_DATABASE_URL -> Postgres pool + migrate + Postgres queue, else memory; GAPOS_STORAGE memory|s3 with GAPOS_S3_*; poll/lease/batch; budgets) and returns a ready worker. daemon-main.ts starts the loop, holds the process open with a ref'd heartbeat (the poll timer is unref'd for tests), and shuts down cleanly on SIGTERM/SIGINT: stop claiming, finish in-flight, release the pool. apps/worker now has scripts.start + a gapos-worker bin. Found and fixed a real bug: with only the unref'd poll timer the daemon process exited immediately after boot."
+    }
+   ]
+  },
+  "GAP-021": {
+   "status": "done",
+   "notes": "The HTTP API over the service layer. Handlers are plain functions (context, owner, params, body) in server/api.ts with zod validation and an error map (400 validation, 401 owner header, 404 missing, 409 conflict, 402 budget, 422 screening); Next.js route handlers are thin adapters. Owner scoping is enforced by X-Owner-Id on every learner endpoint. Endpoints: health, users, gaps (list/create/get/transition/compile), sources (list with chunks/register), today, curriculum, lesson, artefact audio URL, attempts, mastery. The web process bootstraps from env (Postgres + migrate when GAPOS_DATABASE_URL, else memory; storage + providers by env). next build compiles; the repo's extension-alias webpack config makes the .js-specifier workspace imports resolve. CI now builds the web app.",
+   "completedAt": "2026-08-03T15:19:44.000Z",
+   "evidence": [
+    {
+     "command": "pnpm test apps/web/src/server/api.test.ts",
+     "result": "pass",
+     "note": "The HTTP API over the service layer. Handlers are plain functions (context, owner, params, body) in server/api.ts with zod validation and an error map (400 validation, 401 owner header, 404 missing, 409 conflict, 402 budget, 422 screening); Next.js route handlers are thin adapters. Owner scoping is enforced by X-Owner-Id on every learner endpoint. Endpoints: health, users, gaps (list/create/get/transition/compile), sources (list with chunks/register), today, curriculum, lesson, artefact audio URL, attempts, mastery. The web process bootstraps from env (Postgres + migrate when GAPOS_DATABASE_URL, else memory; storage + providers by env). next build compiles; the repo's extension-alias webpack config makes the .js-specifier workspace imports resolve. CI now builds the web app."
+    }
+   ]
+  },
+  "GAP-022": {
+   "status": "done",
+   "notes": "The web application and offline PWA (E14). Next.js app router pages over the API handlers: /gaps (list + create + owner switcher), /gaps/[gapId] (status, transitions, today, sources with chunks, source form), /gaps/[gapId]/study (lesson player: audio player via signed URLs, questions with hint + attempt form posting to /api), /gaps/[gapId]/mastery (objective statuses + ready-to-fill). PWA: manifest route (study start_url), icon, and a stale-while-revalidate service worker that serves the lesson offline after first load; writes always go to the network. Server pages call the handlers in-process; client interactivity uses the /api routes with the owner cookie as X-Owner-Id.",
+   "completedAt": "2026-08-03T15:28:02.000Z",
+   "evidence": [
+    {
+     "command": "pnpm test tests/end-to-end/pwa.test.ts",
+     "result": "pass",
+     "note": "The web application and offline PWA (E14). Next.js app router pages over the API handlers: /gaps (list + create + owner switcher), /gaps/[gapId] (status, transitions, today, sources with chunks, source form), /gaps/[gapId]/study (lesson player: audio player via signed URLs, questions with hint + attempt form posting to /api), /gaps/[gapId]/mastery (objective statuses + ready-to-fill). PWA: manifest route (study start_url), icon, and a stale-while-revalidate service worker that serves the lesson offline after first load; writes always go to the network. Server pages call the handlers in-process; client interactivity uses the /api routes with the owner cookie as X-Owner-Id."
+    }
+   ]
+  },
+  "GAP-023": {
+   "status": "done",
+   "notes": "Live speech-to-text and a real live-mode factory. createLiveSpeechToText speaks OpenAI-compatible /audio/transcriptions over plain fetch (multipart form, bearer auth, typed errors, cost from env price/minute with a floor). createLiveSpeechToTextFromEnv + createLiveEmbeddingsFromEnv assemble from GAPOS_* env. createProviders({mode:'live'}) now boots all four adapters instead of throwing; constructors still refuse without keys, which is the AGENTS.md \u00a75 human gate.",
+   "completedAt": "2026-08-03T14:57:43.000Z",
+   "evidence": [
+    {
+     "command": "pnpm test packages/provider-adapters/src/live-mode.test.ts",
+     "result": "pass",
+     "note": "Live speech-to-text and a real live-mode factory. createLiveSpeechToText speaks OpenAI-compatible /audio/transcriptions over plain fetch (multipart form, bearer auth, typed errors, cost from env price/minute with a floor). createLiveSpeechToTextFromEnv + createLiveEmbeddingsFromEnv assemble from GAPOS_* env. createProviders({mode:'live'}) now boots all four adapters instead of throwing; constructors still refuse without keys, which is the AGENTS.md \u00a75 human gate."
+    }
+   ]
+  },
+  "GAP-024": {
+   "status": "done",
+   "notes": "The SigV4 client is proven against a real S3 endpoint: tests/end-to-end/s3-smoke.test.ts round-trips put/get/presigned-URL/delete/deleteOwnedBy against real MinIO, skipping loudly without GAPOS_S3_* env (mirroring the Postgres suites). The CI MinIO service + bucket setup are staged in the final workflow commit, which needs a workflow-scoped token to push.",
+   "completedAt": "2026-08-03T15:28:02.000Z",
+   "evidence": [
+    {
+     "command": "pnpm test tests/end-to-end/s3-smoke.test.ts",
+     "result": "pass",
+     "note": "The SigV4 client is proven against a real S3 endpoint: tests/end-to-end/s3-smoke.test.ts round-trips put/get/presigned-URL/delete/deleteOwnedBy against real MinIO, skipping loudly without GAPOS_S3_* env (mirroring the Postgres suites). The CI MinIO service + bucket setup are staged in the final workflow commit, which needs a workflow-scoped token to push."
+    }
+   ]
+  },
+  "GAP-025": {
+   "status": "done",
+   "notes": "The command-line study client. apps/cli exposes : gap new (flags or prompts), gap list/show, source add (--file or --text), compile, plan, study (interactive answer loop with graded feedback), mastery. Commands are plain functions over the service layer with injectable IO; main.ts builds the context from env (Postgres or in-memory with a loud warning) and dispatches. The acceptance is proven in-process: a scripted session (gap new -> source add -> compile -> plan -> study -> mastery) runs end to end without a server or database.",
+   "completedAt": "2026-08-03T15:38:36.000Z",
+   "evidence": [
+    {
+     "command": "pnpm test apps/cli/src/cli.test.ts",
+     "result": "pass",
+     "note": "The command-line study client. apps/cli exposes : gap new (flags or prompts), gap list/show, source add (--file or --text), compile, plan, study (interactive answer loop with graded feedback), mastery. Commands are plain functions over the service layer with injectable IO; main.ts builds the context from env (Postgres or in-memory with a loud warning) and dispatches. The acceptance is proven in-process: a scripted session (gap new -> source add -> compile -> plan -> study -> mastery) runs end to end without a server or database."
+    }
+   ]
+  },
+  "GAP-026": {
+   "status": "done",
+   "notes": "Operations documentation for the deployment surface. OPERATIONS.md gains a Deployment surface section: the three processes (web/worker/CLI) with commands, boot order, worker shutdown semantics, live-mode + local-preset configuration, S3/MinIO storage, the full HTTP API map, and the PWA offline contract. README's quickstart now shows how to run the UI, worker and CLI, plus the complete GAPOS_* environment table.\nFresh-checkout verification (2026-08-07, autopilot): cloned main to a clean dir; pnpm install; pnpm verify -> 400 passed | 26 loud skips. Web boots env-only (in-memory warning + /api/health 200 with X-Owner-Id). Worker boots and shuts down gracefully on SIGTERM (\"stopped cleanly\"). Full journey via scripts/smoke-compile.ts: gap -> source -> define -> compile -> published 3-lesson course -> audio bytes from memory storage (no-S3 path). Findings: (1) in-memory state is per-process, so a no-S3/no-Postgres trial must run as a single process (web+worker as separate services cannot share it) \u2014 OPERATIONS.md corrected; (2) release step 4 now names the smoke script.",
+   "completedAt": "2026-08-03T15:39:20.000Z",
+   "evidence": [
+    {
+     "command": "pnpm verify",
+     "result": "pass",
+     "note": "Operations documentation for the deployment surface. OPERATIONS.md gains a Deployment surface section: the three processes (web/worker/CLI) with commands, boot order, worker shutdown semantics, live-mode + local-preset configuration, S3/MinIO storage, the full HTTP API map, and the PWA offline contract. README's quickstart now shows how to run the UI, worker and CLI, plus the complete GAPOS_* environment table."
+    },
+    "git clone \u2192 pnpm install \u2192 pnpm verify: 400 passed | 26 skipped (loud)",
+    "pnpm --filter @gapos/web start (no env): /api/health 200; in-memory warning logged",
+    "pnpm --filter @gapos/worker start + SIGTERM: \"gapos-worker stopped cleanly\", exit 0",
+    "pnpm tsx scripts/smoke-compile.ts: SMOKE OK: published course, 3 lessons, audio/mpeg (43 bytes)"
+   ]
+  },
+  "GAP-027": {
+   "status": "done",
+   "notes": "The knowledge map (E15). knowledgeMap handler builds nodes (the gap + every capability its curriculum teaches + their prerequisites + knowledge-graph edges) and edges (teaches / prerequisite_of / extends / related), owner-scoped. A /gaps/[gapId]/map page renders it as a deterministic BFS-ring SVG with no new dependencies; gap nodes are links, capability nodes carry tooltips. API tests cover the map contents and owner isolation; next build compiles the page.",
+   "completedAt": "2026-08-03T15:29:52.000Z",
+   "evidence": [
+    {
+     "command": "pnpm test apps/web/src/server/api.test.ts",
+     "result": "pass",
+     "note": "The knowledge map (E15). knowledgeMap handler builds nodes (the gap + every capability its curriculum teaches + their prerequisites + knowledge-graph edges) and edges (teaches / prerequisite_of / extends / related), owner-scoped. A /gaps/[gapId]/map page renders it as a deterministic BFS-ring SVG with no new dependencies; gap nodes are links, capability nodes carry tooltips. API tests cover the map contents and owner isolation; next build compiles the page."
+    }
+   ]
+  },
+  "GAP-028": {
+   "status": "done",
+   "notes": "Voice gap capture (E16). POST /api/gaps/voice accepts raw audio bytes, transcribes through the provider STT (fake scriptable in tests, live via GAP-023), and returns an editable draft: the full transcript plus a suggested title with common lead-ins (I want to be able to\u2026) stripped. The VoiceCapture component records with MediaRecorder, posts the blob, and shows a confirm form that creates the real gap through the ordinary endpoint. Tests cover the draft shape and the confirm->create flow.",
+   "completedAt": "2026-08-03T15:31:49.000Z",
+   "evidence": [
+    {
+     "command": "pnpm test apps/web/src/server/api.test.ts",
+     "result": "pass",
+     "note": "Voice gap capture (E16). POST /api/gaps/voice accepts raw audio bytes (audio/webm) in the body, transcribes via the provider STT, and returns an editable draft gap; POST /api/gaps creates the real gap from the draft. The capture component records with MediaRecorder, sends the blob, and hands the transcript to a confirm form. With the fake STT scripted, a recorded blob becomes a draft whose text matches. Route handlers + capture UI + tests."
+    },
+    {
+     "command": "pnpm test apps/web/src/server/api.test.ts",
+     "result": "pass",
+     "note": "Voice gap capture (E16). POST /api/gaps/voice accepts raw audio bytes, transcribes through the provider STT (fake scriptable in tests, live via GAP-023), and returns an editable draft: the full transcript plus a suggested title with common lead-ins (I want to be able to\u2026) stripped. The VoiceCapture component records with MediaRecorder, posts the blob, and shows a confirm form that creates the real gap through the ordinary endpoint. Tests cover the draft shape and the confirm->create flow."
+    }
+   ]
+  },
+  "GAP-029": {
+   "status": "done",
+   "notes": "Provider routing by policy (E17). The live language model accepts a per-purpose routing table (purpose -> model); unlisted purposes fall back to the default model. createLiveLanguageModelFromEnv parses GAPOS_MODEL_ROUTING ('planning:model-a,teaching:model-b'). Tests prove a teaching call uses the teaching model, a planning call the planning model, and an unlisted purpose the default, plus env parsing.",
+   "completedAt": "2026-08-03T15:37:02.000Z",
+   "evidence": [
+    {
+     "command": "pnpm test packages/provider-adapters/src/live-mode.test.ts",
+     "result": "pass",
+     "note": "Provider routing by policy (E17). The live language model accepts a per-purpose routing table (purpose -> model); unlisted purposes fall back to the default model. createLiveLanguageModelFromEnv parses GAPOS_MODEL_ROUTING ('planning:model-a,teaching:model-b'). Tests prove a teaching call uses the teaching model, a planning call the planning model, and an unlisted purpose the default, plus env parsing."
+    }
+   ]
+  },
+  "GAP-030": {
+   "status": "done",
+   "notes": "Local-model execution preset (E18). GAPOS_LLM_MODE=local assembles the live backend against Ollama/llama.cpp's OpenAI-compatible endpoint (default http://localhost:11434/v1, model qwen2.5:7b-instruct) with no API key \u2014 the Authorization header is omitted when no key is set. The remote gate still applies without local mode (GAPOS_LLM_API_KEY required). Tested with a scripted fetch; model qualification against the evaluation pack is documented in OPERATIONS.md.",
+   "completedAt": "2026-08-03T15:37:02.000Z",
+   "evidence": [
+    {
+     "command": "pnpm test packages/provider-adapters/src/live-mode.test.ts",
+     "result": "pass",
+     "note": "Local-model execution preset (E18). GAPOS_LLM_MODE=local assembles the live backend against Ollama/llama.cpp's OpenAI-compatible endpoint (default http://localhost:11434/v1, model qwen2.5:7b-instruct) with no API key \u2014 the Authorization header is omitted when no key is set. The remote gate still applies without local mode (GAPOS_LLM_API_KEY required). Tested with a scripted fetch; model qualification against the evaluation pack is documented in OPERATIONS.md."
+    }
+   ]
+  },
+  "GAP-031": {
+   "status": "done",
+   "notes": "The educator review queue (E19). Migration 005 adds review_status + review_note to lessons; CurriculumRepository.setReview records the decision owner-scoped. GET /api/review lists lessons whose generation run recorded audit findings (with their findings and any decision), POST /api/review/:lessonId approves or rejects with a note, and the note is visible on the lesson. /review page renders the queue with severity-coloured findings and approve/reject controls; the gaps header links to it. Tests cover flag -> reject-with-note -> visible-note, and owner isolation.",
+   "completedAt": "2026-08-03T15:35:05.000Z",
+   "evidence": [
+    {
+     "command": "pnpm test apps/web/src/server/api.test.ts",
+     "result": "pass",
+     "note": "The educator review queue (E19). Migration 005 adds review_status + review_note to lessons; CurriculumRepository.setReview records the decision owner-scoped. GET /api/review lists lessons whose generation run recorded audit findings (with their findings and any decision), POST /api/review/:lessonId approves or rejects with a note, and the note is visible on the lesson. /review page renders the queue with severity-coloured findings and approve/reject controls; the gaps header links to it. Tests cover flag -> reject-with-note -> visible-note, and owner isolation."
+    }
+   ]
+  }
+ },
+ "GAP-014b": {
+  "status": "in_progress",
+  "startedAt": "2026-08-02T19:40:00.000Z",
+  "evidence": [
+   {
+    "command": "pnpm vitest run packages/provider-adapters/src/live/language-model.test.ts",
+    "result": "pass",
+    "note": "13 tests. The live backend speaks OpenAI-compatible chat-completions over plain fetch (no SDK): bearer auth, response_format json_object, the contract named in the system prompt, evidence passed through inside the fence, temperature/max_tokens/timeout forwarded. Failures are typed LiveProviderErrors with a retryable flag (429/5xx/network retryable; 400/JSON/usage failures not). Usage is required because the wrapper cannot account for a call whose cost it cannot measure; cost is integer millicents rounded up from an env-overridable price table (defaults track deepseek-chat list prices)."
+   },
+   {
+    "command": "pnpm vitest run packages/provider-adapters/src/live/speech.test.ts",
+    "result": "pass",
+    "note": "14 tests. The live TTS wrapper computes the transcript-linked checksum (identical to the fake's, so memory/SQL/pipeline integrity checks hold for live runs), estimates duration with the same 14-characters-per-second heuristic the domain segmenter uses, forwards text/voice/locale verbatim, wraps engine failures in LiveSynthesisError naming the segment, and charges 0 by default (free endpoint) with an optional per-thousand-characters price. The Google Translate TTS engine is plain fetch with the gTTS query shape, chunks long segments at word boundaries under the endpoint cap, hard-splits overlong words, maps regional locales to language codes, and throws typed errors on HTTP and network failure."
+   },
+   {
+    "command": "pnpm verify",
+    "result": "pass",
+    "note": "330 passed + 14 skipped (Postgres block and the live-provider pack, both skipping loudly with the missing variable named). Format, lint, typecheck and the full suite are green with the pipeline hardening in place."
+   },
+   {
+    "command": "GAPOS_PROVIDER_MODE=live ... pnpm tsx scripts/record-eval-baselines.ts (run 3, final)",
+    "result": "pass",
+    "note": "ALL NINE FIXTURES PASS, exit 0. eval_02 0.9957, eval_03 1.0, eval_04 1.0, eval_05 1.0, eval_06 0.9739, eval_07 0.9742 (injection recorded as a finding, 3), eval_08 PASS (clarification requested, no curriculum guessed), eval_09 1.0, eval_10 1.0. Five fixtures perfect across all ten dimensions. Baselines recorded for 8 scored fixtures; eval_08 has no scorecard by design. The duration_accuracy, difficulty, rubric and blocking fixes all verified live."
+   },
+   {
+    "command": "pnpm verify",
+    "result": "pass",
+    "note": "333 passed + 14 skipped (Postgres block and the live-provider pack, both skipping loudly). Green on the committed state with the real baselines file."
+   }
+  ],
+  "notes": "GAP-014b DONE: the first live-model lessons are generated, verified, scored and recorded as baselines. DeepSeek deepseek-v4-flash + Google TTS produce source-grounded audio-first courses that satisfy every evaluation dimension on all nine reference fixtures, resist a prompt-injection attempt (recorded as a finding, never followed), and ask for clarification instead of guessing on an underspecified request. Cost for run 3 well within the $2 cap. Remaining live-gate nicety: the CI-form regression test (tests/evaluation/live-provider.test.ts) can be run with the live env at any time; it re-compiles the pack and compares against these baselines."
+ },
+ "blockers": []
 }
