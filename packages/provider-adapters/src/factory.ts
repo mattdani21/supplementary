@@ -11,6 +11,7 @@ import { createFakeEmbeddings, type FakeEmbeddingsOptions } from './fake/embeddi
 import { createFakeLanguageModel, type FakeLanguageModelOptions } from './fake/language-model.js';
 import { createFakeSpeechToText, createFakeTextToSpeech } from './fake/speech.js';
 import { createLanguageModel } from './language-model.js';
+import { createTextToSpeech } from './speech.js';
 import { createLiveEmbeddingsFromEnv } from './live/embeddings.js';
 import { createLiveLanguageModelFromEnv } from './live/language-model.js';
 import { createGoogleTranslateTtsEngine, createLiveTextToSpeech } from './live/speech.js';
@@ -53,7 +54,14 @@ export const createProviders = (options: ProviderFactoryOptions): Providers => {
         logger: options.logger,
       }),
       speechToText: createLiveSpeechToTextFromEnv(),
-      textToSpeech: createLiveTextToSpeech({ engine: createGoogleTranslateTtsEngine() }),
+      textToSpeech: createTextToSpeech(
+        createLiveTextToSpeech({ engine: createGoogleTranslateTtsEngine() }),
+        {
+          costAccountant: options.costAccountant,
+          metrics: options.metrics,
+          logger: options.logger,
+        },
+      ),
       embeddings: createEmbeddings(createLiveEmbeddingsFromEnv(), {
         costAccountant: options.costAccountant,
         metrics: options.metrics,
@@ -70,7 +78,11 @@ export const createProviders = (options: ProviderFactoryOptions): Providers => {
       logger: options.logger,
     }),
     speechToText: createFakeSpeechToText(),
-    textToSpeech: createFakeTextToSpeech(),
+    textToSpeech: createTextToSpeech(createFakeTextToSpeech(), {
+      costAccountant: options.costAccountant,
+      metrics: options.metrics,
+      logger: options.logger,
+    }),
     embeddings: createEmbeddings(createFakeEmbeddings(options.fakeEmbeddings), {
       costAccountant: options.costAccountant,
       metrics: options.metrics,

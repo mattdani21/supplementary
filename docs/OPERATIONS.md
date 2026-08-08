@@ -11,9 +11,12 @@ Three processes, all configured entirely by environment (full table in `README.m
 | CLI | `pnpm --filter @gapos/cli start -- <cmd>` | terminal study client |
 
 **Boot order.** The web and worker processes both run migrations on boot, so a deploy is:
-start the worker, start the web app, run a smoke compilation (`gapos compile`), then open the
-cohort. `GAPOS_DATABASE_URL` selects Postgres; without it both processes run in-memory with a
-loud warning and must never be used for anything but a throwaway trial.
+start the worker, start the web app, run a smoke compilation (`pnpm tsx scripts/smoke-compile.ts`
+from the repo root, or `gapos compile` against a live instance), then open the cohort.
+`GAPOS_DATABASE_URL` selects Postgres; without it both processes run in-memory with a
+loud warning and must never be used for anything but a throwaway trial. In-memory state is
+per-process: a multi-step journey (create gap → compile → listen) must run in a single
+process — the smoke script is exactly that.
 
 **Worker shutdown.** SIGTERM/SIGINT stops the poller after the in-flight job, releases the
 pool, and exits 0. Restart recovery is the lease protocol: a job whose lease expired is
@@ -67,9 +70,12 @@ Variables on web **and** worker (identical, so either process can be the first b
 Both processes migrate on boot and self-provision the bucket (`ensureBucket`), so the
 deploy order is: postgres + minio up, then web and worker (either first). The worker polls
 the Postgres queue, so compiles enqueued through the web run in the worker and audio lands
-in MinIO where the web's signed URLs reach it. No-S3 trial deploys work too: leave
-`GAPOS_STORAGE` unset and audio is proxied through the API (bytes are served from the same
-container that generated them — fine for one replica, not for horizontal scale).
+in MinIO where the web's signed URLs reach it. A no-S3 trial works only as a **single
+process** — the smoke script (`scripts/smoke-compile.ts`) or a CLI session — because
+in-memory repositories and storage are per-process: with web and worker as separate
+services, a job enqueued through the web never reaches the worker's queue and audio
+generated in the worker is invisible to the web. Separate services require Postgres plus
+either S3 or a shared filesystem-backed store.
 
 The gate before flipping a deployed instance to real learners is the live-provider
 evaluation (GAP-014b): `GAPOS_PROVIDER_MODE=live GAPOS_LLM_API_KEY=… pnpm test
@@ -92,7 +98,7 @@ opted into explicitly, so no test run can accidentally spend money.
 1. Deploy database migrations.
 2. Deploy the worker.
 3. Deploy the web application.
-4. Run a smoke compilation.
+4. Run a smoke compilation (`pnpm tsx scripts/smoke-compile.ts`).
 5. Enable a small user cohort.
 6. Monitor latency, failure rate and cost.
 7. Expand gradually.

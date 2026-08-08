@@ -12,7 +12,17 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { REFERENCE_GAP_STATEMENT, SET_THEORY_SOURCE } from '@gapos/test-fixtures';
 import type { OwnerId } from '@gapos/database';
-import { checksumFor } from '@gapos/provider-adapters';
+import { CostAccountant, createLogger, createMetrics } from '@gapos/observability';
+import {
+  checksumFor,
+  createEmbeddings,
+  createFakeEmbeddings,
+  createFakeLanguageModel,
+  createFakeSpeechToText,
+  createFakeTextToSpeech,
+  createLanguageModel,
+  createTextToSpeech,
+} from '@gapos/provider-adapters';
 import { createServerContext, type ServerContext } from '../../apps/web/src/server/context.js';
 import {
   applyTransition,
@@ -460,6 +470,53 @@ describe('resilience', () => {
     expect(outcome.status).toBe('failed');
     expect(outcome.error).toMatch(/budget/i);
     expect(context.metrics.sum('budget_degradation_total')).toBeGreaterThan(0);
+  });
+
+  it('degrades to text-only when audio synthesis would exceed the budget, instead of overspending', async () => {
+    // M2.2 (GAP-015): the budget is checked before EVERY provider call. Text-to-speech was the
+    // only adapter without the check, so a paid audio engine could overspend a run. With a
+    // per-run budget that fits the language-model stages but not the audio, the run must
+    // publish the curriculum transcript-only — not fail, not overspend.
+    const costAccountant = new CostAccountant({
+      perRunMillicents: 150_000,
+      perUserDailyMillicents: 10_000_000,
+    });
+    const metrics = createMetrics();
+    const logger = createLogger({}, { level: 'error' });
+    const { context } = buildContext({
+      budget: { perRunMillicents: 150_000, perUserDailyMillicents: 10_000_000 },
+      providers: {
+        mode: 'fake' as const,
+        languageModel: createLanguageModel(createFakeLanguageModel(), {
+          costAccountant,
+          metrics,
+          logger,
+        }),
+        speechToText: createFakeSpeechToText(),
+        textToSpeech: createTextToSpeech(createFakeTextToSpeech(), {
+          costAccountant,
+          metrics,
+          logger,
+          estimateMillicents: () => 10_000_000, // an absurdly expensive audio engine
+        }),
+        embeddings: createEmbeddings(createFakeEmbeddings(), {
+          costAccountant,
+          metrics,
+          logger,
+        }),
+      },
+    });
+    await seedLearner(context, LEARNER);
+
+    const { outcome } = await compileReferenceCourse(context, LEARNER, 'audio-broke');
+    expect(outcome.status).toBe('complete');
+    expect(outcome.days.every((d) => d.textOnly)).toBe(true);
+    for (const day of outcome.days) {
+      const artefacts = await context.uow.curricula.listArtefacts(LEARNER, day.lessonId);
+      expect(artefacts.some((a) => a.kind === 'transcript')).toBe(true);
+      expect(artefacts.some((a) => a.kind === 'audio')).toBe(false);
+    }
+    expect(metrics.sum('budget_degradation_total')).toBeGreaterThan(0);
   });
 });
 
