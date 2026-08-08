@@ -20,6 +20,7 @@ import {
   type OwnerId,
 } from '@gapos/database';
 import { createServerContext, type ServerContext } from '../../apps/web/src/server/context.js';
+import type { Providers } from '@gapos/provider-adapters';
 import { bootstrapDaemon } from '../../apps/worker/src/daemon.js';
 import { enqueueCompile } from '../../apps/worker/src/queue/enqueue.js';
 import { createCompileWorker } from '../../apps/worker/src/queue/worker.js';
@@ -36,6 +37,7 @@ describeIfPostgres('the durable worker on Postgres (GAP-015)', () => {
   const SCHEMA = 'test_postgres_worker';
   const pool = createPool(databaseUrl!, { max: 4, schema: SCHEMA });
   let context: ServerContext;
+  let now: Date;
   let migrated = false;
 
   afterAll(async () => {
@@ -50,11 +52,13 @@ describeIfPostgres('the durable worker on Postgres (GAP-015)', () => {
     }
     await truncateAll(pool);
 
+    // Mutable clock: lease-expiry scenarios advance `now` past the lease.
+    now = new Date('2026-08-02T09:00:00Z');
     context = createServerContext({
       uow: createPostgresUnitOfWork(pool),
       storage: createMemoryObjectStore(),
       queue: createPostgresJobQueue(pool),
-      now: () => new Date('2026-08-02T09:00:00Z'),
+      now: () => now,
     });
     await context.uow.users.create({
       id: LEARNER,
@@ -76,18 +80,27 @@ describeIfPostgres('the durable worker on Postgres (GAP-015)', () => {
     return gap;
   };
 
-  it('leases a job atomically and completes it through the pipeline', async () => {
+  it('leases a job atomically at the SQL level', async () => {
+    const gap = await seedGap();
+    const job = await enqueueCompile(context, LEARNER, {
+      gapId: gap.id,
+      idempotencyKey: 'pg-compile-1a',
+    });
+
+    const claimed = await context.queue.claimDue(context.now(), 10, 60_000);
+    expect(claimed.map((j) => j.id)).toEqual([job.id]);
+    // A second claim in the same tick window must not see the same job: it is leased.
+    expect(await context.queue.claimDue(context.now(), 10, 60_000)).toEqual([]);
+  });
+
+  it('completes a compile job through the worker pipeline', async () => {
     const gap = await seedGap();
     const job = await enqueueCompile(context, LEARNER, {
       gapId: gap.id,
       idempotencyKey: 'pg-compile-1',
     });
 
-    // A second claim in the same tick window must not see the same job: it is leased.
-    const claimed = await context.queue.claimDue(context.now(), 10, 60_000);
-    expect(claimed.map((j) => j.id)).toEqual([job.id]);
-    expect(await context.queue.claimDue(context.now(), 10, 60_000)).toEqual([]);
-
+    // The worker's tick claims (atomically) and processes the job end to end.
     const worker = createCompileWorker(context, { leaseDurationMs: 60_000 });
     await worker.tick();
 
@@ -104,7 +117,7 @@ describeIfPostgres('the durable worker on Postgres (GAP-015)', () => {
 
     // Worker A claims and dies. Its lease expires; a restarted worker's tick re-claims.
     await context.queue.claimDue(context.now(), 10, 100); // 100ms lease
-    await new Promise((resolve) => setTimeout(resolve, 120));
+    now = new Date('2026-08-02T09:00:00.300Z'); // advance the clock past the lease
     const worker = createCompileWorker(context, { leaseDurationMs: 60_000 });
     await worker.tick();
 
@@ -121,8 +134,38 @@ describeIfPostgres('the durable worker on Postgres (GAP-015)', () => {
       maxAttempts: 1,
     });
 
-    const worker = createCompileWorker(context, { leaseDurationMs: 60_000 });
-    await worker.tick();
+    // A provider failure dead-letters the job after maxAttempts: the compile
+    // must fail, so inject a throwing language model for this scenario.
+    const failingProviders: Providers = {
+      mode: 'fake',
+      languageModel: {
+        name: 'fake-throwing',
+        generate: async () => {
+          throw new Error('provider boom');
+        },
+      },
+      speechToText: {
+        name: 'fake',
+        transcribe: async () => {
+          throw new Error('not used');
+        },
+      },
+      textToSpeech: {
+        name: 'fake',
+        synthesise: async () => {
+          throw new Error('not used');
+        },
+      },
+      embeddings: {
+        name: 'fake',
+        embed: async () => undefined,
+      },
+    };
+    const failingWorker = createCompileWorker(
+      { ...context, providers: failingProviders },
+      { leaseDurationMs: 60_000 },
+    );
+    await failingWorker.tick();
 
     const dead = (await context.queue.listByState(LEARNER, 'dead_letter'))[0];
     expect(dead?.state).toBe('dead_letter');
@@ -185,6 +228,13 @@ describeIfPostgres('the durable worker on Postgres (GAP-015)', () => {
   });
 
   it('boots the daemon against Postgres (GAP-020)', async () => {
+    // The daemon bootstraps the PUBLIC schema of the test database (raw URL,
+    // no schema search_path) — clear its fixed-id leftovers so repeated runs
+    // don't collide (the per-test truncateAll only touches the SCHEMA pool).
+    const cleanupPool = createPool(databaseUrl!, { max: 2 });
+    await cleanupPool.query('DELETE FROM jobs WHERE id = $1', ['pg-daemon-job-1']);
+    await cleanupPool.query('DELETE FROM users WHERE id = $1', [LEARNER]);
+    await cleanupPool.end();
     // The daemon's Postgres bootstrap path: pool + migrate + Postgres queue, all wired by env.
     const bundle = await bootstrapDaemon({
       GAPOS_DATABASE_URL: databaseUrl,
@@ -193,6 +243,13 @@ describeIfPostgres('the durable worker on Postgres (GAP-015)', () => {
       GAPOS_LOG_LEVEL: 'error',
     });
     try {
+      // The daemon's DB is FK-enforced: register the owner before enqueueing.
+      await bundle.context.uow.users.create({
+        id: LEARNER,
+        email: `${LEARNER}@example.com`,
+        locale: 'en',
+        timezone: 'UTC',
+      });
       const gap = await seedGap();
       const job = await bundle.context.queue.enqueue(
         LEARNER,
