@@ -168,7 +168,7 @@ export const createPostgresJobQueue = (pool: Pool): JobQueue => {
                 last_error   = $3,
                 leased_until = NULL,
                 available_at = CASE WHEN attempts + 1 >= max_attempts THEN available_at
-                                    ELSE $4 + LEAST(60, POW(2, attempts + 1)) * INTERVAL '1 second'
+                                    ELSE $4::timestamptz + LEAST(60, POW(2, attempts + 1)) * INTERVAL '1 second'
                                END
           WHERE id = $1 AND owner_id = $2 AND state = 'leased'
           RETURNING ${jobColumns}`,

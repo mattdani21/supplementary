@@ -14,6 +14,13 @@ import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 import type { Pool } from 'pg';
 
+// DATE columns (OID 1082) are calendar days, not instants. pg parses them into a
+// JS Date at the SESSION timezone's midnight; mapping that with toISOString()
+// (UTC) shifts the calendar day for any non-UTC session (SAST midnight = the
+// previous day 22:00Z). Keep DATE as its raw string so the day round-trips
+// unchanged — timestamps (timestamptz) are untouched by this parser override.
+pg.types.setTypeParser(1082, (value: string) => value);
+
 export interface PoolOptions {
   readonly max?: number;
   /**
