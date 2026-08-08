@@ -1,0 +1,24 @@
+# The image must be built from sources only. Without these exclusions a checkout that has
+# node_modules/ or .next/ present ships host artefacts into the build context — foreign-
+# platform binaries break `pnpm install --frozen-lockfile`, and the context balloons to
+# hundreds of MB. `.env*` is excluded even though the Dockerfile does not COPY it, so a
+# future `COPY .` can never leak credentials into an image.
+.git
+.gitignore
+**/node_modules
+**/.next
+**/dist
+**/coverage
+**/*.tsbuildinfo
+**/*.tgz
+.env
+.env.*
+!.env.example
+tmp
+.storage
+.toolchain
+.pnpm-store
+.vite
+.vite-temp
+.DS_Store
+core

@@ -21,7 +21,9 @@ _Under active construction (README.md "Status"). Core engine done; not yet deplo
 
 ## Test command
 
-`pnpm verify` (format + lint + typecheck + test). Postgres suites: `GAPOS_TEST_DATABASE_URL=... pnpm test packages/database` (skipped loudly without it).
+pnpm verify
+
+Postgres suites (skipped loudly without GAPOS_TEST_DATABASE_URL): pnpm test packages/database
 
 ## Run command
 
