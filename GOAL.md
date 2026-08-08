@@ -5,7 +5,7 @@ Launch GapOS publicly and get real learners completing verified audio courses
 ## Roadmap
 
 ### M1 — Deployable single-node (close issue #6)
-- [ ] Root Dockerfile that builds and runs apps/web + apps/worker
+- [x] Root Dockerfile that builds and runs apps/web + apps/worker
 - [ ] railway.json (or equivalent) with healthcheck; deployment boots with env config only
 - [ ] Audio proxy / no-S3 storage path so artefacts serve without MinIO (issue #6)
 - [ ] Verify the OPERATIONS.md deployment surface from a fresh checkout (GAP-026)
