@@ -1,6 +1,6 @@
 {
  "schemaVersion": 1,
- "updatedAt": "2026-08-14T19:48:00Z",
+ "updatedAt": "2026-08-14T20:10:35Z",
  "controller": "gapos-controller",
  "tasks": {
   "GAP-035": {
@@ -450,45 +450,45 @@
     }
    ]
   },
-   "GAP-039": {
+  "GAP-039": {
    "status": "done",
    "startedAt": "2026-08-14T19:37:00.000Z",
    "evidence": [
-   {
-    "command": "git status + git log --oneline -5; read specs/quality.md (the contract), tasks/backlog.yaml GAP-039, AGENTS.md; read page.tsx, gap-form.tsx, source-form.tsx, generation-progress.tsx, empty-state.tsx, bootstrap.ts, viewer.ts, api routes (gaps, compile, sources), screens.test.tsx, feedback.test.tsx, status-pill.ts, tab-bar-items.ts",
-    "result": "pass",
-    "note": "Controller loop: clean tree on autopilot/m1-fresh-checkout; GAP-039 ready, dependency GAP-037 done. Contract = specs/quality.md \u00a75 (onboarding + first run): 3-step guided flow (name a gap -> source -> daily minutes -> compile starts immediately), Today never empty after onboarding (compile-in-progress surface until Day 1 lands), skip always available + app usable without onboarding. GAP-037's GenerationProgress (phase label, per-step chips, debug toggle) is the surface to reuse. Compile is synchronous in-process (worker pipeline); source API takes filename/mediaType/text (no URL endpoint \u2014 the flow's URL input fetches client-side into the paste field, same contract). Owner = cookie gapos_owner (viewerOwner), default local-learner; apiFetch sends X-Owner-Id from the same cookie."
-   },
-   {
-    "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm verify (baseline)",
-    "result": "pass",
-    "note": "469 passed | 26 loud skips (matches GAP-038 final). Format, lint, typecheck and the full suite green. Same hermetic note as every E22/E23 task: the sandbox injects GAPOS_PROVIDER_MODE=live without a key, so verify runs with env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL."
-   },
-   {
-    "command": "pnpm exec vitest run apps/web/src/components/onboarding.test.tsx (test-first, red run)",
-    "result": "fail",
-    "note": "Expected red before implementation, for exactly the right reasons: the suite could not load because lib/onboarding.ts, lib/sources.ts and components/onboarding.tsx did not exist yet. The 14 tests already pin the contract: per-owner completion key (gapos.onboarded.<owner>), isOnboardingComplete (absent marker = fresh user -> flow; '1' = completed -> Today), markOnboardingComplete under the same key, the step machine (gap -> source -> minutes -> done + previousOnboardingStep), the deterministic auto-compile idempotency key (onboarding-<gapId>, replay-safe), mediaTypeForFilename (the source-form rule), the 3-step walkthrough markup (step 1 = gap-form title/rawStatement fields, step 2 = source-form filename/content + URL fetch, step 3 = dailyMinutes 5-480 + Start-my-course auto-compile submit, skip on every step), and the Today page integration (fresh owner -> styled empty state with no onboarding markup; defined-but-uncompiled gap -> GenerationProgress compile-in-progress surface, never blank; compiled gap -> continue card, no in-progress surface)."
-   },
-   {
-    "command": "pnpm exec vitest run apps/web (targeted, green)",
-    "result": "pass",
-    "note": "82 tests across 8 files (baseline 68 + 14 onboarding) \u2014 no regressions. The onboarding suite's step-3 regex initially assumed name-before-type attribute order; React renders type first, so the assertion was corrected to accept either order (an assertion-shape fix, not a weakened check). The source-form mediaType refactor onto lib/sources is covered by the existing web API suite."
-   },
-   {
-    "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm verify (final)",
-    "result": "pass",
-    "note": "483 passed | 26 loud skips (baseline 469 -> +14 onboarding tests). Format, lint (eslint), typecheck (strict, noUncheckedIndexedAccess) and the full suite green."
-   },
-   {
-    "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm --filter @gapos/web build + next start on :3125 (GAPOS_DATABASE_URL=postgres://gapos:gapos@localhost:5432/gapos, in-memory storage) + curl smoke",
-    "result": "pass",
-    "note": "Build green: / route 2.56 kB, all routes compile. Runtime smoke against the seeded local DB (MinIO down, same as GAP-038): local-learner / renders the continue-card for the active gap, the designed GenerationProgress card for the featured non-landed gap (empty-state 'Not compiled yet.' with the Add-sources action pointing at the right gap), the track list (3 seeded gaps) \u2014 never blank; a fresh owner (gapos_owner=brand-new-learner) renders the styled 'No tracks yet.' empty state with no onboarding markup in SSR (the guided flow is client-side after hydration: the onboarding strings ship in the / page chunk, confirmed by grepping .next/static/chunks/app/page-*.js). Also caught in the smoke: the sandbox injects GAPOS_PROVIDER_MODE=live, so the server must be started with env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL (same hermetic note as every test invocation); an earlier start without the unset crashed with the typed live-provider guard, which is the architecture working."
-   }
-  ],
+    {
+     "command": "git status + git log --oneline -5; read specs/quality.md (the contract), tasks/backlog.yaml GAP-039, AGENTS.md; read page.tsx, gap-form.tsx, source-form.tsx, generation-progress.tsx, empty-state.tsx, bootstrap.ts, viewer.ts, api routes (gaps, compile, sources), screens.test.tsx, feedback.test.tsx, status-pill.ts, tab-bar-items.ts",
+     "result": "pass",
+     "note": "Controller loop: clean tree on autopilot/m1-fresh-checkout; GAP-039 ready, dependency GAP-037 done. Contract = specs/quality.md \u00a75 (onboarding + first run): 3-step guided flow (name a gap -> source -> daily minutes -> compile starts immediately), Today never empty after onboarding (compile-in-progress surface until Day 1 lands), skip always available + app usable without onboarding. GAP-037's GenerationProgress (phase label, per-step chips, debug toggle) is the surface to reuse. Compile is synchronous in-process (worker pipeline); source API takes filename/mediaType/text (no URL endpoint \u2014 the flow's URL input fetches client-side into the paste field, same contract). Owner = cookie gapos_owner (viewerOwner), default local-learner; apiFetch sends X-Owner-Id from the same cookie."
+    },
+    {
+     "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm verify (baseline)",
+     "result": "pass",
+     "note": "469 passed | 26 loud skips (matches GAP-038 final). Format, lint, typecheck and the full suite green. Same hermetic note as every E22/E23 task: the sandbox injects GAPOS_PROVIDER_MODE=live without a key, so verify runs with env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL."
+    },
+    {
+     "command": "pnpm exec vitest run apps/web/src/components/onboarding.test.tsx (test-first, red run)",
+     "result": "fail",
+     "note": "Expected red before implementation, for exactly the right reasons: the suite could not load because lib/onboarding.ts, lib/sources.ts and components/onboarding.tsx did not exist yet. The 14 tests already pin the contract: per-owner completion key (gapos.onboarded.<owner>), isOnboardingComplete (absent marker = fresh user -> flow; '1' = completed -> Today), markOnboardingComplete under the same key, the step machine (gap -> source -> minutes -> done + previousOnboardingStep), the deterministic auto-compile idempotency key (onboarding-<gapId>, replay-safe), mediaTypeForFilename (the source-form rule), the 3-step walkthrough markup (step 1 = gap-form title/rawStatement fields, step 2 = source-form filename/content + URL fetch, step 3 = dailyMinutes 5-480 + Start-my-course auto-compile submit, skip on every step), and the Today page integration (fresh owner -> styled empty state with no onboarding markup; defined-but-uncompiled gap -> GenerationProgress compile-in-progress surface, never blank; compiled gap -> continue card, no in-progress surface)."
+    },
+    {
+     "command": "pnpm exec vitest run apps/web (targeted, green)",
+     "result": "pass",
+     "note": "82 tests across 8 files (baseline 68 + 14 onboarding) \u2014 no regressions. The onboarding suite's step-3 regex initially assumed name-before-type attribute order; React renders type first, so the assertion was corrected to accept either order (an assertion-shape fix, not a weakened check). The source-form mediaType refactor onto lib/sources is covered by the existing web API suite."
+    },
+    {
+     "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm verify (final)",
+     "result": "pass",
+     "note": "483 passed | 26 loud skips (baseline 469 -> +14 onboarding tests). Format, lint (eslint), typecheck (strict, noUncheckedIndexedAccess) and the full suite green."
+    },
+    {
+     "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm --filter @gapos/web build + next start on :3125 (GAPOS_DATABASE_URL=postgres://gapos:gapos@localhost:5432/gapos, in-memory storage) + curl smoke",
+     "result": "pass",
+     "note": "Build green: / route 2.56 kB, all routes compile. Runtime smoke against the seeded local DB (MinIO down, same as GAP-038): local-learner / renders the continue-card for the active gap, the designed GenerationProgress card for the featured non-landed gap (empty-state 'Not compiled yet.' with the Add-sources action pointing at the right gap), the track list (3 seeded gaps) \u2014 never blank; a fresh owner (gapos_owner=brand-new-learner) renders the styled 'No tracks yet.' empty state with no onboarding markup in SSR (the guided flow is client-side after hydration: the onboarding strings ship in the / page chunk, confirmed by grepping .next/static/chunks/app/page-*.js). Also caught in the smoke: the sandbox injects GAPOS_PROVIDER_MODE=live, so the server must be started with env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL (same hermetic note as every test invocation); an earlier start without the unset crashed with the typed live-provider guard, which is the architecture working."
+    }
+   ],
    "completedAt": "2026-08-14T19:48:00.000Z",
    "notes": "E23 quality spec \u00a75 on Today: first-run onboarding + the compile-in-progress home. (1) OnboardingGate + OnboardingFlow (components/onboarding.tsx): a 3-step guided first run \u2014 step 1 name a gap (gap-form fields: title + rawStatement), step 2 supply a source (source-form fields: filename + pasted content, plus a URL input whose Fetch pulls the page text into the paste field \u2014 same POST /sources contract, no new API), step 3 set daily minutes (5\u2013480) with the Start-my-course submit that auto-compiles: POST /api/gaps -> POST /api/gaps/:id/sources -> POST /api/gaps/:id/compile carrying the deterministic idempotency key onboarding-<gapId> (replay-safe per AGENTS.md \u00a72.6), then persists the per-owner completion marker and lands on Today. Skip is on every step, sets the same marker, and the app is fully usable without onboarding (Today's styled empty state is the server baseline). Completion is persisted in localStorage under gapos.onboarded.<owner> (client-only, read after mount like the audio player's speed, so SSR first paint is always Today \u2014 hydration-safe); the gate also skips onboarding for owners who already have tracks (self-onboarded via /gaps). (2) Today (app/page.tsx) now renders GenerationProgress (GAP-037) for the featured gap while Day 1 has not landed \u2014 phase label / per-step chips / not-compiled empty state with the Add-sources action \u2014 so the home surface is never blank after onboarding, and swaps to the continue card the moment Day 1 lands. (3) Shared media-type rule extracted to lib/sources (mediaTypeForFilename) used by both SourceForm and the flow. Tests written first (onboarding.test.tsx, 14): pure first-run rules (per-owner key, isOnboardingComplete/markOnboardingComplete, step machine + back, deterministic compile key, mediaTypeForFilename), the 3-step walkthrough markup per step with skip on every step, and Today integration (fresh owner -> empty state, defined-but-uncompiled gap -> progress surface, compiled gap -> continue card). No API/schema change (specs/ untouched), no migration, no new server telemetry (the flow rides existing gap/source/compile handlers \u2014 creation, registration and compilation are already metered; the completion marker is a client preference, same precedent as GAP-037/038 UI-only notes). A11y: labels wrap inputs (never placeholder-only), step indicator is role=status, errors role=alert, Back/Continue/Skip are real buttons with the shared focus-visible + pressed-state rules, skip disabled while compiling, no new animation (reduced-motion untouched). Out of scope, untouched: account creation (Phase 0), multi-step URL ingestion server-side (URL is a client-side convenience; the API contract is unchanged)."
   },
- "GAP-014b": {
+  "GAP-014b": {
    "status": "done",
    "completedAt": "2026-08-03T14:28:14.000Z",
    "notes": " Closed: the nine-fixture live scoring run completed and the baselines were recorded (commits f65270d + 1b6426e on the branch: 9/9 PASS \u2014 eval_02 0.9957, eval_03-05/09-10 1.0, eval_06 0.9739, eval_07 0.9742 with the injection recorded as a finding, eval_08 clarified rather than guessing). The live gate test now has baselines to compare against."
@@ -834,6 +834,23 @@
     }
    ],
    "notes": "E23 quality spec \u00a78 on the study surface. (1) Playback speed: a 0.75/1/1.25/1.5/2 cycle button (.player-speed) driven by cyclePlaybackSpeed, persisted per session in localStorage under gapos.playback-speed (read on mount, written on change; try/catch so private mode falls back to 1\u00d7). (2) Transcript: now rendered inside the player as tap-to-seek blocks \u2014 alignTranscriptSegments splits the lesson transcript proportionally to each audio segment's duration on sentence boundaries (start/end = whole-lesson seconds), the block containing the playback position gets transcript__segment--active + aria-current and is scrollIntoView'd (smooth, auto under prefers-reduced-motion) while playing; tapping a block seeks the audio to its start. (3) Fallback: AudioPlayer resolves every segment's signed URL up front; any 401/missing/empty payload flips to the designed AudioFallback (audio-fallback.tsx, GAP-037) with the transcript still readable below \u2014 the raw error string never reaches the surface (the view takes a boolean failed, not an error). (4) Duration: formatDuration (M:SS / H:MM:SS) on Day cards (curriculum lesson rows: 'N questions \u00b7 ~M min \u00b7 X:XX audio') and the study lesson header ('~N minutes \u00b7 X:XX audio'), computed from artefact durationSeconds that the fake TTS already persists. Player mechanics: one hidden <audio> element drives all segments (auto-advance on ended, prefetched URLs so skips never stall, playbackRate reapplied on src change), a native range seek over the whole lesson, prev/next segment skip buttons, tabular-nums time readout. Architecture: lib/audio.ts holds the pure, DOM-free rules (speed cycle, alignment, segmentIndexAtTime, formatting) and AudioPlayerView is the pure presentational surface, so the whole behaviour is tested with renderToStaticMarkup + unit tests exactly like GAP-037 \u2014 no jsdom dependency added. A11y: buttons + range input get the shared focus-visible rule, aria-labels on icon buttons and the seek control, transcript text stays the button's accessible name (no aria-label override), disabled skip buttons at the edges. No API/schema change (specs/ untouched), no migration, no new telemetry (UI-only client behaviour; the audio fetch already rides the existing endpoint)."
+  },
+  "E24-T001": {
+   "status": "done",
+   "startedAt": "2026-08-14T20:10:00.000Z",
+   "completedAt": "2026-08-14T20:10:20.000Z",
+   "evidence": [
+    {
+     "command": "git status + git log --oneline -5; read specs/001-content-engine-epic/{spec,plan,tasks,data-model,quickstart}.md, contracts/*.md, specs/constitution.md, specs/quality.md, AGENTS.md",
+     "result": "pass",
+     "note": "Controller loop: clean tree on autopilot/m1-fresh-checkout (head 8f67296, E24 speckit plan commit). E24 plan read end to end: 43 tasks, 8 phases; MVP = Phase 1 (T001 baseline) + Phase 2 (T002-T006 foundational) + Phase 3 (T007-T018 US1). Instruction: stop and validate after US1, do not proceed past it. E24 backlog entry exists in tasks/backlog.yaml epics but no GAP tasks mirrored yet (that is T040, Phase 8 - out of scope for this session). Evidence per task recorded under E24-T### keys."
+    },
+    {
+     "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm verify (baseline)",
+     "result": "pass",
+     "note": "483 passed | 26 loud skips (509 total), 38 test files passed | 4 skipped (42). Format + lint + typecheck + full suite green on the clean tree at commit 8f67296. Same hermetic note as GAP-034/GAP-035/GAP-039: the sandbox injects GAPOS_PROVIDER_MODE=live without a key, so every verify in this epic runs with env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL."
+    }
+   ]
   }
  },
  "GAP-014b": {

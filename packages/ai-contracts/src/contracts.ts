@@ -273,6 +273,7 @@ export const VERIFICATION_CATEGORIES = [
   'duration_estimate',
   'objective_coverage',
   'prompt_injection',
+  'script_structure',
 ] as const;
 export type VerificationCategory = (typeof VERIFICATION_CATEGORIES)[number];
 

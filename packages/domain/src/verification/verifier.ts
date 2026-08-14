@@ -29,7 +29,8 @@ export type FindingCategory =
   | 'spoken_clarity'
   | 'duration_estimate'
   | 'objective_coverage'
-  | 'prompt_injection';
+  | 'prompt_injection'
+  | 'script_structure';
 
 export interface Finding {
   readonly category: FindingCategory;

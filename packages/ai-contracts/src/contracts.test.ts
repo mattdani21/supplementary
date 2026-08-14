@@ -5,6 +5,7 @@ import {
   GapNormalisationContract,
   LessonPackageContract,
   QuestionSchema,
+  VerificationReportContract,
   detectInjectionAttempts,
   renderEvidenceEnvelope,
   EVIDENCE_FENCE,
@@ -193,6 +194,25 @@ describe('plan and lesson contracts', () => {
       evidence,
     });
     expect(parsed.success).toBe(false);
+  });
+});
+
+describe('verification report contract', () => {
+  it('accepts a finding with the script_structure category', () => {
+    const parsed = VerificationReportContract.schema.safeParse({
+      schemaVersion: '1.0.0',
+      artefactId: 'lesson_1',
+      findings: [
+        {
+          category: 'script_structure',
+          severity: 'critical',
+          targetId: 'lesson_1',
+          finding: 'Day 1 script has no checkpoint question.',
+          suggestedRepair: 'Add a pausePrompt whose prompt text appears in the script.',
+        },
+      ],
+    });
+    expect(parsed.success).toBe(true);
   });
 });
 
