@@ -6,6 +6,7 @@ import {
   LessonPackageContract,
   QuestionSchema,
   VerificationReportContract,
+  ClaimAuditContract,
   detectInjectionAttempts,
   renderEvidenceEnvelope,
   EVIDENCE_FENCE,
@@ -213,6 +214,71 @@ describe('verification report contract', () => {
       ],
     });
     expect(parsed.success).toBe(true);
+  });
+});
+
+describe('claim audit contract', () => {
+  const locator = { sourceId: 's1', chunkId: 'c3', locator: 'p. 12' };
+
+  it('accepts a full audit report with a repaired finding', () => {
+    const parsed = ClaimAuditContract.schema.safeParse({
+      schemaVersion: '1.0.0',
+      artefactId: 'lesson_1',
+      findings: [
+        {
+          targetId: 'q1',
+          category: 'unsupported_claim',
+          severity: 'high',
+          claim: 'Equivalence classes partition the set.',
+          citedLocators: [{ sourceId: 's1', chunkId: 'c2', locator: 'p. 9' }],
+          resolution: 'repaired',
+          supportingLocator: locator,
+        },
+      ],
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it('accepts an audit report with no findings', () => {
+    const parsed = ClaimAuditContract.schema.safeParse({
+      schemaVersion: '1.0.0',
+      artefactId: 'lesson_2',
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it('rejects a malformed resolution', () => {
+    const parsed = ClaimAuditContract.schema.safeParse({
+      schemaVersion: '1.0.0',
+      artefactId: 'lesson_1',
+      findings: [
+        {
+          targetId: 'q1',
+          category: 'unsupported_claim',
+          severity: 'high',
+          claim: 'A claim.',
+          resolution: 'maybe',
+        },
+      ],
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it('rejects a finding whose category is not unsupported_claim', () => {
+    const parsed = ClaimAuditContract.schema.safeParse({
+      schemaVersion: '1.0.0',
+      artefactId: 'lesson_1',
+      findings: [
+        {
+          targetId: 'q1',
+          category: 'objective_coverage',
+          severity: 'high',
+          claim: 'A claim.',
+          resolution: 'none',
+        },
+      ],
+    });
+    expect(parsed.success).toBe(false);
   });
 });
 

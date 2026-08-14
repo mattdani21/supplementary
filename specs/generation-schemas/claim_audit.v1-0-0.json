@@ -1,0 +1,121 @@
+{
+  "$id": "https://gapos.dev/generation-schemas/claim_audit/1.0.0",
+  "title": "claim_audit",
+  "description": "Structured response contract for the \"claim_audit\" model call, version 1.0.0. Generated from packages/ai-contracts; do not edit by hand.",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "artefactId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "findings": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "targetId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "category": {
+            "type": "string",
+            "const": "unsupported_claim"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "critical",
+              "high",
+              "medium",
+              "low"
+            ]
+          },
+          "claim": {
+            "type": "string",
+            "minLength": 1
+          },
+          "citedLocators": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sourceId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "chunkId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "locator": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "sourceId",
+                "chunkId",
+                "locator"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "resolution": {
+            "type": "string",
+            "enum": [
+              "removed",
+              "repaired",
+              "labelled",
+              "none"
+            ]
+          },
+          "supportingLocator": {
+            "type": "object",
+            "properties": {
+              "sourceId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "chunkId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "locator": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "sourceId",
+              "chunkId",
+              "locator"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "targetId",
+          "category",
+          "severity",
+          "claim",
+          "citedLocators",
+          "resolution"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "artefactId",
+    "findings"
+  ],
+  "additionalProperties": false
+}

@@ -37,6 +37,7 @@ export const CONTRACT_NAMES = [
   'verification_report',
   'diagnostic_interpretation',
   'repair_result',
+  'claim_audit',
 ] as const;
 
 export type ContractName = (typeof CONTRACT_NAMES)[number];

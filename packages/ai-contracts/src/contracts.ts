@@ -314,6 +314,40 @@ export const VerificationReportContract = defineContract('verification_report', 
 });
 export type VerificationReport = z.infer<typeof VerificationReportContract.schema>;
 
+/* ------------------------------------------------------- stage F2: claim audit */
+
+/** The recorded resolution of an unsupported claim, before anything can publish (FR-009). */
+export const CLAIM_RESOLUTIONS = ['removed', 'repaired', 'labelled', 'none'] as const;
+export type ClaimResolution = (typeof CLAIM_RESOLUTIONS)[number];
+
+/**
+ * A model pass over each generated lesson that finds claims the supplied sources do not support
+ * and forces a recorded resolution: removed, repaired with a real locator, or labelled as
+ * outside the sources. `resolution: 'none'` means the claim is still unresolved and must block
+ * publication until repaired or excluded.
+ */
+export const ClaimAuditContract = defineContract('claim_audit', '1.0.0', {
+  artefactId: z.string().min(1),
+  findings: z
+    .array(
+      z
+        .object({
+          targetId: z.string().min(1),
+          category: z.literal('unsupported_claim'),
+          severity: z.enum(FINDING_SEVERITIES),
+          /** The claim as generated, so the resolution is auditable against the text. */
+          claim: z.string().min(1),
+          citedLocators: z.array(SourceLocatorSchema).default([]),
+          resolution: z.enum(CLAIM_RESOLUTIONS),
+          /** Required for a 'repaired' resolution: the locator that actually supports it. */
+          supportingLocator: SourceLocatorSchema.optional(),
+        })
+        .strict(),
+    )
+    .default([]),
+});
+export type ClaimAudit = z.infer<typeof ClaimAuditContract.schema>;
+
 /* ----------------------------------------------------------------- stage G: repair */
 
 export const RepairResultContract = defineContract('repair_result', '1.0.0', {
@@ -332,4 +366,5 @@ export const ALL_CONTRACTS = {
   lesson_package: LessonPackageContract,
   verification_report: VerificationReportContract,
   repair_result: RepairResultContract,
+  claim_audit: ClaimAuditContract,
 } as const;
