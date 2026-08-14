@@ -22,6 +22,7 @@ import {
 } from '@gapos/provider-adapters';
 import type { Gap, Source, SourceChunk } from '@gapos/database';
 import { createServerContext, type ServerContext } from './context.js';
+import { runMasteryCheck } from './services/learning-service.js';
 import {
   apiHealth,
   audioUrl,
@@ -73,7 +74,11 @@ interface CurriculumLesson {
   artefacts: { id: string; kind: string }[];
 }
 
-const seedCompiledGap = async (context: ServerContext, owner = OWNER): Promise<string> => {
+const seedCompiledGap = async (
+  context: ServerContext,
+  owner = OWNER,
+  idempotencyKey = 'api-compile-1',
+): Promise<string> => {
   await seedUser(context, owner);
   const created = (await createGap(context, owner, {
     title: 'Relations and proof techniques',
@@ -87,9 +92,9 @@ const seedCompiledGap = async (context: ServerContext, owner = OWNER): Promise<s
     mediaType: 'text/markdown',
     text: SET_THEORY_SOURCE,
   });
-  const outcome = (await compile(context, owner, created.gap.id, {
-    idempotencyKey: 'api-compile-1',
-  })) as { run: { status: string; runId: string } };
+  const outcome = (await compile(context, owner, created.gap.id, { idempotencyKey })) as {
+    run: { status: string; runId: string };
+  };
   expect(outcome.run.status).toBe('complete');
   return created.gap.id;
 };
@@ -288,6 +293,94 @@ describe('the knowledge map (E15)', () => {
     expect(map.nodes.some((n) => n.id === gapId && n.kind === 'gap')).toBe(true);
     expect(map.nodes.filter((n) => n.kind === 'capability').length).toBeGreaterThan(0);
     expect(map.edges.some((e) => e.from === gapId && e.relationship === 'teaches')).toBe(true);
+  });
+
+  it('shows the edge and both nodes once two linked gaps are mastered', async () => {
+    const { context } = buildContext();
+    await seedUser(context);
+
+    // The reference course's objectives share internal prerequisites, so two gaps compiled from
+    // it are linked: mastering either records the prerequisite edges into the owner-wide
+    // knowledge store (GAP-013), which is what the map renders.
+    const masterGap = async (compileKey: string): Promise<string> => {
+      const gapId = await seedCompiledGap(context, OWNER, compileKey);
+      const { lessons } = await curriculumOf(context, OWNER, gapId);
+      const practise = async (sessionId: string) => {
+        for (const lesson of lessons) {
+          for (const question of await context.uow.curricula.listQuestions(OWNER, lesson.id)) {
+            await submitAttemptHandler(context, OWNER, gapId, {
+              questionId: question.id,
+              sessionId,
+              response: question.payload.answer,
+              idempotencyKey: `${compileKey}-${sessionId}-${question.id}`,
+            });
+          }
+        }
+      };
+      await practise('session_1');
+      await practise('session_2');
+      const result = await runMasteryCheck(context, OWNER, gapId);
+      expect(result.filled).toBe(true);
+      return gapId;
+    };
+
+    await masterGap('map-compile-a');
+    const gapB = await masterGap('map-compile-b');
+
+    const map = (await knowledgeMap(context, OWNER, gapB)) as {
+      nodes: { id: string; kind: string }[];
+      edges: { from: string; to: string; relationship: string }[];
+    };
+
+    // Both nodes of the shared prerequisite edge are on the map…
+    expect(map.nodes.some((n) => n.id === 'obj_subset_proof' && n.kind === 'capability')).toBe(
+      true,
+    );
+    expect(map.nodes.some((n) => n.id === 'obj_double_inclusion' && n.kind === 'capability')).toBe(
+      true,
+    );
+    // …and the edge itself, which the mastery checks recorded into the knowledge store.
+    expect(
+      map.edges.some(
+        (e) =>
+          e.from === 'obj_subset_proof' &&
+          e.to === 'obj_double_inclusion' &&
+          e.relationship === 'prerequisite_of',
+      ),
+    ).toBe(true);
+    expect(await context.uow.knowledge.listEdges(OWNER)).not.toHaveLength(0);
+  });
+
+  it('renders knowledge-store edges of every relationship, adding capability nodes', async () => {
+    const { context } = buildContext();
+    const gapId = await seedCompiledGap(context);
+
+    await context.uow.knowledge.addEdge(OWNER, {
+      id: 'edge_extends_1',
+      fromCapability: 'obj_relation_properties',
+      toCapability: 'obj_equivalence_classes',
+      relationship: 'extends',
+      confidence: 0.8,
+    });
+    // A capability no curriculum names: the map must still add it as a node for the edge.
+    await context.uow.knowledge.addEdge(OWNER, {
+      id: 'edge_related_1',
+      fromCapability: 'obj_subset_proof',
+      toCapability: 'cap_quantifier_reasoning',
+      relationship: 'related',
+      confidence: 0.6,
+    });
+
+    const map = (await knowledgeMap(context, OWNER, gapId)) as {
+      nodes: { id: string; kind: string }[];
+      edges: { from: string; to: string; relationship: string }[];
+    };
+
+    expect(map.edges.some((e) => e.relationship === 'extends')).toBe(true);
+    expect(map.edges.some((e) => e.relationship === 'related')).toBe(true);
+    expect(
+      map.nodes.some((n) => n.id === 'cap_quantifier_reasoning' && n.kind === 'capability'),
+    ).toBe(true);
   });
 
   it('stays inside the owner', async () => {

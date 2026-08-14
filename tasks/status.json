@@ -454,13 +454,28 @@
   },
   "GAP-027": {
    "status": "done",
-   "notes": "The knowledge map (E15). knowledgeMap handler builds nodes (the gap + every capability its curriculum teaches + their prerequisites + knowledge-graph edges) and edges (teaches / prerequisite_of / extends / related), owner-scoped. A /gaps/[gapId]/map page renders it as a deterministic BFS-ring SVG with no new dependencies; gap nodes are links, capability nodes carry tooltips. API tests cover the map contents and owner isolation; next build compiles the page.",
+   "notes": "The knowledge map (E15). knowledgeMap handler builds nodes (the gap + every capability its curriculum teaches + their prerequisites + knowledge-graph edges) and edges (teaches / prerequisite_of / extends / related), owner-scoped. A /gaps/[gapId]/map page renders it as a deterministic BFS-ring SVG with no new dependencies; gap nodes are links, capability nodes carry tooltips. API tests cover the map contents and owner isolation; next build compiles the page. Re-verification (2026-08-14): added the spec-acceptance check — after mastering two linked gaps the map shows the prerequisite_of edge and both capability nodes — plus a test that extends/related edges from the knowledge store render with their endpoint nodes; documented GET /gaps/{gapId}/knowledge in specs/openapi.yaml. pnpm verify passes (404 passed | 27 skipped); web build compiles the map page.",
    "completedAt": "2026-08-03T15:29:52.000Z",
    "evidence": [
     {
      "command": "pnpm test apps/web/src/server/api.test.ts",
      "result": "pass",
      "note": "The knowledge map (E15). knowledgeMap handler builds nodes (the gap + every capability its curriculum teaches + their prerequisites + knowledge-graph edges) and edges (teaches / prerequisite_of / extends / related), owner-scoped. A /gaps/[gapId]/map page renders it as a deterministic BFS-ring SVG with no new dependencies; gap nodes are links, capability nodes carry tooltips. API tests cover the map contents and owner isolation; next build compiles the page."
+    },
+    {
+     "command": "pnpm vitest run apps/web/src/server/api.test.ts",
+     "result": "pass",
+     "note": "Spec acceptance now automated: 'after mastering two linked gaps the map shows the edge and both nodes' (two reference gaps mastered via two evidence sessions each + runMasteryCheck; the map for the second shows the prerequisite_of edge obj_subset_proof -> obj_double_inclusion with both capability nodes, and the owner-wide knowledge store holds the mastery-recorded edges). Also covers extends/related edges from the knowledge store rendering with their endpoint capability nodes."
+    },
+    {
+     "command": "pnpm verify",
+     "result": "pass",
+     "note": "404 passed | 27 skipped (loud). Full gate: format + lint + typecheck + tests."
+    },
+    {
+     "command": "pnpm --filter @gapos/web build",
+     "result": "pass",
+     "note": "The /gaps/[gapId]/map page (deterministic BFS-ring SVG, no new dependencies) compiles. Matches the CI web-build step."
     }
    ]
   },

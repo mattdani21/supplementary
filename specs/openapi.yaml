@@ -326,6 +326,27 @@ paths:
               schema: { $ref: '#/components/schemas/CapabilityDetail' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /gaps/{gapId}/knowledge:
+    parameters:
+      - $ref: '#/components/parameters/GapId'
+    get:
+      tags: [gaps]
+      operationId: getKnowledgeMap
+      summary: The knowledge map for a gap
+      description: |
+        The graph the map page renders: the gap and the capabilities its curriculum teaches
+        (plus their prerequisites and any capability a recorded knowledge edge references) as
+        nodes, and `teaches` links from the curriculum plus `prerequisite_of`, `extends` and
+        `related` links from the learner's mastery-recorded knowledge graph as edges. The data is
+        deterministic so the page can lay it out without a server round trip.
+      responses:
+        '200':
+          description: The graph, as nodes and edges.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnowledgeMap' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
 components:
   securitySchemes:
     sessionCookie:
@@ -702,3 +723,30 @@ components:
                   objectiveId: { type: string }
                   dueAt: { type: string, format: date-time }
                   intervalDays: { type: integer }
+
+    KnowledgeNode:
+      type: object
+      required: [id, kind, label]
+      properties:
+        id: { type: string }
+        kind: { type: string, enum: [gap, capability] }
+        label: { type: string }
+
+    KnowledgeEdge:
+      type: object
+      required: [from, to, relationship]
+      properties:
+        from: { type: string }
+        to: { type: string }
+        relationship: { type: string, enum: [teaches, prerequisite_of, extends, related] }
+
+    KnowledgeMap:
+      type: object
+      required: [nodes, edges]
+      properties:
+        nodes:
+          type: array
+          items: { $ref: '#/components/schemas/KnowledgeNode' }
+        edges:
+          type: array
+          items: { $ref: '#/components/schemas/KnowledgeEdge' }
