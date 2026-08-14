@@ -32,6 +32,8 @@ const toVerifiable = (day: number): VerifiableLesson => {
     transcript: lesson.transcript,
     estimatedMinutes: lesson.estimatedMinutes,
     questions: lesson.questions,
+    examples: lesson.examples,
+    pausePrompts: lesson.pausePrompts,
   };
 };
 
@@ -146,6 +148,65 @@ describe('rubric tolerance', () => {
     expect(categories(findings)).toContain('rubric_tolerance');
     // A warning, not a blocker: over-strict grading is a defect but not a wrong fact.
     expect(blocksPublication(findings)).toBe(false);
+  });
+});
+
+describe('lesson structure (E24 US1)', () => {
+  it.each([1, 2, 3])('raises no script_structure finding for reference day %i', (day) => {
+    const lesson = toVerifiable(day);
+    const findings = verifyLesson(lesson, contextFor(lesson));
+    expect(findings.filter((f) => f.category === 'script_structure')).toEqual([]);
+  });
+
+  it('flags a lesson with no checkpoint question as critical, naming the element', () => {
+    const lesson = toVerifiable(1);
+    const noCheckpoint = { ...lesson, pausePrompts: [] };
+    const findings = verifyLesson(noCheckpoint, contextFor(noCheckpoint));
+    const structure = findings.filter((f) => f.category === 'script_structure');
+    expect(
+      structure.some((f) => f.severity === 'critical' && /checkpoint/i.test(f.finding)),
+      findings.map((f) => f.finding).join(' | '),
+    ).toBe(true);
+    expect(blocksPublication(findings)).toBe(true);
+  });
+
+  it('flags a script that opens with a statement about the lesson', () => {
+    const lesson = toVerifiable(1);
+    const meta = {
+      ...lesson,
+      script: `In this lesson we will cover the subset definition. ${lesson.script}`,
+    };
+    const findings = verifyLesson(meta, contextFor(meta));
+    expect(
+      findings.some(
+        (f) => f.category === 'script_structure' && /concrete opening/i.test(f.finding),
+      ),
+    ).toBe(true);
+  });
+
+  it('flags a script with no worked example', () => {
+    const lesson = toVerifiable(1);
+    const noExample = {
+      ...lesson,
+      examples: [],
+      script: `Some sets contain elements and the subset definition is straightforward. ${lesson.pausePrompts?.[0]?.prompt ?? ''} The proof follows the definition.`,
+    };
+    const findings = verifyLesson(noExample, contextFor(noExample));
+    expect(
+      findings.some((f) => f.category === 'script_structure' && /worked example/i.test(f.finding)),
+    ).toBe(true);
+  });
+
+  it('flags list-like prose as a segment violation', () => {
+    const lesson = toVerifiable(1);
+    const listed = {
+      ...lesson,
+      script: `${lesson.pausePrompts?.[0]?.prompt ?? ''} - point one - point two - point three`,
+    };
+    const findings = verifyLesson(listed, contextFor(listed));
+    expect(
+      findings.some((f) => f.category === 'script_structure' && /segment/i.test(f.finding)),
+    ).toBe(true);
   });
 });
 

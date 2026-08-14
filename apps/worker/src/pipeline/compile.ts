@@ -882,6 +882,8 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
         transcript: lesson.transcript,
         estimatedMinutes: lesson.estimatedMinutes,
         questions: lesson.questions,
+        examples: lesson.examples,
+        pausePrompts: lesson.pausePrompts,
       },
       { ...verificationContext, independentSolutions: report.independentSolutions },
     );

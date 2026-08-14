@@ -11,7 +11,12 @@
  */
 
 import type { CurriculumPlan, LessonPackage, Question } from '@gapos/ai-contracts';
-import { WORDS_PER_MINUTE } from '@gapos/domain';
+import {
+  STRUCTURE_ELEMENT_LABELS,
+  WORDS_PER_MINUTE,
+  checkStructuralElements,
+  type StructureElement,
+} from '@gapos/domain';
 import {
   SCORE_DIMENSIONS,
   SCORE_FLOORS,
@@ -360,6 +365,45 @@ const scoreScopeDiscipline = (
   };
 };
 
+/**
+ * Does every published lesson read like a real teacher wrote it (E24 US1, C-01/C-02)?
+ *
+ * The dimension score is the share of lessons that pass all four structural checks: concrete
+ * opening, one idea per segment, a worked example inside the script, and a checkpoint question.
+ * Observations name the missing element per lesson so a regression report says exactly what
+ * read like a model dump.
+ */
+const scoreHumanSounding = (produced: ProducedCurriculum): DimensionScore => {
+  const observations: string[] = [];
+  let passing = 0;
+
+  for (const lesson of produced.lessons) {
+    const failed = checkStructuralElements({
+      script: lesson.script,
+      examples: lesson.examples,
+      pausePrompts: lesson.pausePrompts,
+    }).filter((check) => !check.passes);
+
+    if (failed.length === 0) {
+      passing += 1;
+      continue;
+    }
+
+    for (const check of failed) {
+      observations.push(
+        `Day ${lesson.day} missing ${STRUCTURE_ELEMENT_LABELS[check.element as StructureElement]}: ` +
+          `${check.detail ?? ''}`,
+      );
+    }
+  }
+
+  return {
+    dimension: 'human_sounding',
+    score: ratio(passing, produced.lessons.length),
+    observations,
+  };
+};
+
 /* ---------------------------------------------------------------------- scoring */
 
 export const scoreCurriculum = (
@@ -377,6 +421,7 @@ export const scoreCurriculum = (
     scoreDuplicateContent(produced),
     scoreAnswerLeakage(produced),
     scoreScopeDiscipline(fixture, produced),
+    scoreHumanSounding(produced),
   ];
 
   const dimensions = Object.fromEntries(scores.map((s) => [s.dimension, s])) as Record<

@@ -38,9 +38,7 @@ export const assertTraceability = (
     if (item.evidence.basis === 'general_knowledge') return;
 
     if (item.evidence.locators.length === 0) {
-      violations.push(
-        `${item.kind} ${item.id} claims source grounding but cites no locator.`,
-      );
+      violations.push(`${item.kind} ${item.id} claims source grounding but cites no locator.`);
       return;
     }
 

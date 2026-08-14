@@ -41,7 +41,14 @@ interface LessonView {
   objectiveIds?: string[];
   questions: LessonQuestionView[];
   artefacts: ArtefactView[];
-  package: { transcript: string };
+  package: {
+    transcript: string;
+    pausePrompts?: { atSecond: number; prompt: string; expectedAnswer: string }[];
+    evidence?: {
+      basis: string;
+      locators: readonly { sourceId: string; chunkId: string; locator: string }[];
+    };
+  };
 }
 
 export default async function StudyPage({ params }: { params: Promise<{ gapId: string }> }) {
@@ -115,6 +122,16 @@ export default async function StudyPage({ params }: { params: Promise<{ gapId: s
   // this is what the audio fallback points at when a segment cannot play.
   const transcriptText = lesson.package.transcript;
 
+  // The checkpoint questions pause the audio until the learner responds (E24 US1, FR-004); the
+  // correction surface shows the lesson's own source locators behind the expected answer.
+  const pausePrompts = lesson.package.pausePrompts ?? [];
+  const checkpointLocators = (lesson.package.evidence?.locators ?? []).map((locator) => ({
+    sourceId: locator.sourceId,
+    chunkId: locator.chunkId,
+    locator: locator.locator,
+    sourceName: sourceNames.get(locator.sourceId),
+  }));
+
   return (
     <main>
       <Link href={`/gaps/${gapId}`} className="back-link">
@@ -143,6 +160,8 @@ export default async function StudyPage({ params }: { params: Promise<{ gapId: s
               durationSeconds: artefact.durationSeconds,
             }))}
             transcript={transcriptText}
+            pausePrompts={pausePrompts}
+            checkpointLocators={checkpointLocators}
           />
         ) : (
           <>
@@ -153,6 +172,12 @@ export default async function StudyPage({ params }: { params: Promise<{ gapId: s
               <p className="muted">Transcript unavailable for this lesson.</p>
             )}
           </>
+        )}
+        {pausePrompts.length > 0 && (
+          <p className="muted checkpoint-note">
+            <strong>Checkpoint:</strong> the lesson pauses at the question —{' '}
+            {pausePrompts[0]!.prompt}
+          </p>
         )}
       </section>
 

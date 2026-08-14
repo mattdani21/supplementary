@@ -2,6 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { AudioFallback } from './audio-fallback';
+import { Checkpoint } from './checkpoint';
+import { gradeCheckpoint, pendingCheckpoint, type CheckpointPrompt } from '../lib/checkpoint';
+import type { FeedbackLocator } from './practice-feedback';
 import {
   DEFAULT_PLAYBACK_SPEED,
   PLAYBACK_SPEED_STORAGE_KEY,
@@ -34,13 +37,25 @@ export interface AudioPlayerViewProps {
   readonly onTogglePlay: () => void;
   readonly onCycleSpeed: () => void;
   readonly onSeek: (timeSeconds: number) => void;
+  /** The due checkpoint: playback pauses here until the learner responds (E24 US1). */
+  readonly checkpoint?: {
+    readonly prompt: string;
+    readonly expectedAnswer: string;
+    readonly answerLabel?: string;
+    readonly locators?: readonly FeedbackLocator[];
+    readonly sourcesTabHref: string;
+    readonly result: { correct: boolean } | null;
+    readonly onAnswer: (response: string) => void;
+    readonly onComplete: () => void;
+  };
 }
 
 /**
  * The presentational player surface (GAP-038, E23 quality spec §8): play/pause, segment skip,
  * the 0.75/1/1.25/1.5/2 speed cycle, a seek bar over the whole lesson, and the transcript as
  * scroll-synced tap-to-seek blocks. Pure markup + scroll behaviour; the media controller in
- * `AudioPlayer` owns the <audio> element, the fetch and localStorage.
+ * `AudioPlayer` owns the <audio> element, the fetch and localStorage. When a checkpoint is due
+ * the play control is disabled — a response is required before the lesson continues.
  */
 export function AudioPlayerView({
   segments,
@@ -52,6 +67,7 @@ export function AudioPlayerView({
   onTogglePlay,
   onCycleSpeed,
   onSeek,
+  checkpoint,
 }: AudioPlayerViewProps) {
   const segmentRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const [reducedMotion, setReducedMotion] = useState(false);
@@ -104,6 +120,7 @@ export function AudioPlayerView({
                 type="button"
                 className="player-btn player-btn--play"
                 onClick={onTogglePlay}
+                disabled={checkpoint !== undefined}
                 aria-label={playing ? 'Pause' : 'Play'}
               >
                 {playing ? 'Pause' : 'Play'}
@@ -146,6 +163,19 @@ export function AudioPlayerView({
         )
       )}
 
+      {checkpoint && (
+        <Checkpoint
+          prompt={checkpoint.prompt}
+          expectedAnswer={checkpoint.expectedAnswer}
+          answerLabel={checkpoint.answerLabel}
+          locators={checkpoint.locators}
+          sourcesTabHref={checkpoint.sourcesTabHref}
+          result={checkpoint.result}
+          onAnswer={checkpoint.onAnswer}
+          onComplete={checkpoint.onComplete}
+        />
+      )}
+
       <div className="transcript" aria-label="Transcript">
         <h3 className="transcript__heading">Transcript</h3>
         {!transcript || !transcript.trim() ? (
@@ -186,6 +216,10 @@ interface AudioPlayerProps {
   readonly segments: readonly AudioSegmentView[];
   /** The lesson transcript, aligned to the segments for scroll-sync + tap-to-seek. */
   readonly transcript?: string;
+  /** Checkpoint questions embedded in the audio: playback pauses until answered (E24 US1). */
+  readonly pausePrompts?: readonly CheckpointPrompt[];
+  /** Source locators behind the checkpoint answers, shown in the correction surface. */
+  readonly checkpointLocators?: readonly FeedbackLocator[];
 }
 
 /** Reads the learner cookie client-side (the audio endpoint scopes by X-Owner-Id). */
@@ -208,7 +242,13 @@ const readOwnerId = (): string | undefined => {
  * localStorage. On any audio failure (401/missing) it flips to the designed fallback — the raw
  * error string never reaches the surface (E23 quality spec §8).
  */
-export function AudioPlayer({ gapId, segments, transcript }: AudioPlayerProps) {
+export function AudioPlayer({
+  gapId,
+  segments,
+  transcript,
+  pausePrompts = [],
+  checkpointLocators = [],
+}: AudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [rate, setRate] = useState<PlaybackSpeed>(DEFAULT_PLAYBACK_SPEED);
   const [failed, setFailed] = useState(false);
@@ -220,6 +260,33 @@ export function AudioPlayer({ gapId, segments, transcript }: AudioPlayerProps) {
   );
   const pendingSeek = useRef<number | null>(null);
   const autoPlay = useRef(false);
+  // Checkpoint state (E24 US1): how many prompts have been answered, and the result of the due
+  // one. `due` is derived from the playback position, so seeking past a prompt makes it due.
+  const [answeredCount, setAnsweredCount] = useState(0);
+  const [checkpointResult, setCheckpointResult] = useState<{ correct: boolean } | null>(null);
+  const due = pendingCheckpoint(pausePrompts, currentTime, answeredCount);
+
+  // Pause at the checkpoint: the moment a prompt's position is reached while playing, stop the
+  // audio and require a response before the lesson continues (FR-004, US1 AS3).
+  useEffect(() => {
+    if (!due || !playing) return;
+    const audio = audioRef.current;
+    if (audio && !audio.paused) audio.pause();
+    setPlaying(false);
+  }, [due, playing]);
+
+  const handleCheckpointAnswer = (response: string) => {
+    if (!due) return;
+    setCheckpointResult({ correct: gradeCheckpoint(response, due.expectedAnswer) });
+  };
+
+  const handleCheckpointComplete = () => {
+    setCheckpointResult(null);
+    setAnsweredCount((count) => count + 1);
+    // Resume from exactly where the checkpoint stopped the lesson.
+    const audio = audioRef.current;
+    if (audio && urls[segmentIndex]) void audio.play().catch(() => undefined);
+  };
 
   // Restore the per-session speed preference, then keep it in sync.
   useEffect(() => {
@@ -371,6 +438,19 @@ export function AudioPlayer({ gapId, segments, transcript }: AudioPlayerProps) {
         onTogglePlay={handleTogglePlay}
         onCycleSpeed={handleCycleSpeed}
         onSeek={handleSeek}
+        checkpoint={
+          due
+            ? {
+                prompt: due.prompt,
+                expectedAnswer: due.expectedAnswer,
+                locators: checkpointLocators,
+                sourcesTabHref: `/gaps/${gapId}?tab=sources`,
+                result: checkpointResult,
+                onAnswer: handleCheckpointAnswer,
+                onComplete: handleCheckpointComplete,
+              }
+            : undefined
+        }
       />
     </>
   );

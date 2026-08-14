@@ -24,7 +24,9 @@ import {
   segmentIndexAtTime,
   totalDurationSeconds,
 } from '../lib/audio';
+import { gradeCheckpoint, pendingCheckpoint } from '../lib/checkpoint';
 import { AudioPlayer, AudioPlayerView } from './audio-player';
+import { Checkpoint } from './checkpoint';
 
 /** Small fixture: three audio segments of 30/30/40 seconds (100s total). */
 const SEGMENTS = [
@@ -214,5 +216,97 @@ describe('duration formatting (GAP-038)', () => {
   it('sums segment durations for the lesson total', () => {
     expect(totalDurationSeconds(SEGMENTS)).toBe(100);
     expect(totalDurationSeconds([{ durationSeconds: undefined }])).toBe(0);
+  });
+});
+
+describe('checkpoint pause position (E24 US1, T010)', () => {
+  const PROMPTS = [
+    {
+      atSecond: 45,
+      prompt: 'Say out loud what "arbitrary" is protecting you from.',
+      expectedAnswer: 'Assuming a property the element need not have.',
+    },
+    {
+      atSecond: 90,
+      prompt: 'Which property guarantees nobody is left out?',
+      expectedAnswer: 'Reflexivity.',
+    },
+  ];
+
+  it('has no pending checkpoint before the first pause position', () => {
+    expect(pendingCheckpoint(PROMPTS, 44, 0)).toBeUndefined();
+  });
+
+  it('pauses at the pausePrompt position: the reached prompt is pending', () => {
+    const pending = pendingCheckpoint(PROMPTS, 45, 0);
+    expect(pending?.prompt).toBe(PROMPTS[0]!.prompt);
+    // Still pending while playback is held at the position.
+    expect(pendingCheckpoint(PROMPTS, 60, 0)?.prompt).toBe(PROMPTS[0]!.prompt);
+  });
+
+  it('does not re-ask a checkpoint that has already been answered', () => {
+    expect(pendingCheckpoint(PROMPTS, 90, 1)?.prompt).toBe(PROMPTS[1]!.prompt);
+    expect(pendingCheckpoint(PROMPTS, 120, 2)).toBeUndefined();
+  });
+
+  it('grades a matching checkpoint answer as correct', () => {
+    expect(
+      gradeCheckpoint('assuming a property the element need not have', PROMPTS[0]!.expectedAnswer),
+    ).toBe(true);
+    expect(gradeCheckpoint('Reflexivity', PROMPTS[1]!.expectedAnswer)).toBe(true);
+  });
+
+  it('grades a wrong answer as incorrect', () => {
+    expect(gradeCheckpoint('I have no idea', PROMPTS[0]!.expectedAnswer)).toBe(false);
+    expect(gradeCheckpoint('', PROMPTS[0]!.expectedAnswer)).toBe(false);
+  });
+});
+
+describe('the checkpoint surface (E24 US1, T010)', () => {
+  const locators = [
+    { sourceId: 's1', chunkId: 'c2', locator: 'p. 9', sourceName: 'set-theory-primer.md' },
+  ];
+  const PROMPT = 'Say out loud what "arbitrary" is protecting you from.';
+  const ANSWER = 'Assuming a property the element need not have.';
+
+  const renderCheckpoint = (result: { correct: boolean } | null) =>
+    renderToStaticMarkup(
+      <Checkpoint
+        prompt={PROMPT}
+        expectedAnswer={ANSWER}
+        answerLabel="Your answer"
+        locators={result?.correct === false ? locators : undefined}
+        sourcesTabHref="/gaps/gap_1?tab=sources"
+        result={result}
+        onAnswer={() => undefined}
+        onComplete={() => undefined}
+      />,
+    );
+
+  it('renders the checkpoint question and requires a response before continuing', () => {
+    const html = renderCheckpoint(null);
+    expect(html).toContain('class="checkpoint"');
+    // The question is shown (quotes are HTML-escaped in server markup).
+    expect(html).toContain('Say out loud what');
+    expect(html).toContain('protecting you from');
+    expect(html).toMatch(/<textarea[^>]*required/);
+    expect(html).toContain('Answer');
+    // No continue button while the question is unanswered: a response is required first.
+    expect(html).not.toContain('Continue');
+  });
+
+  it('confirms a correct answer before the lesson continues', () => {
+    const html = renderCheckpoint({ correct: true });
+    expect(html).toContain('✓ Correct');
+    expect(html).toContain('Continue');
+  });
+
+  it('shows the correction surface with the verified answer and source link on a wrong answer', () => {
+    const html = renderCheckpoint({ correct: false });
+    expect(html).toContain('Not quite');
+    expect(html).toContain(ANSWER);
+    expect(html).toContain('set-theory-primer.md');
+    expect(html).toContain('p. 9');
+    expect(html).toMatch(/<a [^>]*href="[^"]*\?tab=sources/);
   });
 });

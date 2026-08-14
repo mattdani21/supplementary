@@ -334,6 +334,86 @@ describe('the scorer detects poor education', () => {
   });
 });
 
+/**
+ * US1 (E24): the human-sounding rubric must be real. A model-dump script — meta-opening,
+ * list-like prose, no worked example, no checkpoint — must score below the floor with the
+ * failing element named. Each case degrades every lesson in the reference curriculum in exactly
+ * one way (FR-006, SC-002).
+ */
+describe('the human-sounding rubric is not decorative (E24 US1)', () => {
+  let baseline: ProducedCurriculum;
+  const fixture = fixtureById('eval_01_set_operations')!;
+
+  beforeAll(async () => {
+    let counter = 0;
+    const context = createServerContext({
+      newId: (prefix) => `${prefix}_${++counter}`,
+      logLevel: 'error',
+    });
+    await context.uow.users.create({
+      id: LEARNER,
+      email: 'eval@example.com',
+      locale: 'en',
+      timezone: 'UTC',
+    });
+    baseline = await compileFixture(context, 'eval_01_set_operations');
+  });
+
+  const degrade = (transform: (lesson: LessonPackage) => LessonPackage): ProducedCurriculum => ({
+    plan: baseline.plan,
+    lessons: baseline.lessons.map(transform),
+  });
+
+  /** The lesson's own checkpoint question, so the degraded scripts keep the other elements. */
+  const promptText = (lesson: LessonPackage): string => lesson.pausePrompts[0]?.prompt ?? '';
+
+  it('catches a meta-opening that talks about the lesson instead of the subject', () => {
+    const scorecard = scoreCurriculum(
+      fixture,
+      degrade((lesson) => ({
+        ...lesson,
+        script: `In this lesson we will cover the subset definition. ${promptText(lesson)} The proof follows the definition.`,
+      })),
+    );
+    expect(scorecard.dimensions.human_sounding.score).toBeLessThan(SCORE_FLOORS.human_sounding);
+    expect(scorecard.dimensions.human_sounding.observations.join(' ')).toMatch(/concrete opening/i);
+  });
+
+  it('catches list-like bulleted prose instead of taught segments', () => {
+    const scorecard = scoreCurriculum(
+      fixture,
+      degrade((lesson) => ({
+        ...lesson,
+        script: `${promptText(lesson)} - point one - point two - point three`,
+      })),
+    );
+    expect(scorecard.dimensions.human_sounding.score).toBeLessThan(SCORE_FLOORS.human_sounding);
+    expect(scorecard.dimensions.human_sounding.observations.join(' ')).toMatch(/segment/i);
+  });
+
+  it('catches a script that never works an example', () => {
+    const scorecard = scoreCurriculum(
+      fixture,
+      degrade((lesson) => ({
+        ...lesson,
+        examples: [],
+        script: `Some sets contain elements and the subset definition is straightforward. ${promptText(lesson)} The proof follows the definition.`,
+      })),
+    );
+    expect(scorecard.dimensions.human_sounding.score).toBeLessThan(SCORE_FLOORS.human_sounding);
+    expect(scorecard.dimensions.human_sounding.observations.join(' ')).toMatch(/worked example/i);
+  });
+
+  it('catches a script with no checkpoint question', () => {
+    const scorecard = scoreCurriculum(
+      fixture,
+      degrade((lesson) => ({ ...lesson, pausePrompts: [] })),
+    );
+    expect(scorecard.dimensions.human_sounding.score).toBeLessThan(SCORE_FLOORS.human_sounding);
+    expect(scorecard.dimensions.human_sounding.observations.join(' ')).toMatch(/checkpoint/i);
+  });
+});
+
 describe('regression comparison', () => {
   const scorecard = {
     fixtureId: 'eval_01_set_operations',

@@ -77,6 +77,18 @@ export const structurallyInvalidLesson = (): unknown => {
   };
 };
 
+/**
+ * A script that reads like a model dump with no checkpoint (E24 US1): the lesson never pauses
+ * the learner, so the `script_structure` verifier must reject it before publication.
+ */
+export const lessonMissingCheckpoint = (day = 1): LessonPackage => {
+  const lesson = referenceLesson(day);
+  return {
+    ...lesson,
+    pausePrompts: [],
+  };
+};
+
 export const verificationWithFindings = (
   artefactId: string,
   overrides: Partial<VerificationReport> = {},

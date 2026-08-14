@@ -461,7 +461,8 @@ const SCRIPTS: Record<number, { title: string; script: string; summary: string }
       'special about the element we picked, the very same argument would have gone through for ' +
       'any other element of A. We did not check them all. We showed that checking any one of ' +
       'them would go the same way. That is what the word arbitrary is carrying, and it is ' +
-      'standing in for infinitely many checks. ' +
+      'standing in for infinitely many checks. Before I continue: say out loud what the word ' +
+      '"arbitrary" is protecting you from. ' +
       'Let me show you where this goes wrong, because the failure is instructive. Suppose you ' +
       'are proving something about a set of numbers, and halfway through you write: and since x ' +
       'is even, we can write x as two k. Stop. You have just stopped talking about an arbitrary ' +
@@ -511,7 +512,8 @@ const SCRIPTS: Record<number, { title: string; script: string; summary: string }
       'something that A does not. A could be a strict subset, a genuinely smaller collection ' +
       'sitting inside a larger one, and everything you proved would still hold. The second ' +
       'inclusion is exactly what closes that gap. One direction gives you at most. Two ' +
-      'directions give you equality. ' +
+      'directions give you equality. Before I continue: say out loud why one inclusion is not ' +
+      'enough to establish equality. ' +
       'In practice I want you to write the two directions as two clearly separate paragraphs, ' +
       'each starting with its own arbitrary element. There is a reason for this beyond ' +
       'tidiness. When the two arguments are tangled together on the page it becomes very easy ' +
@@ -593,7 +595,8 @@ const SCRIPTS: Record<number, { title: string; script: string; summary: string }
       'inclusion means the classes are equal. Notice that you just used yesterday. ' +
       'So the shape of the result is: reflexivity gives coverage, symmetry and transitivity ' +
       'give disjointness, and together they give a partition. If you can say that sentence and ' +
-      'mean it, you understand equivalence relations. ' +
+      'mean it, you understand equivalence relations. Before I continue: say out loud which ' +
+      'property guarantees nobody is left out. ' +
       'Let me give you a concrete one to hold on to. Take the numbers one through six, and ' +
       'relate two numbers when they leave the same remainder on division by three. Reflexive: ' +
       'every number has the same remainder as itself. Symmetric: sameness of remainder does not ' +
@@ -615,6 +618,31 @@ const SCRIPTS: Record<number, { title: string; script: string; summary: string }
   },
 };
 
+/**
+ * The checkpoint question each lesson actually asks (E24 US1, FR-004): the pause prompt's text
+ * appears in the day's script, so the pause is part of the teaching — the human-sounding rubric
+ * verifies exactly this. Calibration-aligned with the scripts above (T015).
+ */
+const PAUSE_PROMPTS: Record<number, { atSecond: number; prompt: string; expectedAnswer: string }> =
+  {
+    1: {
+      atSecond: 45,
+      prompt: 'Before I continue: say out loud what the word "arbitrary" is protecting you from.',
+      expectedAnswer: 'Assuming a property the element need not have.',
+    },
+    2: {
+      atSecond: 45,
+      prompt:
+        'Before I continue: say out loud why one inclusion is not enough to establish equality.',
+      expectedAnswer: 'Because the larger set may contain elements the smaller one does not.',
+    },
+    3: {
+      atSecond: 45,
+      prompt: 'Before I continue: say out loud which property guarantees nobody is left out.',
+      expectedAnswer: 'Reflexivity.',
+    },
+  };
+
 export const referenceLesson = (day: number): LessonPackage => {
   const content = SCRIPTS[day];
   if (!content) throw new Error(`No reference lesson fixture for day ${day}`);
@@ -632,13 +660,7 @@ export const referenceLesson = (day: number): LessonPackage => {
       day === 3
         ? ['Remainders modulo 3 on {1,...,6} give the classes {1,4}, {2,5}, {3,6}.']
         : ['A intersect B is a subset of A.'],
-    pausePrompts: [
-      {
-        atSecond: 45,
-        prompt: 'Before I continue: say out loud what "arbitrary" is protecting you from.',
-        expectedAnswer: 'Assuming a property the element need not have.',
-      },
-    ],
+    pausePrompts: [PAUSE_PROMPTS[day]!],
     questions,
     estimatedMinutes: 5,
     evidence: sourced(`chunk_${day + 1}`, `§${day + 1}`),

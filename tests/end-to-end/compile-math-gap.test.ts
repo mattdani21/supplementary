@@ -17,16 +17,28 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { referenceDiagnostic, referenceNormalisation } from '@gapos/test-fixtures';
+import {
+  lessonMissingCheckpoint,
+  referenceDiagnostic,
+  referenceLesson,
+  referenceNormalisation,
+} from '@gapos/test-fixtures';
 import { findPlanViolations } from '@gapos/domain';
 import type { OwnerId } from '@gapos/database';
 import { createServerContext, type ServerContext } from '../../apps/web/src/server/context.js';
-import { compile } from '../../apps/web/src/server/services/gap-service.js';
+import { applyTransition, compile } from '../../apps/web/src/server/services/gap-service.js';
 import { compileSeededMathGap, MATH_GAP_ID } from '../../scripts/compile-math-gap.js';
+import { seedCurriculum } from '../../scripts/seed-curriculum.js';
 
 const OWNER: OwnerId = 'user_math_compile';
 /** A fixed key so the acceptance's idempotency claim is exercised, not assumed. */
 const IDEMPOTENCY_KEY = 'gap-033-math-compile';
+
+/** The day number the fake provider encodes in a lesson request's subject ("day-2"). */
+const dayFromSubject = (subject: string | undefined): number => {
+  const match = /(\d+)/.exec(subject ?? '');
+  return match?.[1] ? Number(match[1]) : 1;
+};
 
 const buildContext = (): ServerContext => createServerContext({ logLevel: 'error' });
 
@@ -179,5 +191,54 @@ describe('compile the seeded math gap (GAP-033)', () => {
     const lessons = await context.uow.curricula.listLessons(OWNER, first.curriculumId);
     expect(lessons).toHaveLength(first.lessonCount);
     expect(context.costAccountant.spentForRun(first.runId)).toBe(first.costMillicentsAfterCompile);
+  });
+});
+
+describe('a lesson missing a structural element is never published (E24 US1, T009)', () => {
+  it('repairs or excludes a scripted lesson without a checkpoint', async () => {
+    // Script the fake provider: the first lesson package is faulty (no checkpoint question),
+    // every later one — including the repair — is the clean reference content.
+    let faultyServed = false;
+    const context = createServerContext({
+      logLevel: 'error',
+      fake: {
+        script: {
+          lesson_package: (request) => {
+            const day = dayFromSubject(request.subject);
+            if (!faultyServed) {
+              faultyServed = true;
+              return lessonMissingCheckpoint(day);
+            }
+            return referenceLesson(day);
+          },
+        },
+      },
+    });
+
+    await seedCurriculum(context, OWNER);
+    const gap = await context.uow.gaps.get(OWNER, MATH_GAP_ID);
+    if (gap?.status === 'draft') {
+      await applyTransition(context, OWNER, gap.id, { type: 'define' });
+    }
+    const outcome = await compile(context, OWNER, {
+      gapId: MATH_GAP_ID,
+      idempotencyKey: 'e24-us1-faulty-structure',
+    });
+
+    expect(outcome.status, outcome.error ?? 'compile completes').toBe('complete');
+
+    const curriculum = await context.uow.curricula.getForRun(OWNER, outcome.runId);
+    const lessons = await context.uow.curricula.listLessons(OWNER, curriculum!.id);
+    const published = lessons.filter((lesson) => lesson.publicationStatus === 'published');
+
+    expect(published.length).toBeGreaterThan(0);
+    for (const lesson of published) {
+      // The published surface can never carry the faulty script: every published lesson keeps
+      // its checkpoint question (repaired) or the lesson was excluded entirely.
+      expect(
+        lesson.package.pausePrompts.length,
+        `day ${lesson.day} published with a checkpoint question`,
+      ).toBeGreaterThanOrEqual(1);
+    }
   });
 });

@@ -74,6 +74,7 @@ export const SCORE_DIMENSIONS = [
   'duplicate_content',
   'answer_leakage',
   'scope_discipline',
+  'human_sounding',
 ] as const;
 
 export type ScoreDimension = (typeof SCORE_DIMENSIONS)[number];
@@ -94,6 +95,9 @@ export const SCORE_FLOORS: Readonly<Record<ScoreDimension, number>> = {
   duplicate_content: 0.9,
   answer_leakage: 1.0,
   scope_discipline: 1.0,
+  // Calibrated against the reference curricula (T015): every reference lesson passes all four
+  // structural elements; any single-element degradation drops below this floor.
+  human_sounding: 0.75,
 };
 
 /** How far a score may fall below a stored baseline before it counts as a regression. */

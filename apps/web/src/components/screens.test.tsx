@@ -297,6 +297,19 @@ describe('the study surface (GAP-037)', () => {
   });
 });
 
+describe('the checkpoint on the study page (E24 US1, T010)', () => {
+  it('renders the lesson checkpoint question inside the Listen section', async () => {
+    const html = await renderWithShell(
+      await StudyPage({ params: Promise.resolve({ gapId: compiledGapId }) }),
+    );
+
+    // The published lesson carries a pause prompt; the study page surfaces the checkpoint
+    // question next to the player so the learner knows what they will be asked to respond to.
+    expect(html).toContain('Checkpoint');
+    expect(html).toMatch(/say out loud what[^<]*arbitrary[^<]*protecting you from/i);
+  });
+});
+
 describe('duration estimates on Day cards and the lesson header (GAP-038)', () => {
   it('shows the formatted audio duration on curriculum Day cards', async () => {
     const html = await renderWithShell(

@@ -15,6 +15,11 @@
  */
 
 import { DomainError } from '../errors.js';
+import {
+  STRUCTURE_ELEMENT_LABELS,
+  checkStructuralElements,
+  type StructureElement,
+} from '../curriculum/script-structure.js';
 
 export type FindingSeverity = 'critical' | 'high' | 'medium' | 'low';
 
@@ -65,6 +70,10 @@ export interface VerifiableLesson {
   readonly transcript: string;
   readonly estimatedMinutes: number;
   readonly questions: readonly VerifiableQuestion[];
+  /** Declared worked examples; the script must actually work one (FR-003, E24 US1). */
+  readonly examples?: readonly string[];
+  /** Checkpoint questions embedded in the audio (FR-004, E24 US1). */
+  readonly pausePrompts?: readonly { prompt: string }[];
 }
 
 export interface VerificationContext {
@@ -393,11 +402,51 @@ const checkCoverage = (lesson: VerifiableLesson, context: VerificationContext): 
   return findings;
 };
 
+const SUGGESTED_STRUCTURE_REPAIRS: Readonly<Record<StructureElement, string>> = {
+  concrete_opening:
+    'Rewrite the opening to start with a concrete situation, question or problem the learner recognises.',
+  single_idea_per_segment:
+    'Split the script into complete-sentence segments that each teach one idea; remove list markers.',
+  worked_example:
+    'Work a problem step by step inside the script, or quote a declared example in full.',
+  checkpoint:
+    'Add a pause prompt whose question is asked verbatim in the script, and require a response before continuing.',
+};
+
+/**
+ * A lesson script missing any of the four structural elements — concrete opening, one idea per
+ * segment, worked example, checkpoint question — is a critical `script_structure` finding: the
+ * element is repaired (≤ 2 attempts) or the lesson is excluded, never published (FR-007, E24
+ * US1). Consumes the same detectors as the evaluation scorer, so verification and scoring can
+ * never disagree about what "human-sounding" means.
+ */
+export const checkLessonStructure = (lesson: VerifiableLesson): Finding[] => {
+  const checks = checkStructuralElements({
+    script: lesson.script,
+    examples: lesson.examples,
+    pausePrompts: lesson.pausePrompts,
+  });
+
+  return checks
+    .filter((check) => !check.passes)
+    .map((check) => {
+      const element = check.element as StructureElement;
+      return {
+        category: 'script_structure',
+        severity: 'critical' as const,
+        targetId: lesson.id,
+        finding: `Day ${lesson.day} script is missing ${STRUCTURE_ELEMENT_LABELS[element]}: ${check.detail ?? ''}`,
+        suggestedRepair: SUGGESTED_STRUCTURE_REPAIRS[element],
+      };
+    });
+};
+
 /**
  * Run every structural check, plus interpret any independent solutions supplied.
  */
 export const verifyLesson = (lesson: VerifiableLesson, context: VerificationContext): Finding[] => {
   const findings: Finding[] = [
+    ...checkLessonStructure(lesson),
     ...checkCoverage(lesson, context),
     ...checkDuration(lesson),
     ...checkTranscript(lesson),
