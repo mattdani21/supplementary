@@ -99,6 +99,7 @@ export const GENERATION_STEPS = [
   'generate_assessment',
   'verify_artefact',
   'repair_artefact',
+  'audit_claims',
   'synthesise_audio',
   'publish_day',
 ] as const;

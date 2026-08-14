@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  GENERATION_STEPS,
   GENERATION_STATUSES,
   MAX_STEP_ATTEMPTS,
   decideStep,
@@ -10,6 +11,22 @@ import {
   type GenerationStatus,
   type StepRecord,
 } from './state-machine.js';
+
+describe('generation steps', () => {
+  it('records the claim audit as a first-class step (E24)', () => {
+    // The audit_claims step runs per lesson inside the auditing stage, keyed idempotently by
+    // hash(lesson) so a retry never re-charges the audit call.
+    expect(GENERATION_STEPS).toContain('audit_claims');
+    expect(
+      stepKey({
+        runId: 'run_1',
+        step: 'audit_claims',
+        subject: 'cur_1_day1',
+        inputVersion: 'abc123',
+      }),
+    ).toBe('run_1:audit_claims:cur_1_day1:abc123');
+  });
+});
 
 describe('generation state machine', () => {
   it('walks the full pipeline to complete', () => {
