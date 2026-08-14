@@ -1,8 +1,46 @@
 {
  "schemaVersion": 1,
- "updatedAt": "2026-08-14T03:52:00.000Z",
+ "updatedAt": "2026-08-14T04:55:00.000Z",
  "controller": "gapos-controller",
  "tasks": {
+  "GAP-034": {
+   "status": "done",
+   "startedAt": "2026-08-14T04:10:00.000Z",
+   "completedAt": "2026-08-14T04:55:00.000Z",
+   "evidence": [
+    {
+     "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm verify (baseline)",
+     "result": "pass",
+     "note": "Baseline after formatting the pre-existing uncommitted tasks/backlog.yaml (the GAP-034/E22 task definition itself was hand-added without prettier and failed format:check): 411 passed | 26 loud skips. The autopilot sandbox injects GAPOS_PROVIDER_MODE=live without a key, which breaks the hermetic suite, so verify runs with env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL (CI does not set the variable; same note as GAP-032)."
+    },
+    {
+     "command": "pnpm exec vitest run apps/web/src/components/tab-bar.test.tsx (test-first)",
+     "result": "pass",
+     "note": "9 tests, written before the component: (1) tabBarItems always resolves the four shell destinations; Learn/Map point at the first active gap (/gaps/gap_math_to_ml, /gaps/gap_math_to_ml/map) and fall back to /gaps when none; drafts do not count. (2) resolveActiveTab exact-first then containing-tab, root owned only by Today. (3) renderToStaticMarkup markup: semantic <nav aria-label=Primary> with exactly four labelled links and exactly one aria-current=page, switching across all four destinations and a nested gap detail. The test caught a real defect first: with no active gap, Learn+Map both fall back to href /gaps and href-equality marked three tabs active — fixed by item-identity comparison (resolveActiveTab returns one item, TabBar compares by reference). Requires vitest.config.ts to include *.test.tsx and esbuild jsx automatic (repo tsconfig is jsx:preserve for Next)."
+    },
+    {
+     "command": "pnpm exec vitest run apps/web/src/components/tab-bar.test.tsx apps/web/src/server/api.test.ts apps/web/src/app/api/health/route.test.ts tests/end-to-end/pwa.test.ts",
+     "result": "pass",
+     "note": "30 targeted tests: new tab-bar suite plus the web API, health probe and PWA artifact suites — no regressions from the layout shell change."
+    },
+    {
+     "command": "pnpm typecheck && pnpm lint && pnpm format:check",
+     "result": "pass",
+     "note": "Strict TS, ESLint (no-restricted-imports etc.) and Prettier all clean on the new shell code."
+    },
+    {
+     "command": "pnpm --filter @gapos/web build && next start on :3123 + curl /, /gaps, /manifest.webmanifest",
+     "result": "pass",
+     "note": "next build compiles; live smoke against the built app: <nav class=tab-bar aria-label=Primary> with four <a> destinations, exactly one aria-current=page (Today at /, Gaps at /gaps), viewport meta width=device-width, initial-scale=1, viewport-fit=cover, theme-color #0a0a0c, manifest background/theme #0a0a0c. The runtime smoke caught a real architecture bug the build and unit suite cannot: calling tabBarItems() from a 'use client' module in the server layout is a client-boundary violation thrown at serve time — fixed by splitting the pure destination logic into apps/web/src/lib/tab-bar-items.ts (server-safe), leaving only components in the client file. Layout + home page render the shell end to end (empty in-memory store shows the styled empty state; the seeded-track path shares the same listGaps code the /gaps page already proves)."
+    },
+    {
+     "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm verify (final)",
+     "result": "pass",
+     "note": "420 passed | 26 loud skips (baseline 411 -> +9 tab-bar tests). Format, lint, typecheck and the full suite green with the shell in place."
+    }
+   ],
+   "notes": "E22 web-first shell: globals.css carries the design tokens (--bg #0a0a0c, --surface #121214, --surface-2 #1a1a1e, --hairline rgba(255,255,255,0.08), text #f5f5f7/secondary rgba(245,245,247,0.6), --accent #4f8cff, radii 12/16/24, -apple-system SF Pro stack, motion 120/200/320ms with ease-out cubic-bezier(0.22,1,0.36,1) and spring cubic-bezier(0.34,1.56,0.64,1) wired into pressed-state scales) and keeps every class the current pages use so nothing regresses (detail screens get their own restyle in GAP-035). Shell: layout.tsx is async, resolves the four tab destinations from listGaps via tabBarItems, renders the fixed blur tab bar (backdrop-filter 20px saturate(180%), rgba(10,10,12,0.72), env(safe-area-inset-bottom) padding, active tab accent + 4px dot indicator) inside a max-width 430px app-frame centered with hairline gutters on desktop, min-height 100dvh, padding-top safe-area-inset-top, viewport-fit=cover, themeColor #0a0a0c; manifest colors updated. Home page: greeting by hour of day (context.now()), one-tap continue card (Continue -> first active gap's /study, Start -> first gap, none -> hidden) and the track list from listGaps with status pills + min/day + target capability, styled empty state with primary CTA. Motion: PageTransition client wrapper keys the page subtree by pathname so the CSS page-in fade/slide replays on every route change; pressed-state scale(0.92-0.98) on all interactive elements; prefers-reduced-motion kills animations/transitions. Accessibility: semantic <nav aria-label=Primary>, aria-current=page on exactly one tab, focus-visible outlines, keyboard-reachable links. No API/schema change (specs/ untouched), no migration, no new runtime telemetry (UI-only). One design decision: 'active' for Learn/Map = status in {active, mastery_check, review_due}; with the seeded data Learn lands on /gaps/gap_math_to_ml and Map on its /map."
+  },
   "GAP-000": {
    "status": "done",
    "startedAt": "2026-08-02T04:12:00.000Z",

@@ -117,6 +117,11 @@ epics:
     priority: P1
     dependencies: [E2, E3, E4, E11, E14]
     evidence: The three seeded tracks compile and pass plan validation
+  - id: E22
+    title: iOS-minimal app shell (web first, native later)
+    priority: P1
+    dependencies: [E14]
+    evidence: The PWA renders a near-black, Linear/Vercel-style minimal shell with a bottom tab bar
 
 tasks:
   - id: E20
@@ -813,3 +818,64 @@ tasks:
       - compiling the seeded math gap yields a valid plan (plan-validation tests pass)
       - every objective maps to ≥1 lesson, ≥2 retrieval items and ≥1 application item
       - the compile is idempotent: a second run does not duplicate lessons or charges
+  - id: GAP-034
+    title: iOS-minimal design system + app shell (E22)
+    epic: E22
+    priority: P1
+    status: ready
+    goal: 'The PWA gets a near-black, Linear/Vercel-minimal, iOS-sleek shell: design tokens, typography scale, a fixed bottom tab bar (Today / Gaps / Learn / Map), safe-area handling, and a motion-polished landing surface — web-first, ready to re-skin for native later.'
+    scope:
+      - 'design tokens in globals.css: near-black surfaces (#0a0a0c family), hairline borders (rgba white ~8%), iOS system font stack (-apple-system + SF-like), radius scale (12/16/24), accent, motion tokens (spring/ease curves)'
+      - 'a bottom tab bar component (fixed, translucent blur backdrop, active-tab indicator) with four destinations wired to the existing routes: Today (/), Gaps (/gaps), Learn (first active gap or /gaps), Map (/gaps/<first>/map fallback /gaps)'
+      - 'layout.tsx applies the shell: safe-area insets (env(safe-area-inset-*)), viewport-fit=cover, themeColor near-black, max-width phone-frame centering on desktop (<= 430px), PWA manifest colors updated'
+      - 'home page (/): minimal Today surface — greeting, one-tap continue, track list from seeded gaps, empty state styled'
+      - 'motion polish: page fade/slide transitions, pressed-state scale on interactive elements, reduced-motion respect'
+    out_of_scope:
+      - 'restyling every detail page (GAP-035 does gaps/detail/study/mastery/map/review)'
+      - native iOS/Android codegen
+      - new features or data flows
+    dependencies: [GAP-021, GAP-022, GAP-032]
+    acceptance:
+      - 'pnpm verify passes (format + lint + typecheck + tests)'
+      - 'the tab bar renders four labelled destinations and is keyboard/screen-reader reachable (semantic nav, aria-current on active tab)'
+      - 'home page renders the seeded tracks with a continue affordance'
+      - 'no horizontal scroll on 375px viewport; safe-area bottom padding present'
+      - 'a component test asserts the tab bar renders with four links and aria-current tracking'
+  - id: GAP-035
+    title: Detail screens restyled to the design system (E22)
+    epic: E22
+    priority: P2
+    status: ready
+    goal: 'Gaps list, gap detail (Overview/Sources/Curriculum/Learn/Practice/Mastery), study, mastery, map and review screens adopt the E22 design system so the whole app feels like one minimal iOS product.'
+    scope:
+      - 'gaps list: card rows with status pills and min/day, empty state, form surfaces inline'
+      - 'gap detail: workspace tabs (Overview, Sources, Curriculum, Learn, Practice, Mastery) as a segmented control; generation log readable; sources with locator chips'
+      - 'study: audio player surface, transcript, practice items with verified-solution reveal, confidence capture'
+      - 'mastery: objective bars, evidence counts, review schedule'
+      - 'knowledge map and review queue: restyled cards/tables'
+      - 'all interactive elements share pressed-state + focus-visible styling'
+    out_of_scope:
+      - new features, API changes, native app code
+    dependencies: [GAP-034, GAP-022]
+    acceptance:
+      - 'pnpm verify passes'
+      - 'every listed screen uses design tokens (no leftover slate-900 / #0f172a hardcodes)'
+      - 'keyboard focus is visible on all interactive elements'
+      - 'a smoke render test covers gaps list and gap detail with the shell'
+  - id: GAP-036
+    title: PWA install polish + shareable study link (E22)
+    epic: E22
+    priority: P3
+    status: blocked
+    goal: 'The app installs like an iOS app (icon, splash, standalone, safe-area) and a study session is shareable.'
+    scope:
+      - 'app icon + apple-touch-icon + maskable manifest icons'
+      - 'standalone display with status-bar color; launch splash'
+      - "deep link to a specific gap's study screen"
+    out_of_scope:
+      - App Store / Play Store distribution
+    dependencies: [GAP-035]
+    acceptance:
+      - 'manifest icons resolve; lighthouse PWA installability passes on the home route'
+      - 'opening /gaps/<id>/study directly renders the study surface'
+      - 'pnpm verify passes'

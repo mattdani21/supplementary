@@ -5,6 +5,12 @@ const resolvePackage = (name: string) =>
   fileURLToPath(new URL(`./packages/${name}/src/index.ts`, import.meta.url));
 
 export default defineConfig({
+  esbuild: {
+    // Component tests render JSX server-side (renderToStaticMarkup); the repo's tsconfig uses
+    // `jsx: preserve` for Next, so vitest must own the transform — automatic runtime, no
+    // React-in-scope requirement.
+    jsx: 'automatic',
+  },
   resolve: {
     alias: {
       '@gapos/ai-contracts': resolvePackage('ai-contracts'),
@@ -18,7 +24,14 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['packages/**/*.test.ts', 'apps/**/*.test.ts', 'tests/**/*.test.ts'],
+    include: [
+      'packages/**/*.test.ts',
+      'packages/**/*.test.tsx',
+      'apps/**/*.test.ts',
+      'apps/**/*.test.tsx',
+      'tests/**/*.test.ts',
+      'tests/**/*.test.tsx',
+    ],
     exclude: ['**/node_modules/**', '**/dist/**', '**/.next/**'],
     // Integration suites that need Postgres opt in explicitly via GAPOS_TEST_DATABASE_URL.
     passWithNoTests: false,

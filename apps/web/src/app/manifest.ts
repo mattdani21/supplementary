@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: 'A gap-to-mastery learning companion.',
     start_url: '/gaps',
     display: 'standalone',
-    background_color: '#0f172a',
-    theme_color: '#0f172a',
+    background_color: '#0a0a0c',
+    theme_color: '#0a0a0c',
     icons: [
       {
         src: '/icon.svg',
