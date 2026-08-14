@@ -8,6 +8,8 @@
  */
 
 import {
+  SET_THEORY_SECTIONS,
+  claimAuditClean,
   referenceDiagnostic,
   referenceLesson,
   referenceNormalisation,
@@ -55,6 +57,7 @@ export const referenceScript = (): Required<Record<string, FakeHandler>> => ({
     repairedScript: 'Repaired script.',
     addressedFindings: ['Regenerated the failed artefact.'],
   }),
+  claim_audit: (request) => claimAuditClean(request.subject ?? 'artefact'),
 });
 
 export class FakeProviderFailure extends Error {
@@ -63,6 +66,106 @@ export class FakeProviderFailure extends Error {
     this.name = 'FakeProviderFailure';
   }
 }
+
+/** The `[source:… chunk:… at:…]` headers renderEvidenceEnvelope emits before each chunk. */
+const EVIDENCE_HEADER = /\[source:(.+?) chunk:(.+?) at:(.+?)\]/g;
+
+const normaliseKey = (text: string): string =>
+  text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]/gu, '')
+    .trim();
+
+interface EvidenceEntry {
+  readonly sourceId: string;
+  readonly chunkId: string;
+  readonly locator: string;
+}
+
+/**
+ * The fixture content cites evidence by placeholder ids (`src_set_theory_primer` / `chunk_2`,
+ * meaning "the second section"). A competent model cites the chunks it was actually shown, so
+ * the fake rewrites every locator in its response to the real evidence it was given:
+ *
+ *   1. exact id match (`sourceId::chunkId`), as a live model would;
+ *   2. normalized locator match (`§2 Subsets…` → `§ 2. Subsets…`);
+ *   3. the fixture convention `chunk_N` → the Nth section of the cited source (ordinal N−1),
+ *      for locators too coarse to match on their own (`§2`).
+ *
+ * A locator that matches nothing is left untouched — a deliberately wrong citation in a faulty
+ * fixture stays wrong, which is exactly what the traceability invariant must catch.
+ */
+const remapLocators = (value: unknown, evidenceBlock: string): unknown => {
+  const entries: EvidenceEntry[] = [];
+  for (const match of evidenceBlock.matchAll(EVIDENCE_HEADER)) {
+    entries.push({
+      sourceId: match[1]!.trim(),
+      chunkId: match[2]!.trim(),
+      locator: match[3]!.trim(),
+    });
+  }
+  if (entries.length === 0) return value;
+
+  const byId = new Map(entries.map((e) => [`${e.sourceId}::${e.chunkId}`, e]));
+  const byLocator = new Map<string, EvidenceEntry>();
+  for (const entry of entries) byLocator.set(normaliseKey(entry.locator), entry);
+
+  const rewrite = (locator: { sourceId: string; chunkId: string; locator?: string }): void => {
+    const exact = byId.get(`${locator.sourceId}::${locator.chunkId}`);
+    if (exact) {
+      locator.sourceId = exact.sourceId;
+      locator.chunkId = exact.chunkId;
+      return;
+    }
+    if (locator.locator) {
+      const byLoc = byLocator.get(normaliseKey(locator.locator));
+      if (byLoc) {
+        locator.sourceId = byLoc.sourceId;
+        locator.chunkId = byLoc.chunkId;
+        return;
+      }
+    }
+    const ordinal = /^chunk_(\d+)$/.exec(locator.chunkId);
+    if (ordinal) {
+      // The fixtures cite `chunk_N` for "the Nth section". The sourceId in a fixture is a
+      // placeholder (`src_set_theory_primer`), so match on the chunk-id suffix alone — but
+      // only when the envelope's Nth section is actually a primer section, so a citation is
+      // never remapped onto a foreign document's section (e.g. the hostile chunk of the
+      // injection fixture). Require exactly one candidate: a deliberately wrong citation
+      // stays unresolved.
+      const primerSections = new Set(SET_THEORY_SECTIONS.map(normaliseKey));
+      const nthSection = entries.filter(
+        (e) =>
+          primerSections.has(normaliseKey(e.locator)) &&
+          e.chunkId.endsWith(`_c${Number(ordinal[1]) - 1}`),
+      );
+      if (nthSection.length === 1) {
+        locator.sourceId = nthSection[0]!.sourceId;
+        locator.chunkId = nthSection[0]!.chunkId;
+      }
+    }
+  };
+
+  const walk = (node: unknown): void => {
+    if (Array.isArray(node)) {
+      for (const item of node) walk(item);
+      return;
+    }
+    if (typeof node !== 'object' || node === null) return;
+    const record = node as Record<string, unknown>;
+    if (
+      typeof record.sourceId === 'string' &&
+      typeof record.chunkId === 'string' &&
+      typeof record.locator === 'string'
+    ) {
+      rewrite(record as unknown as { sourceId: string; chunkId: string; locator?: string });
+    }
+    for (const value of Object.values(record)) walk(value);
+  };
+
+  walk(value);
+  return value;
+};
 
 export const createFakeLanguageModel = (
   options: FakeLanguageModelOptions = {},
@@ -97,8 +200,10 @@ export const createFakeLanguageModel = (
         );
       }
 
+      const json = remapLocators(handler(request), request.evidenceBlock);
+
       return {
-        json: handler(request),
+        json,
         model: options.model ?? 'fake-large',
         inputTokens: Math.ceil((request.instruction.length + request.evidenceBlock.length) / 4),
         outputTokens: 400,

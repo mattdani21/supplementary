@@ -53,6 +53,7 @@ import RootLayout from '../app/layout';
 import GapsPage from '../app/gaps/page';
 import GapDetailPage from '../app/gaps/[gapId]/page';
 import StudyPage from '../app/gaps/[gapId]/study/page';
+import { SourceLinks } from './source-links';
 import { getServerContext } from '../server/bootstrap';
 import {
   compile,
@@ -327,6 +328,61 @@ describe('duration estimates on Day cards and the lesson header (GAP-038)', () =
       await StudyPage({ params: Promise.resolve({ gapId: compiledGapId }) }),
     );
     expect(html).toMatch(/minutes · \d+:\d{2} audio/);
+  });
+});
+
+/**
+ * T022 (US2, E24): traceability is user-visible. Every published lesson and every practice
+ * question shows the locator(s) behind it, and the source is one step away — a real link to
+ * the Sources tab chunk anchor (C-07, FR-011, SC-006). A general-knowledge item renders the
+ * explicit label instead of a link, and the links keep the quality-spec focus-visible rule.
+ */
+describe('source links on the study surface (E24 US2, T022)', () => {
+  it('renders lesson locator links in Listen and per-question locators before answering', async () => {
+    const html = await renderWithShell(
+      await StudyPage({ params: Promise.resolve({ gapId: compiledGapId }) }),
+    );
+
+    // Every source-grounded link targets the Sources tab chunk anchor, one step from the
+    // content (SC-006).
+    const sourceLinks = [...html.matchAll(/href="(\/gaps\/[^"]*\?tab=sources#chunk-[^"]+)"/g)].map(
+      (match) => match[1],
+    );
+    expect(sourceLinks.length).toBeGreaterThanOrEqual(2); // Listen lesson + at least one question
+    for (const href of sourceLinks) {
+      expect(href).toMatch(new RegExp(`^/gaps/${compiledGapId}\\?tab=sources#chunk-`));
+    }
+
+    // The links are real anchors with accessible names, not bare text.
+    expect(html).toMatch(/<a[^>]*aria-label="Open source[^"]*"/);
+  });
+
+  it('renders the explicit general-knowledge label instead of a link', () => {
+    const html = renderToStaticMarkup(
+      <SourceLinks gapId={compiledGapId} basis="general_knowledge" locators={[]} />,
+    );
+    expect(html).toContain('General knowledge');
+    expect(html).not.toMatch(/<a\b/);
+  });
+
+  it('renders a source locator as a one-step link with an accessible name', () => {
+    const html = renderToStaticMarkup(
+      <SourceLinks
+        gapId={compiledGapId}
+        basis="source"
+        locators={[
+          { sourceId: 's1', chunkId: 'c2', locator: '§2 Subsets', sourceName: 'primer.md' },
+        ]}
+      />,
+    );
+    expect(html).toContain(`href="/gaps/${compiledGapId}?tab=sources#chunk-c2"`);
+    expect(html).toMatch(/aria-label="Open source[^"]*§2 Subsets/);
+    expect(html).toContain('primer.md');
+  });
+
+  it('keeps a visible focus-visible rule for source links', () => {
+    const css = readFileSync(join(process.cwd(), 'apps/web/src/app/globals.css'), 'utf8');
+    expect(css).toMatch(/a:focus-visible/);
   });
 });
 

@@ -8,10 +8,18 @@
  * assertion (SC-003/SC-006).
  */
 
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import type { CurriculumPlan, LessonPackage } from '@gapos/ai-contracts';
 import type { EvidenceItem } from '@gapos/ai-contracts';
-import { assertTraceability } from '@gapos/evaluation';
+import type { OwnerId } from '@gapos/database';
+import { assertTraceability, fixtureById } from '@gapos/evaluation';
+import { createServerContext, type ServerContext } from '../../apps/web/src/server/context.js';
+import {
+  applyTransition,
+  compile,
+  createGap,
+  registerSource,
+} from '../../apps/web/src/server/services/gap-service.js';
 
 const locator = (sourceId: string, chunkId: string) => ({
   sourceId,
@@ -138,5 +146,82 @@ describe('assertTraceability', () => {
       })),
     };
     expect(assertTraceability(p, [generalKnowledge], evidence)).toEqual([]);
+  });
+});
+
+/**
+ * T019 (US2, E24): the invariant against the *compiled* reference curriculum. This is the
+ * machine-checkable form of FR-008/SC-003 — 100% of published objectives, lessons and questions
+ * carry a locator or an explicit general-knowledge label, and every locator resolves to a real
+ * evidence chunk of the gap the curriculum was compiled for.
+ */
+describe('the compiled reference curriculum is fully traceable (E24 US2, T019)', () => {
+  let context: ServerContext;
+  const LEARNER: OwnerId = 'user_traceability';
+  let violations: readonly string[];
+  let status: string;
+
+  beforeAll(async () => {
+    let counter = 0;
+    context = createServerContext({
+      newId: (prefix) => `${prefix}_${++counter}`,
+      logLevel: 'error',
+    });
+    await context.uow.users.create({
+      id: LEARNER,
+      email: 'traceability@example.com',
+      locale: 'en',
+      timezone: 'UTC',
+    });
+
+    const fixture = fixtureById('eval_01_set_operations')!;
+    const gap = await createGap(context, LEARNER, {
+      title: fixture.title,
+      rawStatement: fixture.learnerStatement,
+      dailyMinutes: fixture.dailyMinutes,
+    });
+    if (fixture.source) {
+      await registerSource(context, LEARNER, {
+        gapId: gap.id,
+        filename: fixture.source.filename,
+        mediaType: fixture.source.mediaType,
+        text: fixture.source.text,
+      });
+    }
+    await applyTransition(context, LEARNER, gap.id, { type: 'define' });
+    const outcome = await compile(context, LEARNER, {
+      gapId: gap.id,
+      idempotencyKey: 't019_traceability',
+    });
+    status = outcome.status;
+
+    const curriculum = await context.uow.curricula.get(LEARNER, outcome.curriculumId!);
+    const lessons = await context.uow.curricula.listLessons(LEARNER, outcome.curriculumId!);
+    const evidence: EvidenceItem[] = [];
+    for (const source of await context.uow.sources.listForGap(LEARNER, gap.id)) {
+      for (const chunk of await context.uow.sources.listChunks(LEARNER, source.id)) {
+        evidence.push({
+          sourceId: chunk.sourceId,
+          chunkId: chunk.id,
+          locator: chunk.locator,
+          text: chunk.text,
+        });
+      }
+    }
+
+    violations = assertTraceability(
+      curriculum!.plan,
+      lessons.map((l) => l.package),
+      evidence,
+    );
+  });
+
+  it('compiles to a complete published course', () => {
+    // The invariant is only meaningful on what would actually ship.
+    expect(status).toBe('complete');
+  });
+
+  it('every objective, lesson and question carries a locator or a general-knowledge label, and every locator resolves', () => {
+    expect(violations).toEqual([]);
   });
 });

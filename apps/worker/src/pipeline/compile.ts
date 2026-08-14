@@ -18,6 +18,7 @@
 
 import { createHash } from 'node:crypto';
 import {
+  ClaimAuditContract,
   CurriculumPlanContract,
   DiagnosticInterpretationContract,
   GapNormalisationContract,
@@ -236,7 +237,11 @@ export const compileGap = async (
     // selects chunks by relevance to the learner's question, and a hostile paragraph is
     // typically about nothing — so scanning only what was retrieved silently misses the payload
     // on this run and lets it through on a later query that happens to match it.
-    for (const signal of detectInjectionAttempts(await allChunks(owner, gap.id, deps))) {
+    //
+    // The signals also flow into the verifier (E24 US2, FR-010): an item whose evidence cites
+    // an injected chunk is refused, because the chunk never becomes teaching material.
+    const injectionSignals = detectInjectionAttempts(await allChunks(owner, gap.id, deps));
+    for (const signal of injectionSignals) {
       await uow.generation.addFinding(owner, {
         id: newId('finding'),
         runId: run.id,
@@ -457,6 +462,7 @@ export const compileGap = async (
           plan,
           curriculumId: curriculum.id,
           evidence,
+          injectionSignals,
           step,
           runId: run.id,
           owner,
@@ -473,6 +479,7 @@ export const compileGap = async (
           plan,
           curriculumId: curriculum.id,
           evidence,
+          injectionSignals,
           step,
           runId: run.id,
           owner,
@@ -727,6 +734,8 @@ interface CompileDayParams {
   readonly plan: CurriculumPlan;
   readonly curriculumId: string;
   readonly evidence: readonly EvidenceItem[];
+  /** Chunks flagged as instruction-like (FR-010, E24 US2): items citing them are refused. */
+  readonly injectionSignals: readonly { chunkId: string; excerpt: string }[];
   readonly step: StepContext;
   readonly runId: string;
   readonly owner: OwnerId;
@@ -734,7 +743,8 @@ interface CompileDayParams {
 }
 
 const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
-  const { dayPlan, plan, curriculumId, evidence, step, runId, owner, deps } = params;
+  const { dayPlan, plan, curriculumId, evidence, injectionSignals, step, runId, owner, deps } =
+    params;
   const { uow, providers, metrics, now, newId } = deps;
   const lessonId = `${curriculumId}_day${dayPlan.day}`;
   const planVersion = hash(plan);
@@ -833,6 +843,7 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
       plan.assessmentBlueprint.map((b) => [b.objectiveId, b.targetDifficulty]),
     ),
     plannedObjectiveIds: dayPlan.objectiveIds,
+    injectionSignals,
   };
 
   // Another day teaching the same objectives means this one can be dropped without losing
@@ -873,7 +884,7 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
         ).value,
     );
 
-    findings = verifyLesson(
+    const verifyFindings = verifyLesson(
       {
         id: lessonId,
         day: lesson.day,
@@ -888,7 +899,27 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
       { ...verificationContext, independentSolutions: report.independentSolutions },
     );
 
-    for (const finding of findings) {
+    // Stage F2 (E24 US2, FR-009): a separate model pass audits the lesson for claims the
+    // supplied sources do not support. Its findings merge into the same repair loop, so an
+    // unresolved claim (`resolution: 'none'` → critical) is repaired or excluded, never
+    // published, and every resolved claim is recorded with its resolution. Keyed by
+    // hash(lesson): a repaired lesson is a new input and is audited again; a re-entered run
+    // reuses the recorded audit output and never re-charges.
+    const auditFindings = await auditLessonClaims({
+      lessonId,
+      lesson,
+      evidence,
+      step,
+      runId,
+      owner,
+      day: dayPlan.day,
+      repairAttempts,
+      deps,
+    });
+
+    findings = [...verifyFindings, ...auditFindings];
+
+    for (const finding of verifyFindings) {
       await uow.generation.addFinding(owner, {
         id: newId('finding'),
         runId,
@@ -1100,6 +1131,97 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
 };
 
 /* ------------------------------------------------------------------------- helpers */
+
+/**
+ * Stage F2: the claim audit (E24 US2, C-05, FR-009).
+ *
+ * A separate model pass over the lesson that finds claims the supplied sources do not support,
+ * and forces a recorded resolution before the lesson can publish. It is separate from the
+ * generator and the verifier — a generator must not audit itself (`assertIndependentVerifier`
+ * doctrine). The findings merge into the day's repair loop:
+ *
+ *   - `resolution: 'none'` (unresolved) → `critical` → `decideRepair` refuses the lesson;
+ *   - `removed` / `repaired` / `labelled` → non-blocking, recorded as the finding's resolution
+ *     (`excluded` / `repaired` / `accepted`), so the learner can see what was dropped, fixed or
+ *     flagged as outside the sources.
+ */
+const auditLessonClaims = async (params: {
+  lessonId: string;
+  lesson: LessonPackage;
+  evidence: readonly EvidenceItem[];
+  step: StepContext;
+  runId: string;
+  owner: OwnerId;
+  day: number;
+  repairAttempts: number;
+  deps: CompileDeps;
+}): Promise<Finding[]> => {
+  const { lessonId, lesson, evidence, step, runId, owner, day, repairAttempts, deps } = params;
+
+  const audit = await runStep(
+    step,
+    // Keyed by the lesson content: a repaired lesson is a new input and is audited again; a
+    // re-entered run reuses the recorded output and never re-charges (constitution §7).
+    { step: 'audit_claims', subject: lessonId, inputVersion: hash(lesson) },
+    async () =>
+      (
+        await deps.providers.languageModel.generate({
+          contract: ClaimAuditContract,
+          purpose: 'verification',
+          temperature: 0,
+          runId,
+          userId: owner,
+          subject: `day-${day}`,
+          instruction:
+            'Audit this lesson for claims the supplied evidence does not support. ' +
+            'For every unsupported claim choose exactly one resolution: removed (drop the ' +
+            'claim), repaired (cite a supportingLocator that resolves to the evidence), ' +
+            'labelled (the claim is explicitly general knowledge or outside the sources), or ' +
+            'none (unresolved — this blocks publication). Only report claims the sources ' +
+            'genuinely do not support; do not nitpick phrasing.',
+          evidence,
+        })
+      ).value,
+  );
+
+  const findings: Finding[] = [];
+  for (const finding of audit.findings) {
+    const resolved = finding.resolution !== 'none';
+    const severity = resolved ? 'low' : 'critical';
+    const repairStatus =
+      finding.resolution === 'removed'
+        ? 'excluded'
+        : finding.resolution === 'repaired'
+          ? 'repaired'
+          : finding.resolution === 'labelled'
+            ? 'accepted'
+            : 'open';
+
+    findings.push({
+      category: 'unsupported_claim',
+      severity,
+      targetId: finding.targetId,
+      finding: `Unsupported claim in day ${day}: "${finding.claim}" — resolution: ${finding.resolution}.`,
+      suggestedRepair: resolved
+        ? undefined
+        : 'Remove the claim, repair it with a supporting locator, or label it as outside the sources.',
+    });
+
+    await step.generation.addFinding(owner, {
+      id: deps.newId('finding'),
+      runId,
+      targetId: finding.targetId,
+      category: 'unsupported_claim',
+      severity,
+      finding: `Unsupported claim in day ${day}: "${finding.claim}" — resolution: ${finding.resolution}.`,
+      repairStatus,
+      repairAttempts,
+    });
+    deps.metrics.increment('audit_finding_total', { category: 'unsupported_claim' });
+  }
+
+  return findings;
+};
 
 const requiredObjectivesCovered = (
   plan: CurriculumPlan,

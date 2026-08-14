@@ -549,13 +549,15 @@ export const createPostgresUnitOfWork = (pool: Pool): UnitOfWork => {
         );
         return rows.map(toChunk);
       }
+      // Every chunk competes, ranked by relevance (E24 US2, T019): the planner must be able
+      // to ground a citation in any section of the material, so the tsvector predicate is a
+      // rank, not a filter — non-matching chunks rank last and only appear within the limit.
       const { rows } = await db.query(
         `SELECT c.*
            FROM source_chunks c
            JOIN sources s ON s.id = c.source_id AND s.owner_id = c.owner_id
           WHERE c.owner_id = $1
             AND s.gap_id = $2
-            AND to_tsvector('english', c.text) @@ plainto_tsquery('english', $3)
           ORDER BY ts_rank(to_tsvector('english', c.text), plainto_tsquery('english', $3)) DESC,
                    c.ordinal ASC
           LIMIT $4`,

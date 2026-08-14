@@ -35,7 +35,8 @@ export type FindingCategory =
   | 'duration_estimate'
   | 'objective_coverage'
   | 'prompt_injection'
-  | 'script_structure';
+  | 'script_structure'
+  | 'unsupported_claim';
 
 export interface Finding {
   readonly category: FindingCategory;
@@ -303,18 +304,45 @@ const checkDifficulty = (question: VerifiableQuestion, context: VerificationCont
   ];
 };
 
-const checkSourceSupport = (question: VerifiableQuestion): Finding[] => {
+/**
+ * A source-grounded item must cite a locator, and it must never cite a chunk that was flagged as
+ * instruction-like (FR-010, E24 US2): source text is evidence, never instruction, so an item
+ * built on an injected chunk is refused — repaired or excluded, never published.
+ */
+const checkSourceSupport = (
+  question: VerifiableQuestion,
+  context: VerificationContext,
+): Finding[] => {
   if (question.evidence.basis === 'general_knowledge') return [];
-  if (question.evidence.locators.length > 0) return [];
-  return [
-    {
+  const findings: Finding[] = [];
+
+  if (question.evidence.locators.length === 0) {
+    findings.push({
       category: 'source_support',
       severity: 'high',
       targetId: question.id,
       finding: 'The item claims source grounding but cites no locator.',
       suggestedRepair: 'Cite the chunk the item is drawn from, or relabel it general knowledge.',
-    },
-  ];
+    });
+  }
+
+  const injected = new Set((context.injectionSignals ?? []).map((signal) => signal.chunkId));
+  for (const raw of question.evidence.locators) {
+    const locator = raw as { chunkId?: string };
+    if (locator.chunkId !== undefined && injected.has(locator.chunkId)) {
+      findings.push({
+        category: 'prompt_injection',
+        severity: 'critical',
+        targetId: question.id,
+        finding:
+          `The item cites chunk ${locator.chunkId}, which contains instruction-like text; ` +
+          'evidence from an injected chunk is never taught.',
+        suggestedRepair: 'Regenerate the item without citing the injected chunk.',
+      });
+    }
+  }
+
+  return findings;
 };
 
 const checkGlossary = (lesson: VerifiableLesson, context: VerificationContext): Finding[] => {
@@ -460,7 +488,7 @@ export const verifyLesson = (lesson: VerifiableLesson, context: VerificationCont
       ...checkDistractors(question),
       ...checkRubricTolerance(question),
       ...checkDifficulty(question, context),
-      ...checkSourceSupport(question),
+      ...checkSourceSupport(question, context),
     );
   }
 

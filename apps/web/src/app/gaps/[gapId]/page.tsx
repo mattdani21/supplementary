@@ -191,7 +191,9 @@ export default async function GapDetailPage({
                   <div className="source-row__chips">
                     <span className="chip">{source.chunks.length} chunks</span>
                     {source.chunks.slice(0, 4).map((chunk) => (
-                      <span key={chunk.id} className="chip">
+                      // The anchor the study-page source links resolve to (E24 US2, C-07):
+                      // one step from the content to the supporting source.
+                      <span key={chunk.id} id={`chunk-${chunk.id}`} className="chip">
                         {chunk.id}
                       </span>
                     ))}

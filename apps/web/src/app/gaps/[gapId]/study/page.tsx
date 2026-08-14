@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { AttemptForm, type AttemptQuestion } from '../../../../components/attempt-form';
 import { AudioPlayer } from '../../../../components/audio-player';
 import { EmptyState } from '../../../../components/empty-state';
+import { SourceLinks } from '../../../../components/source-links';
 import { WorkspaceTabs } from '../../../../components/workspace-tabs';
 import { getLesson, listSources, todayView } from '../../../../server/api';
 import { getServerContext } from '../../../../server/bootstrap';
@@ -179,6 +180,15 @@ export default async function StudyPage({ params }: { params: Promise<{ gapId: s
             {pausePrompts[0]!.prompt}
           </p>
         )}
+        {/* Traceability is user-visible (E24 US2, C-07): the locators behind this lesson, one
+            step from the source. A general-knowledge lesson carries the explicit label. */}
+        <SourceLinks
+          gapId={gapId}
+          basis={
+            lesson.package.evidence?.basis === 'general_knowledge' ? 'general_knowledge' : 'source'
+          }
+          locators={checkpointLocators}
+        />
       </section>
 
       <section id="questions" className="practice-section" aria-labelledby="questions-heading">

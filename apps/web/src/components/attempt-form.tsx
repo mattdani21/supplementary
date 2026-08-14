@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { apiFetch } from './api';
 import { ConfidenceControl, type ConfidenceLevel } from './confidence-control';
 import { PracticeFeedback, type FeedbackLocator } from './practice-feedback';
+import { SourceLinks } from './source-links';
 
 export interface AttemptQuestion {
   id: string;
@@ -80,6 +81,9 @@ export function AttemptForm({
   return (
     <form onSubmit={submit} className="card attempt-form">
       <p className="prompt">{question.prompt}</p>
+      {/* The locators behind this item are visible BEFORE answering (E24 US2, C-07): the
+          learner sees what the question rests on, not only after a wrong answer. */}
+      <SourceLinks gapId={gapId} locators={question.locators ?? []} />
       {question.options ? (
         <label>
           <select name="response" required>

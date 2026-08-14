@@ -6,7 +6,12 @@
  * to catch, so "a faulty provider fixture is rejected and repaired" is a test rather than a hope.
  */
 
-import type { LessonPackage, RepairResult, VerificationReport } from '@gapos/ai-contracts';
+import type {
+  ClaimAudit,
+  LessonPackage,
+  RepairResult,
+  VerificationReport,
+} from '@gapos/ai-contracts';
 import { referenceLesson } from './reference-curriculum.js';
 
 /** The answer is visible inside the prompt, so the item measures reading, not knowledge. */
@@ -137,4 +142,59 @@ export const ineffectiveRepair = (targetId = 'q_d1_r1'): RepairResult => ({
   targetId,
   repairedQuestions: lessonWithInvalidDistractor().questions.filter((q) => q.id === targetId),
   addressedFindings: ['Attempted to rewrite the distractor.'],
+});
+
+/* ----------------------------------------------------------- claim audit (E24 US2) */
+
+/** The audit found no unsupported claims: the lesson publishes unchanged (T020). */
+export const claimAuditClean = (artefactId = 'lesson-1'): ClaimAudit => ({
+  schemaVersion: '1.0.0',
+  artefactId,
+  findings: [],
+});
+
+/**
+ * The audit found a claim the sources do not support and recorded NO resolution. `resolution:
+ * 'none'` is the unresolved state — the pipeline must refuse the lesson until it is repaired or
+ * excluded (FR-009, T020).
+ */
+export const claimAuditUnresolved = (artefactId = 'lesson-1'): ClaimAudit => ({
+  schemaVersion: '1.0.0',
+  artefactId,
+  findings: [
+    {
+      targetId: 'q_d1_r1',
+      category: 'unsupported_claim',
+      severity: 'high',
+      claim: 'Every subset relation is reflexive.',
+      citedLocators: [
+        {
+          sourceId: 'src_set_theory_primer',
+          chunkId: 'chunk_2',
+          locator: '§2 Subsets and set equality',
+        },
+      ],
+      resolution: 'none',
+    },
+  ],
+});
+
+/**
+ * The audit found a claim outside the sources and explicitly labelled it as such: a recorded
+ * resolution (`labelled`), so the lesson may publish with the finding recorded as `accepted`
+ * (T020).
+ */
+export const claimAuditLabelled = (artefactId = 'lesson-1'): ClaimAudit => ({
+  schemaVersion: '1.0.0',
+  artefactId,
+  findings: [
+    {
+      targetId: 'q_d1_r1',
+      category: 'unsupported_claim',
+      severity: 'medium',
+      claim: 'This proof technique is the one used across most university courses.',
+      citedLocators: [],
+      resolution: 'labelled',
+    },
+  ],
 });

@@ -263,8 +263,11 @@ export const createMemoryUnitOfWork = (store: MemoryStore = createMemoryStore())
         return { chunk, score: terms.filter((t) => text.includes(t)).length };
       });
 
+      // Every chunk competes, ranked by relevance: a planner must be able to ground a
+      // citation in any section of the learner's material, and a relevance filter that
+      // silently hides most sections starves it (E24 US2, T019). The limit still bounds the
+      // prompt; zero-overlap chunks sort last and only appear when the source is small.
       return scored
-        .filter((s) => s.score > 0)
         .sort((a, b) => b.score - a.score || a.chunk.ordinal - b.chunk.ordinal)
         .slice(0, limit)
         .map((s) => s.chunk);

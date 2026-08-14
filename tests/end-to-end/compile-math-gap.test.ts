@@ -18,6 +18,8 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  claimAuditLabelled,
+  claimAuditUnresolved,
   lessonMissingCheckpoint,
   referenceDiagnostic,
   referenceLesson,
@@ -240,5 +242,114 @@ describe('a lesson missing a structural element is never published (E24 US1, T00
         `day ${lesson.day} published with a checkpoint question`,
       ).toBeGreaterThanOrEqual(1);
     }
+  });
+});
+
+/**
+ * T020 (US2, E24): the claim audit is a real publication gate. An unsupported claim with no
+ * recorded resolution must block publication (repair → repair → exclude, never ship); a labelled
+ * resolution must publish with the finding's resolution recorded; the clean default must publish
+ * unchanged with no `unsupported_claim` findings (FR-009, SC-003).
+ *
+ * A generous budget is set because an unresolved claim walks the full repair ladder (three
+ * audit rounds per lesson) — the default run budget would degrade the run before the ladder
+ * completes, which would test the budget, not the audit.
+ */
+describe('the claim audit blocks or records every unsupported claim (E24 US2, T020)', () => {
+  const OWNER_AUDIT: OwnerId = 'user_math_audit';
+  const BUDGET = { perRunMillicents: 500_000, perUserDailyMillicents: 10_000_000 };
+
+  const compileMathGap = async (context: ServerContext, key: string) => {
+    await seedCurriculum(context, OWNER_AUDIT);
+    const gap = await context.uow.gaps.get(OWNER_AUDIT, MATH_GAP_ID);
+    if (gap?.status === 'draft') {
+      await applyTransition(context, OWNER_AUDIT, gap.id, { type: 'define' });
+    }
+    return compile(context, OWNER_AUDIT, { gapId: MATH_GAP_ID, idempotencyKey: key });
+  };
+
+  it('refuses publication while an unsupported claim has no recorded resolution', async () => {
+    const context = createServerContext({
+      logLevel: 'error',
+      budget: BUDGET,
+      fake: { script: { claim_audit: () => claimAuditUnresolved() } },
+    });
+    await context.uow.users.create({
+      id: OWNER_AUDIT,
+      email: 'math-audit@example.com',
+      locale: 'en',
+      timezone: 'UTC',
+    });
+
+    const outcome = await compileMathGap(context, 'e24-us2-unresolved-claim');
+    // The whole run cannot publish: every lesson carries an unresolved claim.
+    expect(outcome.status).toBe('partial');
+
+    const findings = await context.uow.generation.listFindings(OWNER_AUDIT, outcome.runId);
+    const unresolved = findings.filter(
+      (f) => f.category === 'unsupported_claim' && f.repairStatus === 'open',
+    );
+    expect(unresolved.length, 'unresolved claims are recorded as open findings').toBeGreaterThan(0);
+
+    const curriculum = await context.uow.curricula.getForRun(OWNER_AUDIT, outcome.runId);
+    const lessons = await context.uow.curricula.listLessons(OWNER_AUDIT, curriculum!.id);
+    const published = lessons.filter((lesson) => lesson.publicationStatus === 'published');
+    expect(published.length, 'no lesson with an unresolved claim is ever published').toBe(0);
+  });
+
+  it('publishes a labelled resolution and records the finding as accepted', async () => {
+    const context = createServerContext({
+      logLevel: 'error',
+      budget: BUDGET,
+      fake: { script: { claim_audit: () => claimAuditLabelled() } },
+    });
+    await context.uow.users.create({
+      id: OWNER_AUDIT,
+      email: 'math-audit@example.com',
+      locale: 'en',
+      timezone: 'UTC',
+    });
+
+    const outcome = await compileMathGap(context, 'e24-us2-labelled-claim');
+    expect(outcome.status, outcome.error ?? 'labelled claims do not block').toBe('complete');
+
+    const findings = await context.uow.generation.listFindings(OWNER_AUDIT, outcome.runId);
+    const labelled = findings.filter(
+      (f) => f.category === 'unsupported_claim' && f.repairStatus === 'accepted',
+    );
+    expect(labelled.length, 'the labelled resolution is recorded as accepted').toBeGreaterThan(0);
+
+    const curriculum = await context.uow.curricula.getForRun(OWNER_AUDIT, outcome.runId);
+    const lessons = await context.uow.curricula.listLessons(OWNER_AUDIT, curriculum!.id);
+    expect(lessons.some((lesson) => lesson.publicationStatus === 'published')).toBe(true);
+  });
+
+  it('publishes unchanged when the audit finds no unsupported claims', async () => {
+    const context = createServerContext({ logLevel: 'error', budget: BUDGET });
+    await context.uow.users.create({
+      id: OWNER_AUDIT,
+      email: 'math-audit@example.com',
+      locale: 'en',
+      timezone: 'UTC',
+    });
+
+    const outcome = await compileMathGap(context, 'e24-us2-clean-claims');
+    expect(outcome.status, outcome.error ?? 'clean compile completes').toBe('complete');
+
+    // The audit really ran (per lesson) even though it found nothing: a passing clean test
+    // must not be explained by the audit step being absent.
+    const steps = await context.uow.generation.listSteps(OWNER_AUDIT, outcome.runId);
+    expect(
+      steps.some((s) => s.step === 'audit_claims'),
+      'audit_claims ran on this run',
+    ).toBe(true);
+
+    const findings = await context.uow.generation.listFindings(OWNER_AUDIT, outcome.runId);
+    expect(findings.filter((f) => f.category === 'unsupported_claim')).toHaveLength(0);
+
+    const curriculum = await context.uow.curricula.getForRun(OWNER_AUDIT, outcome.runId);
+    const lessons = await context.uow.curricula.listLessons(OWNER_AUDIT, curriculum!.id);
+    const published = lessons.filter((lesson) => lesson.publicationStatus === 'published');
+    expect(published.length).toBeGreaterThan(0);
   });
 });
