@@ -11,7 +11,11 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { createLogger, createMetrics, CostAccountant } from '@gapos/observability';
 import { createLiveSpeechToText } from './live/speech-to-text.js';
 import { createLiveEmbeddings } from './live/embeddings.js';
-import { createLiveLanguageModel, createLiveLanguageModelFromEnv } from './live/language-model.js';
+import {
+  createLiveLanguageModel,
+  createLiveLanguageModelFromEnv,
+  LOCAL_LLM_BASE_URL,
+} from './live/language-model.js';
 import { createProviders } from './factory.js';
 
 const audioBytes = new Uint8Array([0, 1, 2, 3, 4]);
@@ -92,11 +96,13 @@ describe('live speech-to-text backend', () => {
 });
 
 describe('provider routing (E17) and the local preset (E18)', () => {
-  const completionFetch = (capture: { bodies: { model?: string; authorization?: string }[] }) =>
-    scriptedFetch(async (_url, init) => {
+  const completionFetch = (capture: {
+    bodies: { url: string; model?: string; authorization?: string }[];
+  }) =>
+    scriptedFetch(async (url, init) => {
       const body = JSON.parse(String(init.body)) as { model?: string };
       const headers = (init.headers ?? {}) as Record<string, string>;
-      capture.bodies.push({ model: body.model, authorization: headers.authorization });
+      capture.bodies.push({ url, model: body.model, authorization: headers.authorization });
       return {
         status: 200,
         body: {
@@ -116,7 +122,9 @@ describe('provider routing (E17) and the local preset (E18)', () => {
   });
 
   it('routes the model by call purpose', async () => {
-    const capture: { bodies: { model?: string; authorization?: string }[] } = { bodies: [] };
+    const capture: { bodies: { url: string; model?: string; authorization?: string }[] } = {
+      bodies: [],
+    };
     const backend = createLiveLanguageModel({
       apiKey: 'key',
       model: 'default-model',
@@ -135,7 +143,9 @@ describe('provider routing (E17) and the local preset (E18)', () => {
   });
 
   it('parses the routing table from the environment', async () => {
-    const capture: { bodies: { model?: string; authorization?: string }[] } = { bodies: [] };
+    const capture: { bodies: { url: string; model?: string; authorization?: string }[] } = {
+      bodies: [],
+    };
     const backend = createLiveLanguageModelFromEnv(
       {
         GAPOS_LLM_API_KEY: 'key',
@@ -148,13 +158,16 @@ describe('provider routing (E17) and the local preset (E18)', () => {
   });
 
   it('assembles the local preset without any key (E18)', async () => {
-    const capture: { bodies: { model?: string; authorization?: string }[] } = { bodies: [] };
+    const capture: { bodies: { url: string; model?: string; authorization?: string }[] } = {
+      bodies: [],
+    };
     const backend = createLiveLanguageModelFromEnv(
       { GAPOS_LLM_MODE: 'local' },
       completionFetch(capture),
     );
     const completion = await backend.complete(request('teaching'));
     expect(completion.json).toEqual({ ok: true });
+    expect(capture.bodies[0]?.url).toBe(`${LOCAL_LLM_BASE_URL}/chat/completions`);
     expect(capture.bodies[0]?.model).toBe('qwen2.5:7b-instruct');
     expect(capture.bodies[0]?.authorization).toBeUndefined();
   });
