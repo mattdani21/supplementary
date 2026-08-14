@@ -12,6 +12,8 @@ export interface AttemptQuestion {
   hint?: string;
 }
 
+const CONFIDENCE_LEVELS = ['low', 'medium', 'high'] as const;
+
 export function AttemptForm({
   gapId,
   sessionId,
@@ -34,6 +36,7 @@ export function AttemptForm({
     setBusy(true);
     setError(null);
     const form = new FormData(event.currentTarget);
+    const confidence = String(form.get('confidence') ?? '');
     try {
       const outcome = (await apiFetch(`/api/gaps/${gapId}/attempts`, {
         method: 'POST',
@@ -41,6 +44,7 @@ export function AttemptForm({
           questionId: question.id,
           sessionId,
           response: String(form.get('response') ?? ''),
+          ...(confidence ? { confidence } : {}),
           idempotencyKey: `web-${question.id}-${Date.now()}`,
         }),
       })) as { attempt: { correct: boolean; feedback: { answer: string } } };
@@ -55,11 +59,14 @@ export function AttemptForm({
 
   if (result) {
     return (
-      <div className={`attempt ${result.correct ? 'attempt-correct' : 'attempt-wrong'}`}>
-        <p>
-          {result.correct ? '✓ Correct' : '✗ Not quite'} — model answer: {result.feedback.answer}
-        </p>
-        <button onClick={() => setResult(null)}>Try the next one</button>
+      <div
+        className={`attempt-result ${result.correct ? 'attempt-result--correct' : 'attempt-result--wrong'}`}
+      >
+        <p className="attempt-result__verdict">{result.correct ? '✓ Correct' : '✗ Not quite'}</p>
+        <p className="attempt-result__answer">Verified solution: {result.feedback.answer}</p>
+        <button type="button" className="btn" onClick={() => setResult(null)}>
+          Try the next one
+        </button>
       </div>
     );
   }
@@ -86,14 +93,23 @@ export function AttemptForm({
       )}
       {question.hint && (
         <p>
-          <button type="button" onClick={() => setRevealedHint((v) => !v)}>
+          <button type="button" className="btn" onClick={() => setRevealedHint((v) => !v)}>
             {revealedHint ? 'Hide hint' : 'Show hint'}
           </button>
           {revealedHint && <span className="hint"> {question.hint}</span>}
         </p>
       )}
+      <fieldset className="confidence">
+        <legend>How sure are you?</legend>
+        {CONFIDENCE_LEVELS.map((level) => (
+          <label key={level} className="confidence__option">
+            <input type="radio" name="confidence" value={level} />
+            <span>{level}</span>
+          </label>
+        ))}
+      </fieldset>
       {error && <p className="error">{error}</p>}
-      <button type="submit" disabled={busy}>
+      <button type="submit" className="btn btn--primary" disabled={busy}>
         {busy ? 'Checking…' : 'Answer'}
       </button>
     </form>

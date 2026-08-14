@@ -328,6 +328,117 @@ export const masteryView = async (
   mastery: await assessMastery(context, owner, gapId),
 });
 
+export interface GenerationLogStep {
+  readonly step: string;
+  readonly state: string;
+  readonly attempt: number;
+  readonly error?: string;
+}
+
+export interface GenerationLogFinding {
+  readonly category: string;
+  readonly severity: string;
+  readonly finding: string;
+}
+
+export interface GenerationLog {
+  readonly run?: {
+    readonly id: string;
+    readonly status: string;
+    readonly pipelineVersion: string;
+    readonly costMillicents: number;
+    readonly startedAt: string;
+    readonly error?: string;
+  };
+  readonly steps: readonly GenerationLogStep[];
+  readonly findings: readonly GenerationLogFinding[];
+}
+
+/**
+ * The generation log for a gap's current curriculum (GAP-035): the run record, its steps and
+ * any audit findings, read-only. Purely additive — it surfaces data the review queue already
+ * reads, so the detail screen can show the learner what the compiler did and what it flagged.
+ */
+export const generationLog = async (
+  context: ServerContext,
+  owner: OwnerId,
+  gapId: string,
+): Promise<{ log: GenerationLog }> => {
+  const curriculum = await context.uow.curricula.getCurrentForGap(owner, gapId);
+  if (!curriculum?.runId) return { log: { steps: [], findings: [] } };
+
+  const [run, steps, findings] = await Promise.all([
+    context.uow.generation.getRun(owner, curriculum.runId),
+    context.uow.generation.listSteps(owner, curriculum.runId),
+    context.uow.generation.listFindings(owner, curriculum.runId),
+  ]);
+
+  return {
+    log: {
+      ...(run
+        ? {
+            run: {
+              id: run.id,
+              status: run.status,
+              pipelineVersion: run.pipelineVersion,
+              costMillicents: run.costMillicents,
+              startedAt: run.startedAt.toISOString(),
+              ...(run.error ? { error: run.error } : {}),
+            },
+          }
+        : {}),
+      steps: steps.map((step) => ({
+        step: step.step,
+        state: step.state,
+        attempt: step.attempt,
+        ...(step.error ? { error: step.error } : {}),
+      })),
+      findings: findings.map((finding) => ({
+        category: finding.category,
+        severity: finding.severity,
+        finding: finding.finding,
+      })),
+    },
+  };
+};
+
+export interface MasteryScheduleItem {
+  readonly id: string;
+  readonly objectiveId: string;
+  readonly dueAt: string;
+  readonly intervalDays: number;
+  readonly reason: string;
+  readonly state: string;
+}
+
+/**
+ * The due review schedule for a gap's current curriculum (GAP-035): the spaced-repetition
+ * items the learner still owes. Read-only and per-gap, so the mastery screen can show what is
+ * coming up next alongside the objective bars.
+ */
+export const masterySchedule = async (
+  context: ServerContext,
+  owner: OwnerId,
+  gapId: string,
+): Promise<{ reviews: MasteryScheduleItem[] }> => {
+  const curriculum = await context.uow.curricula.getCurrentForGap(owner, gapId);
+  if (!curriculum) return { reviews: [] };
+
+  const due = await context.uow.mastery.listDueReviews(owner, context.now());
+  return {
+    reviews: due
+      .filter((review) => review.curriculumId === curriculum.id)
+      .map((review) => ({
+        id: review.id,
+        objectiveId: review.objectiveId,
+        dueAt: review.dueAt.toISOString(),
+        intervalDays: review.intervalDays,
+        reason: review.reason,
+        state: review.state,
+      })),
+  };
+};
+
 export interface ReviewQueueItem {
   readonly lessonId: string;
   readonly lessonTitle: string;

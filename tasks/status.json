@@ -1,8 +1,56 @@
 {
  "schemaVersion": 1,
- "updatedAt": "2026-08-14T05:00:00.000Z",
+ "updatedAt": "2026-08-14T05:17:57.000Z",
  "controller": "gapos-controller",
  "tasks": {
+  "GAP-035": {
+   "status": "done",
+   "startedAt": "2026-08-14T05:01:06.000Z",
+   "evidence": [
+    {
+     "command": "git status + git log --oneline -5; read tasks/backlog.yaml GAP-035; read AGENTS.md",
+     "result": "pass",
+     "note": "Controller loop: repo clean on autopilot/m1-fresh-checkout; GAP-034 (b2a0fe1) shipped the E22 shell (design tokens in globals.css, tab bar, Today surface). GAP-035 dependencies satisfied: GAP-034 done, GAP-022 done."
+    },
+    {
+     "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm verify (baseline)",
+     "result": "pass",
+     "note": "420 passed | 26 loud skips. Same hermetic note as GAP-034: the sandbox injects GAPOS_PROVIDER_MODE=live without a key, so every verify in this task runs with env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL."
+    },
+    {
+     "command": "pnpm exec vitest run apps/web/src/components/screens.test.tsx (test-first)",
+     "result": "pass",
+     "note": "Smoke render test written BEFORE the restyle: apps/web/src/components/screens.test.tsx (lives in apps/web, not tests/end-to-end, because pnpm isolates react-dom to apps/web \u2014 the GAP-034 tab-bar test set the same precedent). It mocks next/headers (cookies) + next/navigation (router hooks) and renders the real async server pages + RootLayout with react-dom/server against a fresh in-memory context (bootstrap mocked \u2014 the sandbox sets GAPOS_DATABASE_URL, which would otherwise point page renders at the developer's Postgres and leak state between runs). Red run before implementation: 7 failing assertions for exactly the right reasons (no track-row/pill/empty-state on /gaps; no segmented control/log-line/chip on detail; slate-900-family hexes in the map; no summary/confidence focus-visible rules)."
+    },
+    {
+     "command": "pnpm exec vitest run screens.test.tsx tab-bar.test.tsx api.test.ts route.test.ts (targeted)",
+     "result": "pass",
+     "note": "34 tests: 9 new smoke + 9 tab-bar + 15 web API + 1 health \u2014 no regressions. The smoke suite covers: gaps list + gap detail inside the shell (app-frame, tab bar, exactly one aria-current), the six-tab segmented control with aria-current tracking, the readable generation log, sources with locator chips, the styled empty state, no leftover slate-900-family hexes in the six screens, and focus-visible rules for every new interactive pattern."
+    },
+    {
+     "command": "pnpm typecheck && pnpm lint && pnpm format:check",
+     "result": "pass",
+     "note": "Strict TS, ESLint (consistent-type-imports caught the vi.importActual<typeof import(...)> pattern in the test; fixed with a type-only namespace import) and Prettier clean."
+    },
+    {
+     "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm verify (final)",
+     "result": "pass",
+     "note": "429 passed | 26 loud skips (baseline 420 -> +9 smoke tests). Format, lint, typecheck and the full suite green."
+    },
+    {
+     "command": "pnpm --filter @gapos/web build && next start on :3123 + curl every screen",
+     "result": "pass",
+     "note": "next build compiles. Runtime smoke against the built app + Postgres: / renders the Today shell; /gaps renders three seeded tracks with status pills + min/day + New gap + Speak a gap + Review queue; /gaps/gap_math_to_ml renders the six-tab segmented control (aria-current on Overview), status pill, statement, Today continue-card and the generation log (complete run, step lines); ?tab=sources renders locator chips + Add a source; ?tab=curriculum renders objectives (required chips) + lessons; /study renders the player surface (6 audio segments), transcript card, confidence pickers (3 per question) and the #questions section; /mastery renders objective bars + evidence counts + review schedule; /map renders the token-driven SVG (var(--accent)/var(--warn) fills, no slate hexes); /review renders severity chips + findings. Shell check on a detail page: tab bar keeps exactly one aria-current (Learn). Found and killed a stale GAP-034-era next server still holding :3123, then re-smoked the fresh build."
+    },
+    {
+     "command": "dev-DB hygiene: hermetic test fix + restore local DB",
+     "result": "pass",
+     "note": "The first smoke-test run used the real bootstrap singleton (GAPOS_DATABASE_URL set) and polluted the local dev DB (6 test gaps, two stuck at 'compiling' because re-run fixed idempotency keys hit run-dedupe). Fixed by mocking bootstrap to a fresh in-memory context per test file (hermetic; the API journey suite uses the same context pattern). Restored the DB to the GAP-034 state: deleted the local-learner account (cascade), re-seeded the 3 tracks, recompiled gap_math_to_ml (run_c0956f76 complete -> active, Day 1 audio + transcript verified). Observation (pre-existing, untouched by this change): re-running scripts/compile-math-gap.ts with its fixed idempotency key dedupes against the recorded run and finishCompilation (apps/worker/src/pipeline/lifecycle.ts) early-returns on deduplicated, leaving the gap at 'compiling' until a fresh-key compile \u2014 an E21 lifecycle concern, noted here, not fixed in this design task."
+    }
+   ],
+   "notes": "E22 detail-screen restyle on the GAP-034 shell, all tokens from globals.css. Screens: (1) /gaps \u2014 track-row cards with status pills + min/day + target capability (shared .track-row/.pill classes with Today), styled .empty-state with a #new-gap CTA anchor, inline GapForm/VoiceCapture surfaces grouped under Create, shared pillClass in lib/status-pill.ts (home page refactored onto it, no behaviour change). (2) gap detail \u2014 six-tab workspace segmented control (components/workspace-tabs.tsx, server-safe links with aria-current; Overview/Sources/Curriculum are ?tab= sections, Learn/Practice/Mastery are the real routes, Practice anchors to #questions); Overview shows title + status pill + TransitionButtons + statement + Today continue-card + a readable generation log (new read-only generationLog handler: run pill, step lines with state/attempt, findings count); Sources tab shows cards with processing-status chips + chunk-count/chunk-id locator chips + preview details; Curriculum tab (new read-only getCurriculum usage, 404 -> empty state) shows objectives with required chips + lesson rows. (3) study \u2014 player-surface card around the audio players, transcript card, practice items with confidence capture (low/medium/high radios sent through the EXISTING attempts API confidence field \u2014 no API change) and the graded verified-solution reveal. (4) mastery \u2014 summary progress bar + per-objective bars (score), evidence counts (items/sessions/score), missing-clause reasons, and a due-review schedule (new read-only masterySchedule handler). (5) map \u2014 SVG now token-driven (var(--accent)/var(--warn)/var(--hairline-strong)/var(--text-tertiary)); the slate-800/600/500/400 hexes are gone. (6) review \u2014 severity chips (critical/high/medium/low) replacing inline hex styles, finding rows, approve/reject as .btn--ok/.btn--danger. Cross-cutting: --ok/--warn/--danger semantic CSS variables added (fixes the pre-existing .hint { color: var(--warn) } dangling reference); .card h2 rhythm tightened; summary:focus-visible + .confidence__option:has(input:focus-visible) cover the new interactive patterns; every new interactive element is a native a/button/input/summary so the global focus-visible rules apply, and all share the pressed-state scale. Server compatibility kept: all pages remain async server components (searchParams is the only new prop, on gap detail); no HTTP route, schema, migration or data-flow change; the two new handlers are in-process reads mirroring reviewQueue. Acceptance: smoke render test covers gaps list + gap detail with the shell (screens.test.tsx, 9 tests); no slate-900/#0f172a-family hardcodes remain (asserted by test); focus-visible asserted for every new interactive pattern; pnpm verify 429 passed. Untracked render.yaml (appeared at 07:00, no git history, no repo references, not created by this task) deliberately left out of the commit.",
+   "completedAt": "2026-08-14T05:17:57.000Z"
+  },
   "GAP-034": {
    "status": "done",
    "startedAt": "2026-08-14T04:10:00.000Z",

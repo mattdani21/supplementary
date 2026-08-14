@@ -59,13 +59,16 @@ export default async function KnowledgeMapPage({ params }: { params: Promise<{ g
 
   return (
     <main>
-      <p>
-        <Link href={`/gaps/${gapId}`}>← gap</Link>
-      </p>
-      <h1>Knowledge map</h1>
-      <p className="muted">
-        {gapNode?.label} — {nodes.length} nodes, {edges.length} links. Click a gap node to open it.
-      </p>
+      <Link href={`/gaps/${gapId}`} className="back-link">
+        ← Workspace
+      </Link>
+      <header className="page-head">
+        <h1>Knowledge map</h1>
+        <p className="page-head__meta">
+          {gapNode?.label} — {nodes.length} nodes, {edges.length} links. Click a gap node to open
+          it.
+        </p>
+      </header>
 
       <svg viewBox="-400 -400 800 800" className="map" role="img" aria-label="Knowledge map">
         {edges.map((edge, index) => {
@@ -79,7 +82,9 @@ export default async function KnowledgeMapPage({ params }: { params: Promise<{ g
               y1={from.y}
               x2={to.x}
               y2={to.y}
-              stroke={edge.relationship === 'prerequisite_of' ? '#f59e0b' : '#475569'}
+              stroke={
+                edge.relationship === 'prerequisite_of' ? 'var(--warn)' : 'var(--hairline-strong)'
+              }
               strokeWidth="1.5"
             />
           );
@@ -91,15 +96,25 @@ export default async function KnowledgeMapPage({ params }: { params: Promise<{ g
             <g key={node.id} transform={`translate(${position.x} ${position.y})`}>
               {isGap ? (
                 <a href={`/gaps/${node.id}`}>
-                  <circle r="14" fill="#38bdf8" />
+                  <circle
+                    r="14"
+                    fill="var(--accent)"
+                    stroke="var(--accent-hover)"
+                    strokeWidth="1.5"
+                  />
                   <title>{node.label}</title>
                 </a>
               ) : (
-                <circle r="9" fill="#1e293b" stroke="#64748b" strokeWidth="1.5">
+                <circle
+                  r="9"
+                  fill="var(--surface-2)"
+                  stroke="var(--hairline-strong)"
+                  strokeWidth="1.5"
+                >
                   <title>{node.label}</title>
                 </circle>
               )}
-              <text y="30" textAnchor="middle" fontSize="10" fill="#94a3b8">
+              <text y="30" textAnchor="middle" fontSize="10" fill="var(--text-tertiary)">
                 {node.label.length > 28 ? `${node.label.slice(0, 27)}…` : node.label}
               </text>
             </g>

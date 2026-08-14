@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { Gap } from '@gapos/database';
 import { isActionableGap } from '../lib/tab-bar-items';
+import { pillClass } from '../lib/status-pill';
 import { viewerOwner } from '../lib/viewer';
 import { listGaps } from '../server/api';
 import { getServerContext } from '../server/bootstrap';
@@ -13,17 +14,6 @@ const greetingFor = (hour: number): string => {
   if (hour < 18) return 'Good afternoon';
   return 'Good evening';
 };
-
-const STATUS_TONE: Record<string, string> = {
-  active: 'pill--accent',
-  mastery_check: 'pill--accent',
-  review_due: 'pill--accent',
-  filled: 'pill--ok',
-  compiling: 'pill--warn',
-  failed: 'pill--error',
-};
-
-const pillClass = (status: string): string => `pill ${STATUS_TONE[status] ?? 'pill--muted'}`;
 
 export default async function HomePage() {
   const owner = await viewerOwner();

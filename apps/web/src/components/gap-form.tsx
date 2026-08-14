@@ -31,7 +31,7 @@ export function GapForm() {
   };
 
   return (
-    <form onSubmit={submit} className="card">
+    <form onSubmit={submit} className="card" id="new-gap">
       <h2>New gap</h2>
       <label>
         Title

@@ -6,11 +6,11 @@ import { viewerOwner } from '../../lib/viewer';
 
 export const dynamic = 'force-dynamic';
 
-const SEVERITY_COLOUR: Record<string, string> = {
-  critical: '#f87171',
-  high: '#fb923c',
-  medium: '#fbbf24',
-  low: '#94a3b8',
+const SEVERITY_CHIP: Record<string, string> = {
+  critical: 'severity-chip severity-chip--critical',
+  high: 'severity-chip severity-chip--high',
+  medium: 'severity-chip severity-chip--medium',
+  low: 'severity-chip severity-chip--low',
 };
 
 export default async function ReviewPage() {
@@ -23,26 +23,33 @@ export default async function ReviewPage() {
 
   return (
     <main>
-      <p>
-        <Link href="/gaps">← all gaps</Link>
-      </p>
-      <h1>Review queue</h1>
-      <p className="muted">
-        {pending.length} lesson{pending.length === 1 ? '' : 's'} flagged by audit findings.
-      </p>
+      <Link href="/gaps" className="back-link">
+        ← Gaps
+      </Link>
+      <header className="page-head">
+        <h1>Review queue</h1>
+        <p className="page-head__meta">
+          {pending.length} lesson{pending.length === 1 ? '' : 's'} flagged by audit findings.
+        </p>
+      </header>
 
       {pending.map((item) => (
-        <section key={item.lessonId} className="card">
-          <h2>
-            Day {item.day}: {item.lessonTitle}
-          </h2>
+        <section key={item.lessonId} className="card review-card">
+          <div className="row">
+            <h2>
+              Day {item.day}: {item.lessonTitle}
+            </h2>
+          </div>
           <p className="muted">
             {item.gapTitle} · <Link href={`/gaps/${item.gapId}/study`}>open lesson</Link>
           </p>
-          <ul>
+          <ul className="findings">
             {item.findings.map((finding, index) => (
-              <li key={index} style={{ color: SEVERITY_COLOUR[finding.severity] ?? undefined }}>
-                [{finding.severity} · {finding.category}] {finding.finding}
+              <li key={index} className="finding">
+                <span className={SEVERITY_CHIP[finding.severity] ?? SEVERITY_CHIP.low}>
+                  {finding.severity} · {finding.category}
+                </span>
+                <span>{finding.finding}</span>
               </li>
             ))}
           </ul>
@@ -51,15 +58,18 @@ export default async function ReviewPage() {
       ))}
 
       {pending.length === 0 && (
-        <p className="muted">Nothing waiting — every lesson is clean or decided.</p>
+        <div className="empty-state">
+          <p className="empty-state__title">Queue is clear.</p>
+          <p className="empty-state__body">Nothing waiting — every lesson is clean or decided.</p>
+        </div>
       )}
 
       {decided.length > 0 && (
         <>
           <h2>Decided</h2>
-          <ul>
+          <ul className="review-schedule">
             {decided.map((item) => (
-              <li key={item.lessonId} className="card">
+              <li key={item.lessonId} className="card decided-row">
                 <span className={item.reviewStatus === 'approved' ? 'ok' : 'error'}>
                   {item.reviewStatus === 'approved' ? '✓ approved' : '✗ rejected'}
                 </span>{' '}

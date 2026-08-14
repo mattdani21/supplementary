@@ -35,10 +35,18 @@ export function ReviewButtons({ lessonId }: { lessonId: string }) {
         onChange={(event) => setNote(event.target.value)}
       />
       <span className="actions">
-        <button onClick={() => void decide('approve')} disabled={busy !== null}>
+        <button
+          className="btn btn--ok"
+          onClick={() => void decide('approve')}
+          disabled={busy !== null}
+        >
           {busy === 'approve' ? '…' : '✓ Approve'}
         </button>
-        <button onClick={() => void decide('reject')} disabled={busy !== null}>
+        <button
+          className="btn btn--danger"
+          onClick={() => void decide('reject')}
+          disabled={busy !== null}
+        >
           {busy === 'reject' ? '…' : '✗ Reject'}
         </button>
       </span>

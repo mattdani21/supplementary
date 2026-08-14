@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { randomUUID } from 'node:crypto';
 import { AttemptForm, type AttemptQuestion } from '../../../../components/attempt-form';
 import { AudioPlayer } from '../../../../components/audio-player';
+import { WorkspaceTabs } from '../../../../components/workspace-tabs';
 import { getLesson, todayView } from '../../../../server/api';
 import { getServerContext } from '../../../../server/bootstrap';
 import { viewerOwner } from '../../../../lib/viewer';
@@ -35,11 +36,14 @@ export default async function StudyPage({ params }: { params: Promise<{ gapId: s
   if (!today.lesson) {
     return (
       <main>
-        <p>
-          <Link href={`/gaps/${gapId}`}>← gap</Link>
-        </p>
-        <h1>Nothing due today</h1>
-        <p className="muted">Come back when a lesson is scheduled.</p>
+        <Link href={`/gaps/${gapId}`} className="back-link">
+          ← Workspace
+        </Link>
+        <WorkspaceTabs gapId={gapId} active="learn" />
+        <header className="page-head">
+          <h1>Nothing due today</h1>
+          <p className="page-head__meta">Come back when a lesson is scheduled.</p>
+        </header>
       </main>
     );
   }
@@ -49,42 +53,42 @@ export default async function StudyPage({ params }: { params: Promise<{ gapId: s
   };
 
   const sessionId = `web-${gapId}-${randomUUID().slice(0, 8)}`;
+  const audio = lesson.artefacts.filter((a) => a.kind === 'audio');
+  const transcripts = lesson.artefacts.filter((a) => a.kind === 'transcript');
 
   return (
     <main>
-      <p>
-        <Link href={`/gaps/${gapId}`}>← gap</Link>
-      </p>
-      <h1>
-        Day {lesson.day}: {lesson.title}
-      </h1>
-      {typeof lesson.estimatedMinutes === 'number' && (
-        <p className="muted">~{lesson.estimatedMinutes} minutes</p>
-      )}
+      <Link href={`/gaps/${gapId}`} className="back-link">
+        ← Workspace
+      </Link>
+      <WorkspaceTabs gapId={gapId} active="learn" />
 
-      <section>
-        <h2>Listen</h2>
-        {lesson.artefacts
-          .filter((a) => a.kind === 'audio')
-          .map((artefact) => (
-            <AudioPlayer key={artefact.id} gapId={gapId} artefactId={artefact.id} />
-          ))}
-        {lesson.artefacts.filter((a) => a.kind === 'audio').length === 0 && (
-          <p className="muted">No audio for this lesson.</p>
+      <header className="page-head">
+        <p className="today__date">Day {lesson.day}</p>
+        <h1>{lesson.title}</h1>
+        {typeof lesson.estimatedMinutes === 'number' && (
+          <p className="page-head__meta">~{lesson.estimatedMinutes} minutes</p>
         )}
+      </header>
+
+      <section className="card player-surface" aria-labelledby="listen-heading">
+        <h2 id="listen-heading">Listen</h2>
+        {audio.map((artefact) => (
+          <AudioPlayer key={artefact.id} gapId={gapId} artefactId={artefact.id} />
+        ))}
+        {audio.length === 0 && <p className="muted">No audio for this lesson.</p>}
       </section>
 
-      {lesson.artefacts
-        .filter((a) => a.kind === 'transcript')
-        .map((artefact) => (
-          <section key={artefact.id} className="card">
-            <h2>Transcript</h2>
-            <p className="muted">{artefact.id} — playback text</p>
-          </section>
-        ))}
+      {transcripts.map((artefact) => (
+        <section key={artefact.id} className="card" aria-labelledby="transcript-heading">
+          <h2 id="transcript-heading">Transcript</h2>
+          <p className="muted">Playback text</p>
+          <p className="transcript__id">{artefact.id}</p>
+        </section>
+      ))}
 
-      <section>
-        <h2>Questions</h2>
+      <section id="questions" className="practice-section" aria-labelledby="questions-heading">
+        <h2 id="questions-heading">Questions</h2>
         {lesson.questions.map((question) => (
           <AttemptForm key={question.id} gapId={gapId} sessionId={sessionId} question={question} />
         ))}

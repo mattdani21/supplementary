@@ -3,6 +3,7 @@ import type { Gap } from '@gapos/database';
 import { GapForm } from '../../components/gap-form';
 import { OwnerSwitcher } from '../../components/owner-switcher';
 import { VoiceCapture } from '../../components/voice-capture';
+import { pillClass } from '../../lib/status-pill';
 import { listGaps } from '../../server/api';
 import { getServerContext } from '../../server/bootstrap';
 import { viewerOwner } from '../../lib/viewer';
@@ -16,33 +17,54 @@ export default async function GapsPage() {
 
   return (
     <main>
-      <header className="row">
-        <h1>GapOS</h1>
-        <span className="actions">
-          <Link href="/review">Review queue</Link>
-          <OwnerSwitcher />
-        </span>
+      <header className="page-head">
+        <div className="row page-head__row">
+          <h1>Gaps</h1>
+          <span className="actions">
+            <Link href="/review">Review queue</Link>
+            <OwnerSwitcher />
+          </span>
+        </div>
+        <p className="page-head__meta">Your learning tracks, one gap at a time.</p>
       </header>
 
       {gaps.length === 0 ? (
-        <p>No gaps yet. Name the thing you want to be able to do.</p>
+        <div className="empty-state">
+          <p className="empty-state__title">No gaps yet.</p>
+          <p className="empty-state__body">
+            Name the thing you want to be able to do — GapOS turns it into a source-grounded,
+            audio-first course with verified practice.
+          </p>
+          <Link href="#new-gap" className="btn btn--primary">
+            Name your first gap
+          </Link>
+        </div>
       ) : (
-        <ul className="gaps">
+        <ul className="track-list">
           {gaps.map((gap) => (
-            <li key={gap.id} className="card">
-              <Link href={`/gaps/${gap.id}`}>
-                <strong>{gap.title}</strong>
+            <li key={gap.id}>
+              <Link href={`/gaps/${gap.id}`} className="track-row">
+                <span className="track-row__main">
+                  <span className="track-row__title">{gap.title}</span>
+                  {gap.targetCapability && (
+                    <span className="track-row__capability">{gap.targetCapability}</span>
+                  )}
+                </span>
+                <span className="track-row__meta">
+                  <span className={pillClass(gap.status)}>{gap.status}</span>
+                  <span className="track-row__minutes">{gap.dailyMinutes} min/day</span>
+                </span>
               </Link>
-              <p className="muted">
-                {gap.status} · {gap.dailyMinutes} min/day
-              </p>
             </li>
           ))}
         </ul>
       )}
 
-      <GapForm />
-      <VoiceCapture />
+      <section aria-labelledby="create-heading" className="today__tracks">
+        <h2 id="create-heading">Create</h2>
+        <GapForm />
+        <VoiceCapture />
+      </section>
     </main>
   );
 }
