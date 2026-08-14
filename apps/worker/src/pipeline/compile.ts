@@ -40,14 +40,18 @@ import {
   chunkDocument,
   classifyPriorCapabilities,
   decideRepair,
+  derivePlanInputs,
   findAssessmentGaps,
   findPlanViolations,
   isTerminalGenerationStatus,
+  personalisePlan,
   segmentScript,
   transitionGeneration,
   verifyLesson,
   type Finding,
   type GenerationStatus,
+  type LearnerProfileInput,
+  type MasteryInput,
   type PriorCapability,
 } from '@gapos/domain';
 import type { Logger, Metrics } from '@gapos/observability';
@@ -340,6 +344,34 @@ export const compileGap = async (
       });
     }
 
+    /* ---------------------------------- personalisation inputs (E24 US4, R7, FR-016) */
+    // The curriculum is a function of gap + sources + diagnostic + learner profile + mastery
+    // evidence. The profile lives on the user record (migration 006; defaults when absent);
+    // the mastery evidence is the prior filled gaps' capability classification above plus a
+    // summary of the evidence records behind them, rendered into the learner brief.
+    const user = await uow.users.find(owner);
+    const profile: LearnerProfileInput = {
+      goals: user?.goals ?? [],
+      preferredLessonLength: user?.preferredLessonLength ?? 'standard',
+    };
+    let priorEvidenceRecords = 0;
+    for (const filled of filledGaps) {
+      const priorCurriculum = await uow.curricula.getCurrentForGap(owner, filled.id);
+      if (!priorCurriculum) continue;
+      priorEvidenceRecords += (
+        await uow.mastery.listEvidenceForCurriculum(owner, priorCurriculum.id)
+      ).length;
+    }
+    const mastery: MasteryInput = {
+      satisfied: priorReuse.satisfied,
+      decayed: priorReuse.decayed,
+      reviewDue: [],
+      evidenceSummary:
+        priorEvidenceRecords > 0
+          ? `${priorEvidenceRecords} recorded evidence item(s) across prior filled gaps.`
+          : '',
+    };
+
     /* --------------------------------------------------------------- stage C: diagnose */
     const diagnostic = await runStep(
       step,
@@ -377,34 +409,21 @@ export const compileGap = async (
     }
 
     /* ---------------------------------------------------- stage D: plan and validate */
+    const planInputs = derivePlanInputs({ normalisation, diagnostic, profile, mastery });
     const learnerBrief = [
       `The learner stated: "${gap.rawStatement}".`,
       `The learner has ${gap.dailyMinutes} minutes per day.`,
       `Normalisation — topic: ${normalisation.topic}. Current state: ${normalisation.currentState}. ` +
         `Target capability: ${normalisation.targetCapability}. Observable success condition: ` +
         normalisation.observableSuccessCondition,
-      ...(normalisation.assumedPrerequisites.length > 0
-        ? [
-            `The learner is assumed to already hold: ${normalisation.assumedPrerequisites.join(', ')}.`,
-          ]
-        : []),
-      ...(diagnostic.demonstratedCapabilities.length > 0
-        ? [`The learner already demonstrates: ${diagnostic.demonstratedCapabilities.join(', ')}.`]
-        : []),
-      ...(priorReuse.satisfied.length > 0
-        ? [
-            `The learner has previously mastered and still holds: ${priorReuse.satisfied.join(
-              ', ',
-            )}.`,
-          ]
-        : []),
+      ...planInputs.learnerBriefParts,
     ].join(' ');
 
     const planResult = await runStep(
       step,
       {
         step: 'plan_curriculum',
-        inputVersion: hash([normalisation, diagnostic, priorReuse.satisfied]),
+        inputVersion: hash([normalisation, diagnostic, priorReuse.satisfied, profile, mastery]),
       },
       async () =>
         planCurriculum({
@@ -413,19 +432,40 @@ export const compileGap = async (
           gapId: gap.id,
           learnerBrief,
           evidence,
-          satisfiedExternalPrerequisites: [
-            ...normalisation.assumedPrerequisites,
-            ...diagnostic.demonstratedCapabilities,
-            ...priorReuse.satisfied,
-          ],
+          satisfiedExternalPrerequisites: planInputs.satisfiedExternalPrerequisites,
           deps,
           logger,
         }),
     );
     // The step output is the full { plan, attempts } record (C-04); the run's curriculum is the
-    // accepted plan itself. The attempts stay in the step log — that is what the hit-rate harness
-    // reads.
-    const plan = planResult.plan;
+    // accepted plan after deterministic personalisation (US4). The attempts stay in the step log
+    // — that is what the hit-rate harness reads.
+    let plan = planResult.plan;
+
+    // Personalise the plan deterministically from the five inputs, and never store an adapted
+    // plan the validation gate would reject (FR-013): adaptation may reshape teaching, but it
+    // cannot make the plan invalid.
+    plan = personalisePlan(plan, {
+      gap: {
+        rawStatement: gap.rawStatement,
+        dailyMinutes: gap.dailyMinutes,
+        ...(gap.deadline ? { deadline: gap.deadline } : {}),
+      },
+      diagnostic,
+      profile,
+      mastery,
+    });
+    const personalisationViolations = findPlanViolations(plan, {
+      satisfiedExternalPrerequisites: planInputs.satisfiedExternalPrerequisites,
+    });
+    if (personalisationViolations.length > 0) {
+      throw new DomainError(
+        'objective_not_assessed',
+        'Personalisation produced an invalid plan: ' +
+          personalisationViolations.map((v) => v.message).join('; '),
+        { violations: personalisationViolations.map((v) => v.message) },
+      );
+    }
 
     // The run's own curriculum, if it already exists (a resumed run re-enters it rather than
     // creating a second course for the same gap — that is what keeps lesson and artefact ids

@@ -23,7 +23,8 @@ export type DomainErrorCode =
   | 'repair_attempts_exhausted'
   | 'budget_exceeded'
   | 'not_found'
-  | 'forbidden';
+  | 'forbidden'
+  | 'invalid_input';
 
 export class DomainError extends Error {
   readonly code: DomainErrorCode;

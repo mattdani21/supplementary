@@ -17,6 +17,7 @@
 import type { Pool, PoolClient, QueryResultRow } from 'pg';
 import type { CurriculumPlan, LessonPackage, Question } from '@gapos/ai-contracts';
 import type { GapStatus, GenerationStatus, StepState } from '@gapos/domain';
+import { normaliseUserProfile } from './user-profile.js';
 import {
   ConcurrentModificationError,
   NotFoundError,
@@ -81,6 +82,8 @@ const toUser = (row: any): User => ({
   email: row.email,
   locale: row.locale,
   timezone: row.timezone,
+  preferredLessonLength: row.preferred_lesson_length ?? 'standard',
+  goals: row.goals ?? [],
 });
 
 const toGap = (row: any): Gap => ({
@@ -296,11 +299,20 @@ export const createPostgresUnitOfWork = (pool: Pool): UnitOfWork => {
 
   const users: UserRepository = {
     async create(user) {
+      const profile = normaliseUserProfile(user);
       const { rows } = await db.query(
-        `INSERT INTO users (id, email, locale, timezone) VALUES ($1, $2, $3, $4)
+        `INSERT INTO users (id, email, locale, timezone, preferred_lesson_length, goals)
+         VALUES ($1, $2, $3, $4, $5, $6::jsonb)
          ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email
          RETURNING *`,
-        [user.id, user.email, user.locale, user.timezone],
+        [
+          profile.id,
+          profile.email,
+          profile.locale,
+          profile.timezone,
+          profile.preferredLessonLength,
+          JSON.stringify(profile.goals ?? []),
+        ],
       );
       return toUser(rows[0]);
     },

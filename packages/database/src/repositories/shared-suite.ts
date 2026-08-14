@@ -857,4 +857,50 @@ export const describeRepositoryContract = (name: string, harness: SuiteHarness):
       expect(finished.finishedAt).toBeInstanceOf(Date);
     });
   });
+
+  describe(`${name}: learner profile (E24 US4, T032)`, () => {
+    let uow: UnitOfWork;
+
+    beforeEach(async () => {
+      uow = await harness.create();
+      await uow.users.create({
+        id: ALICE,
+        email: 'alice@example.com',
+        locale: 'en',
+        timezone: 'UTC',
+      });
+    });
+
+    it('defaults to standard lesson length and no goals', async () => {
+      const user = await uow.users.find(ALICE);
+      expect(user?.preferredLessonLength).toBe('standard');
+      expect(user?.goals).toEqual([]);
+    });
+
+    it('round-trips an explicit profile through create and find', async () => {
+      await uow.users.create({
+        id: BOB,
+        email: 'bob@example.com',
+        locale: 'en',
+        timezone: 'UTC',
+        preferredLessonLength: 'short',
+        goals: ['pass the interview loop', 'build a portfolio'],
+      });
+      const user = await uow.users.find(BOB);
+      expect(user?.preferredLessonLength).toBe('short');
+      expect(user?.goals).toEqual(['pass the interview loop', 'build a portfolio']);
+    });
+
+    it('rejects an unknown lesson length at the repository layer', async () => {
+      await expect(
+        uow.users.create({
+          id: BOB,
+          email: 'bob@example.com',
+          locale: 'en',
+          timezone: 'UTC',
+          preferredLessonLength: 'marathon' as never,
+        }),
+      ).rejects.toThrow(/preferredLessonLength/);
+    });
+  });
 };

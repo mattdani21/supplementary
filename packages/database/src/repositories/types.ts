@@ -12,11 +12,19 @@ import type { GapStatus, GenerationStatus, StepState } from '@gapos/domain';
 /** A branded id, so an owner cannot be passed where a gap id is expected. */
 export type OwnerId = string & { readonly __brand?: 'OwnerId' };
 
+/** How the learner prefers lessons shaped (E24 US4, R7 — FR-019). Default 'standard'. */
+export const LESSON_LENGTHS = ['short', 'standard', 'long'] as const;
+export type LessonLength = (typeof LESSON_LENGTHS)[number];
+
 export interface User {
   readonly id: OwnerId;
   readonly email: string;
   readonly locale: string;
   readonly timezone: string;
+  /** E24 US4 (R7): plan-shape input — more smaller sessions vs fewer deeper ones (FR-019). */
+  readonly preferredLessonLength?: LessonLength;
+  /** E24 US4 (R7): stated goals, rendered into the learner brief so the planner sequences toward them (FR-019). */
+  readonly goals?: readonly string[];
 }
 
 export interface Gap {

@@ -1,6 +1,6 @@
 {
  "schemaVersion": 1,
- "updatedAt": "2026-08-14T20:48:55.087174Z",
+ "updatedAt": "2026-08-14T20:57:16.879906Z",
  "controller": "gapos-controller",
  "tasks": {
   "GAP-035": {
@@ -1348,6 +1348,83 @@
      "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm exec vitest run tests/evaluation",
      "result": "pass",
      "note": "US3 checkpoint: hit rate is a measured, reproducible number (1/1 = 100% fake mode on eval_01); the per-invariant breakdown is exact; the gate guard rejects every known-bad shape with all violations returned together. Full suite green."
+    }
+   ]
+  },
+  "E24-T031": {
+   "status": "done",
+   "startedAt": "2026-08-14T22:53:00.000Z",
+   "completedAt": "2026-08-14T20:57:16.879906Z",
+   "evidence": [
+    {
+     "command": "pnpm exec vitest run packages/domain/src/curriculum/personalisation.test.ts (test-first, red run)",
+     "result": "fail",
+     "note": "Personalisation unit tests written first (C-06): differing diagnostic/profile/mastery yield measurably different plans; satisfied prerequisite -> <= 5-minute Day-1 recall check, never retaught; decayed -> re-demonstration; every adapted plan passes findPlanViolations; identical inputs stay identical. Red before implementation: the module did not exist."
+    },
+    {
+     "command": "pnpm exec vitest run packages/domain/src/curriculum/personalisation.test.ts (after T033)",
+     "result": "pass",
+     "note": "9 tests pass against the pure module: derivePlanInputs renders goals/length/mastery/diagnostic into the brief and adds satisfied capabilities to the held list; personalisePlan converts a satisfied objective's audio lesson into a <=5-minute recall check and drops later reteaching, turns a decayed objective's lesson into a re-demonstration retrieval, rescales short/long lesson lengths within the budget, and shifts Day-1 blueprint difficulty from the diagnostic without breaking the non-decreasing progression. All adapted plans revalidated by findPlanViolations."
+    }
+   ]
+  },
+  "E24-T032": {
+   "status": "done",
+   "startedAt": "2026-08-14T22:51:00.000Z",
+   "completedAt": "2026-08-14T20:57:16.879906Z",
+   "evidence": [
+    {
+     "command": "pnpm exec vitest run packages/database + GAPOS_TEST_DATABASE_URL=... pnpm exec vitest run packages/database/src/repositories/ownership.test.ts",
+     "result": "pass",
+     "note": "Forward-only migration 006_learner_profile.sql (users.preferred_lesson_length TEXT NOT NULL DEFAULT 'standard' CHECK IN ('short','standard','long'); users.goals JSONB NOT NULL DEFAULT '[]'); User gained preferredLessonLength + goals (optional on input, defaults applied by the repository layer via normaliseUserProfile — 'standard' / [], unknown lengths rejected with a typed invalid_input error); both memory and Postgres implementations updated (Postgres inserts/reads the columns; CHECK mirrors the repo guard). Shared contract suite gained 3 profile tests run against BOTH implementations: 64/64 on Postgres with migration 006 applied. NOTE: the postgres-worker suite fails identically on the clean pre-US4 tree in this sandbox (jobs stuck 'leased', jobs FK on enqueue) — pre-existing environment issue, verified by stash, unrelated to this task; the deadline date test needs TZ=UTC (sandbox is SAST) and passes under UTC."
+    }
+   ]
+  },
+  "E24-T033": {
+   "status": "done",
+   "startedAt": "2026-08-14T22:54:00.000Z",
+   "completedAt": "2026-08-14T20:57:16.879906Z",
+   "evidence": [
+    {
+     "command": "pnpm exec vitest run packages/domain/src/curriculum/personalisation.test.ts + pnpm typecheck",
+     "result": "pass",
+     "note": "packages/domain/src/curriculum/personalisation.ts (pure): derivePlanInputs + personalisePlan, exported from @gapos/domain. Adaptation rules documented and deterministic; every rule budget-safe (trimToBudget) and revalidated by findPlanViolations before storage (FR-013)."
+    }
+   ]
+  },
+  "E24-T034": {
+   "status": "done",
+   "startedAt": "2026-08-14T22:54:30.000Z",
+   "completedAt": "2026-08-14T20:57:16.879906Z",
+   "evidence": [
+    {
+     "command": "pnpm exec vitest run tests/evaluation/differentiation.test.ts tests/evaluation/plan-hit-rate.test.ts tests/end-to-end/compile-math-gap.test.ts + pnpm typecheck",
+     "result": "pass",
+     "note": "compileGap threads the five inputs: profile via uow.users.find(owner) (defaults 'standard'/[]), mastery via prior filled gaps' classifyPriorCapabilities + listEvidenceForCurriculum evidence count; derivePlanInputs renders profile+mastery into the learnerBrief (plan step inputVersion now includes profile+mastery so a changed profile re-keys the step); personalisePlan applied before uow.curricula.create and revalidated (an invalid adapted plan fails the run, never ships)."
+    }
+   ]
+  },
+  "E24-T035": {
+   "status": "done",
+   "startedAt": "2026-08-14T22:55:00.000Z",
+   "completedAt": "2026-08-14T20:57:16.879906Z",
+   "evidence": [
+    {
+     "command": "pnpm exec vitest run tests/evaluation/differentiation.test.ts",
+     "result": "pass",
+     "note": "5 tests through the real pipeline (fake provider): differing preferredLessonLength (short vs long) rescales the stored plan measurably and both stay valid; a scripted diagnostic (start 1 vs 3 on a ramp plan) shifts Day-1 blueprint difficulty; a seeded filled capability ('Prove a set equality by double inclusion.', the eval_10 prior-mastery shape) turns the day-2 lesson into a <=5-minute recall check with no audio lesson while a fresh learner keeps the full lesson, and the two stored curricula differ (SC-004)."
+    }
+   ]
+  },
+  "E24-US4-validation": {
+   "status": "done",
+   "startedAt": "2026-08-14T22:56:30.000Z",
+   "completedAt": "2026-08-14T20:57:16.879906Z",
+   "evidence": [
+    {
+     "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm verify",
+     "result": "pass",
+     "note": "US4 checkpoint: personalisation is a demonstrated, deterministic property — the pure module (9 tests) and the pipeline differentiation test (5 tests) prove differing inputs yield differing curricula; reuse/decay behave per spec; identical inputs stay identical (idempotency preserved); every adapted plan passes findPlanViolations. Full suite: 560 passed | 26 loud skips (baseline 517)."
     }
    ]
   }

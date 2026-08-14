@@ -9,6 +9,7 @@
  */
 
 import type { GapStatus, GenerationStatus } from '@gapos/domain';
+import { normaliseUserProfile } from './user-profile.js';
 import {
   ConcurrentModificationError,
   NotFoundError,
@@ -135,8 +136,9 @@ export const createMemoryStore = (): MemoryStore => ({
 export const createMemoryUnitOfWork = (store: MemoryStore = createMemoryStore()): UnitOfWork => {
   const users: UserRepository = {
     async create(user) {
-      store.users.set(user.id, user);
-      return user;
+      const profile = normaliseUserProfile(user);
+      store.users.set(user.id, profile);
+      return profile;
     },
     async find(id) {
       return store.users.get(id);
