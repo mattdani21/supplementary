@@ -297,6 +297,26 @@ describe('the study surface (GAP-037)', () => {
   });
 });
 
+describe('duration estimates on Day cards and the lesson header (GAP-038)', () => {
+  it('shows the formatted audio duration on curriculum Day cards', async () => {
+    const html = await renderWithShell(
+      await GapDetailPage({
+        params: Promise.resolve({ gapId: compiledGapId }),
+        searchParams: Promise.resolve({ tab: 'curriculum' }),
+      }),
+    );
+    // The Day card (lesson row) carries the audio duration estimate before play.
+    expect(html).toMatch(/· \d+:\d{2} audio/);
+  });
+
+  it('shows the formatted audio duration in the study lesson header', async () => {
+    const html = await renderWithShell(
+      await StudyPage({ params: Promise.resolve({ gapId: compiledGapId }) }),
+    );
+    expect(html).toMatch(/minutes · \d+:\d{2} audio/);
+  });
+});
+
 describe('design tokens replace the slate palette (GAP-035)', () => {
   const SCREEN_FILES = [
     'apps/web/src/app/gaps/page.tsx',

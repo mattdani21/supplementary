@@ -5,6 +5,7 @@ import { GenerationProgress } from '../../../components/generation-progress';
 import { SourceForm } from '../../../components/source-form';
 import { TransitionButtons } from '../../../components/transition-buttons';
 import { WorkspaceTabs, type WorkspaceTab } from '../../../components/workspace-tabs';
+import { formatDuration } from '../../../lib/audio';
 import { pillClass } from '../../../lib/status-pill';
 import {
   ApiError,
@@ -44,7 +45,7 @@ interface CurriculumLessonView {
   estimatedMinutes: number;
   publicationStatus: string;
   questions: { id: string }[];
-  artefacts: { id: string }[];
+  artefacts: { id: string; kind?: string; durationSeconds?: number }[];
 }
 
 interface CurriculumView {
@@ -252,30 +253,38 @@ export default async function GapDetailPage({
 
               <h2>Lessons</h2>
               <ul className="track-list">
-                {curriculum.lessons.map((lesson) => (
-                  <li key={lesson.id}>
-                    <Link href={`/gaps/${gapId}/study`} className="track-row">
-                      <span className="track-row__main">
-                        <span className="track-row__title">
-                          Day {lesson.day} — {lesson.title}
+                {curriculum.lessons.map((lesson) => {
+                  // Day card duration estimate (E23 quality spec §8): the lesson's audio length,
+                  // shown before play, alongside the estimated study minutes.
+                  const audioSeconds = lesson.artefacts
+                    .filter((artefact) => artefact.kind === 'audio')
+                    .reduce((sum, artefact) => sum + (artefact.durationSeconds ?? 0), 0);
+                  const audioDuration = formatDuration(audioSeconds);
+                  return (
+                    <li key={lesson.id}>
+                      <Link href={`/gaps/${gapId}/study`} className="track-row">
+                        <span className="track-row__main">
+                          <span className="track-row__title">
+                            Day {lesson.day} — {lesson.title}
+                          </span>
+                          <span className="track-row__capability">
+                            {lesson.questions.length} questions · ~{lesson.estimatedMinutes} min
+                            {audioDuration ? ` · ${audioDuration} audio` : ''}
+                          </span>
                         </span>
-                        <span className="track-row__capability">
-                          {lesson.questions.length} questions · {lesson.artefacts.length} artefacts
-                          · ~{lesson.estimatedMinutes} min
+                        <span className="track-row__meta">
+                          <span
+                            className={
+                              lesson.publicationStatus === 'published' ? 'pill pill--ok' : 'pill'
+                            }
+                          >
+                            {lesson.publicationStatus}
+                          </span>
                         </span>
-                      </span>
-                      <span className="track-row__meta">
-                        <span
-                          className={
-                            lesson.publicationStatus === 'published' ? 'pill pill--ok' : 'pill'
-                          }
-                        >
-                          {lesson.publicationStatus}
-                        </span>
-                      </span>
-                    </Link>
-                  </li>
-                ))}
+                      </Link>
+                    </li>
+                  );
+                })}
               </ul>
             </>
           )}

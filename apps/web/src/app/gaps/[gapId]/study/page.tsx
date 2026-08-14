@@ -6,6 +6,7 @@ import { EmptyState } from '../../../../components/empty-state';
 import { WorkspaceTabs } from '../../../../components/workspace-tabs';
 import { getLesson, listSources, todayView } from '../../../../server/api';
 import { getServerContext } from '../../../../server/bootstrap';
+import { formatDuration } from '../../../../lib/audio';
 import { viewerOwner } from '../../../../lib/viewer';
 
 export const dynamic = 'force-dynamic';
@@ -14,6 +15,8 @@ interface ArtefactView {
   id: string;
   kind: 'audio' | 'transcript' | 'visual';
   mediaType: string;
+  durationSeconds?: number;
+  segmentOrdinal?: number;
 }
 
 interface LessonQuestionView {
@@ -100,7 +103,14 @@ export default async function StudyPage({ params }: { params: Promise<{ gapId: s
   }));
 
   const sessionId = `web-${gapId}-${randomUUID().slice(0, 8)}`;
-  const audio = lesson.artefacts.filter((a) => a.kind === 'audio');
+  // Audio artefacts are per-segment; order them by their position in the lesson so the player
+  // can auto-advance, scroll-sync the transcript and seek across the whole lesson (GAP-038).
+  const audio = lesson.artefacts
+    .filter((a) => a.kind === 'audio')
+    .sort((a, b) => (a.segmentOrdinal ?? 0) - (b.segmentOrdinal ?? 0));
+  const audioDurationLabel = formatDuration(
+    audio.reduce((sum, artefact) => sum + (artefact.durationSeconds ?? 0), 0),
+  );
   // The transcript ships inside the lesson package (it is never uploaded as a byte artefact) —
   // this is what the audio fallback points at when a segment cannot play.
   const transcriptText = lesson.package.transcript;
@@ -116,24 +126,33 @@ export default async function StudyPage({ params }: { params: Promise<{ gapId: s
         <p className="today__date">Day {lesson.day}</p>
         <h1>{lesson.title}</h1>
         {typeof lesson.estimatedMinutes === 'number' && (
-          <p className="page-head__meta">~{lesson.estimatedMinutes} minutes</p>
+          <p className="page-head__meta">
+            ~{lesson.estimatedMinutes} minutes
+            {audioDurationLabel ? ` · ${audioDurationLabel} audio` : ''}
+          </p>
         )}
       </header>
 
       <section className="card player-surface" aria-labelledby="listen-heading">
         <h2 id="listen-heading">Listen</h2>
-        {audio.map((artefact) => (
-          <AudioPlayer key={artefact.id} gapId={gapId} artefactId={artefact.id} />
-        ))}
-        {audio.length === 0 && <p className="muted">No audio for this lesson.</p>}
-      </section>
-
-      <section className="card" aria-labelledby="transcript-heading">
-        <h2 id="transcript-heading">Transcript</h2>
-        {transcriptText ? (
-          <p className="transcript">{transcriptText}</p>
+        {audio.length > 0 ? (
+          <AudioPlayer
+            gapId={gapId}
+            segments={audio.map((artefact) => ({
+              artefactId: artefact.id,
+              durationSeconds: artefact.durationSeconds,
+            }))}
+            transcript={transcriptText}
+          />
         ) : (
-          <p className="muted">Transcript unavailable for this lesson.</p>
+          <>
+            <p className="muted">No audio for this lesson.</p>
+            {transcriptText ? (
+              <p className="transcript">{transcriptText}</p>
+            ) : (
+              <p className="muted">Transcript unavailable for this lesson.</p>
+            )}
+          </>
         )}
       </section>
 
