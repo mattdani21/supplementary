@@ -37,7 +37,7 @@ Monorepo (see [plan.md](plan.md) — Project Structure): `packages/*/src/…`, `
 
 **Purpose**: Baseline the tree so every later claim has a comparison point (FR-022, SC-008).
 
-- [ ] T001 Run the baseline gate `env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm verify` on a
+- [x] T001 Run the baseline gate `env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm verify` on a
       clean tree and record the pass/skip counts and commit hash in `tasks/status.json` (the
       sandbox injects live mode without a key; CI does not — same note as GAP-034/GAP-035).
 
@@ -52,29 +52,29 @@ the C-03, C-04, C-05 and R9 surfaces from [contracts/](contracts/README.md).
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T002 [P] Add `'script_structure'` to `VERIFICATION_CATEGORIES` in
+- [x] T002 [P] Add `'script_structure'` to `VERIFICATION_CATEGORIES` in
       `packages/ai-contracts/src/contracts.ts` and to `FindingCategory` in
       `packages/domain/src/verification/verifier.ts`; extend
       `packages/ai-contracts/src/contracts.test.ts` (test-first: the schema accepts a
       verification finding with the new category); run `pnpm specs:generate` and commit the
       regenerated `specs/generation-schemas/verification_report.v1-0-0.json`
-- [ ] T003 [P] Add `ClaimAuditContract` and `CLAIM_RESOLUTIONS =
+- [x] T003 [P] Add `ClaimAuditContract` and `CLAIM_RESOLUTIONS =
       ['removed','repaired','labelled','none']` to `packages/ai-contracts/src/contracts.ts`,
       register in `ALL_CONTRACTS` and `CONTRACT_NAMES`
       (`packages/ai-contracts/src/versioning.ts`); extend `contracts.test.ts` (test-first:
       accepts a full audit report, rejects a malformed resolution); run `pnpm specs:generate` →
       commit `specs/generation-schemas/claim_audit.v1-0-0.json`
-- [ ] T004 [P] Add `'audit_claims'` to `GENERATION_STEPS` in
+- [x] T004 [P] Add `'audit_claims'` to `GENERATION_STEPS` in
       `packages/domain/src/generation/state-machine.ts` and assert it in
       `packages/domain/src/generation/state-machine.test.ts` (test-first)
-- [ ] T005 Rework `planCurriculum` in `apps/worker/src/pipeline/compile.ts` to return
+- [x] T005 Rework `planCurriculum` in `apps/worker/src/pipeline/compile.ts` to return
       `{ plan, attempts }` (`PlanAttempt`/`PlanCurriculumResult`: ordered per-call
       `{ attempt, violations: string[], passed }`), make `compileGap` store `result.plan`, bump
       `PIPELINE_VERSION` to `'1.1.0'`. Test-first: `tests/evaluation/plan-hit-rate.test.ts`
       compiles `eval_01` through the real pipeline and reads the `plan_curriculum` step output
       via `uow.generation.listSteps`, asserting `attempts.length ≥ 1` and
       `attempts[0].passed === true` on the reference pack
-- [ ] T006 [P] Add `assertTraceability(plan, lessons, evidence)` to
+- [x] T006 [P] Add `assertTraceability(plan, lessons, evidence)` to
       `packages/evaluation/src/traceability.ts` (pure: every objective/lesson/question declares a
       `basis`; `source` items cite ≥ 1 locator whose `sourceId`/`chunkId` resolves to a real
       evidence chunk; `general_knowledge` items are labelled). Test-first:
@@ -98,49 +98,49 @@ scores below the floor with the failing element named (FR-005/FR-006, SC-002).
 
 ### Tests for User Story 1 (write FIRST, ensure they FAIL before implementation) ⚠️
 
-- [ ] T007 [P] [US1] Add the four human-sounding degradation tests to
+- [x] T007 [P] [US1] Add the four human-sounding degradation tests to
       `tests/evaluation/reference-pack.test.ts`: meta-opening, list-like/bulleted prose, no
       worked example, no checkpoint → each scores below `SCORE_FLOORS.human_sounding` and the
       observation names the failing element (depends on the dimension existing — red until T013)
-- [ ] T008 [P] [US1] Add `checkLessonStructure` unit tests to
+- [x] T008 [P] [US1] Add `checkLessonStructure` unit tests to
       `packages/domain/src/verification/verifier.test.ts`: a lesson missing any element yields a
       `critical` `script_structure` finding naming it; a complete lesson yields none
-- [ ] T009 [P] [US1] Add a pipeline test to `tests/end-to-end/compile-math-gap.test.ts`: with a
+- [x] T009 [P] [US1] Add a pipeline test to `tests/end-to-end/compile-math-gap.test.ts`: with a
       scripted faulty lesson (missing checkpoint, from `packages/test-fixtures/src/faulty-fixtures.ts`),
       the lesson is repaired or excluded and never published
-- [ ] T010 [P] [US1] Add checkpoint UI tests to `apps/web/src/components/screens.test.tsx` and
+- [x] T010 [P] [US1] Add checkpoint UI tests to `apps/web/src/components/screens.test.tsx` and
       `apps/web/src/components/audio-player.test.tsx`: audio pauses at the `pausePrompt`
       position, a response is required before continuing, correct → confirm, incorrect →
       correction surface with the verified answer and source link
 
 ### Implementation for User Story 1
 
-- [ ] T011 [US1] Append `'human_sounding'` to `SCORE_DIMENSIONS` and add the floor to
+- [x] T011 [US1] Append `'human_sounding'` to `SCORE_DIMENSIONS` and add the floor to
       `SCORE_FLOORS` in `packages/evaluation/src/fixture.ts` (floor value set in T015)
-- [ ] T012 [US1] Implement the four element detectors in
+- [x] T012 [US1] Implement the four element detectors in
       `packages/domain/src/curriculum/script-structure.ts` (concrete opening via meta-pattern
       rejection; one idea per segment via paragraph/sentence segmentation; worked example via
       `examples` present in the script or a step block; checkpoint via `pausePrompts` with the
       prompt text in the script), export from `packages/domain/src/index.ts` — the single source
       of truth for both the scorer and the domain verifier (C-02/C-03)
-- [ ] T013 [US1] Implement `scoreHumanSounding` in `packages/evaluation/src/scorer.ts` and
+- [x] T013 [US1] Implement `scoreHumanSounding` in `packages/evaluation/src/scorer.ts` and
       register it in `scoreCurriculum` (dimension score = share of lessons passing all four
       checks; observations name the missing element) (depends T011, T012)
-- [ ] T014 [US1] Publish `packages/evaluation/HUMAN_SOUNDING_RUBRIC.md`: the prose rubric, the
+- [x] T014 [US1] Publish `packages/evaluation/HUMAN_SOUNDING_RUBRIC.md`: the prose rubric, the
       deterministic detection rules, the floor and the calibration record
-- [ ] T015 [US1] Calibrate `SCORE_FLOORS.human_sounding` against the reference curricula
+- [x] T015 [US1] Calibrate `SCORE_FLOORS.human_sounding` against the reference curricula
       (`packages/test-fixtures/src/reference-curriculum.ts` `referenceLesson` fixtures) so the
       `eval_01` reference curriculum clears the floor; record the calibration command + scores in
       `tasks/status.json` (depends T013)
-- [ ] T016 [US1] Implement `checkLessonStructure` in
+- [x] T016 [US1] Implement `checkLessonStructure` in
       `packages/domain/src/verification/verifier.ts` using the shared detectors (C-03) and wire
       it into `verifyLesson` (depends T002, T012)
-- [ ] T017 [US1] Update the `generateLesson` instruction in
+- [x] T017 [US1] Update the `generateLesson` instruction in
       `apps/worker/src/pipeline/compile.ts` to demand the four structural elements (concrete
       opening, one idea per segment, worked example worked inside the script, checkpoint via
       `pausePrompts`); add `lessonMissingCheckpoint()` to
       `packages/test-fixtures/src/faulty-fixtures.ts` (depends T009)
-- [ ] T018 [US1] Implement the checkpoint surface: `apps/web/src/components/checkpoint.tsx` +
+- [x] T018 [US1] Implement the checkpoint surface: `apps/web/src/components/checkpoint.tsx` +
       pause-at-pausePrompt in `apps/web/src/components/audio-player.tsx` + render in
       `apps/web/src/app/gaps/[gapId]/study/page.tsx`; grade the checkpoint like any practice
       answer (reuse `apps/web/src/components/practice-feedback.tsx` — correct → confirm,
@@ -165,39 +165,39 @@ assert the source-link affordance (FR-008/FR-009/FR-011, SC-003/SC-006).
 
 ### Tests for User Story 2 (write FIRST, ensure they FAIL before implementation) ⚠️
 
-- [ ] T019 [P] [US2] Add traceability invariant tests to `tests/evaluation/traceability.test.ts`
+- [x] T019 [P] [US2] Add traceability invariant tests to `tests/evaluation/traceability.test.ts`
       against the compiled `eval_01` reference curriculum: 100% of objectives/lessons/questions
       carry a locator or a general-knowledge label and every locator resolves to a real evidence
       chunk (depends T006)
-- [ ] T020 [P] [US2] Add claim-audit pipeline tests to `tests/end-to-end/compile-math-gap.test.ts`
+- [x] T020 [P] [US2] Add claim-audit pipeline tests to `tests/end-to-end/compile-math-gap.test.ts`
       (fake provider): an unresolved claim blocks publication; a labelled resolution publishes
       with the finding's `repairStatus: 'accepted'`; the clean default publishes unchanged
       (depends T003, T004)
-- [ ] T021 [P] [US2] Add injection-chunk refusal tests to
+- [x] T021 [P] [US2] Add injection-chunk refusal tests to
       `packages/domain/src/verification/verifier.test.ts`: an item whose evidence cites a chunk
       in `context.injectionSignals` gets a `critical` finding
-- [ ] T022 [P] [US2] Add source-links render tests to `apps/web/src/components/screens.test.tsx`:
+- [x] T022 [P] [US2] Add source-links render tests to `apps/web/src/components/screens.test.tsx`:
       lesson + question locators render as links to `/gaps/{gapId}?tab=sources#chunk-{chunkId}`,
       a general-knowledge item renders the explicit label, and the link has a visible
       focus-visible rule
 
 ### Implementation for User Story 2
 
-- [ ] T023 [US2] Wire the `audit_claims` step into the `auditing` stage of `compileGap` in
+- [x] T023 [US2] Wire the `audit_claims` step into the `auditing` stage of `compileGap` in
       `apps/worker/src/pipeline/compile.ts` (`runStep` with `inputVersion: hash(lesson)`);
       record findings via `uow.generation.addFinding` with `category: 'unsupported_claim'` and
       `repairStatus` = resolution (`repaired` / `excluded` / `accepted`); `resolution: 'none'`
       findings are `critical` so `decideRepair` refuses the lesson (depends T020)
-- [ ] T024 [US2] Extend `checkSourceSupport` in
+- [x] T024 [US2] Extend `checkSourceSupport` in
       `packages/domain/src/verification/verifier.ts` to refuse evidence locators whose `chunkId`
       is in `context.injectionSignals`; thread the injection signals into the verification
       context from `compileGap` (depends T021)
-- [ ] T025 [US2] Implement `apps/web/src/components/source-links.tsx` and wire it into the study
+- [x] T025 [US2] Implement `apps/web/src/components/source-links.tsx` and wire it into the study
       page (`apps/web/src/app/gaps/[gapId]/study/page.tsx`: Listen-section locators +
       per-question locators before answering in `apps/web/src/components/attempt-form.tsx`); add
       `id="chunk-{chunkId}"` anchors to the Sources tab rows
       (`apps/web/src/app/gaps/[gapId]/page.tsx?tab=sources`) (depends T022)
-- [ ] T026 [US2] Add `claimAuditClean()`, `claimAuditUnresolved()`, `claimAuditLabelled()`
+- [x] T026 [US2] Add `claimAuditClean()`, `claimAuditUnresolved()`, `claimAuditLabelled()`
       fixtures to `packages/test-fixtures/src/faulty-fixtures.ts` (depends T003)
 
 **Checkpoint**: US2 fully functional — the traceability invariant is green on the reference
@@ -219,20 +219,20 @@ proves every known-bad plan shape is still rejected (FR-012/FR-013/FR-014/FR-015
 
 ### Tests and tooling for User Story 3 (write FIRST, ensure they FAIL before implementation) ⚠️
 
-- [ ] T027 [US3] Write `tests/evaluation/plan-hit-rate.test.ts`: compiles `eval_01` through the
+- [x] T027 [US3] Write `tests/evaluation/plan-hit-rate.test.ts`: compiles `eval_01` through the
       real pipeline (fake provider), reads the `plan_curriculum` step output via
       `uow.generation.listSteps`, asserts `attempts[0].passed === true` on the reference pack and
       asserts the harness prints the per-invariant violation breakdown (depends T005)
-- [ ] T028 [US3] Write `tests/evaluation/plan-gate-guard.test.ts`: `findPlanViolations`
+- [x] T028 [US3] Write `tests/evaluation/plan-gate-guard.test.ts`: `findPlanViolations`
       (`packages/domain/src/curriculum/plan-validation.ts`) rejects every known-bad shape —
       over-budget day, untaught objective, unassessed objective, prerequisite cycle, unmet
       prerequisite, source-grounded objective with no locator — and returns all violations
       together in one result (FR-015)
-- [ ] T029 [US3] Implement `scripts/measure-plan-hit-rate.ts`: fake mode compiles `eval_01`;
+- [x] T029 [US3] Implement `scripts/measure-plan-hit-rate.ts`: fake mode compiles `eval_01`;
       live mode (`GAPOS_PROVIDER_MODE=live`) compiles all ten fixtures; prints
       `first-attempt valid X/Y (Z%)` + a per-invariant table; run the fake mode and record the
       output in `tasks/status.json` (FR-022)
-- [ ] T030 [US3] Planner improvement pass in `planCurriculum`
+- [x] T030 [US3] Planner improvement pass in `planCurriculum`
       (`apps/worker/src/pipeline/compile.ts`): strengthen the instruction with a per-invariant
       checklist (budget arithmetic per day, teach-and-assess coverage, acyclic prerequisites,
       locator citations, verbatim external prerequisites, non-decreasing difficulty) and a
@@ -259,11 +259,11 @@ for differing diagnostics/profiles/mastery and asserts measurably different curr
 
 ### Tests for User Story 4 (write FIRST, ensure they FAIL before implementation) ⚠️
 
-- [ ] T031 [US4] Write `packages/domain/src/curriculum/personalisation.test.ts`: two learners
+- [x] T031 [US4] Write `packages/domain/src/curriculum/personalisation.test.ts`: two learners
       differing in only one of diagnostic/profile/mastery yield measurably different plans;
       a satisfied prerequisite is at most a 5-minute Day-1 recall activity; a decayed capability
       is re-demonstrated; every adapted plan passes `findPlanViolations`
-- [ ] T032 [US4] Write the profile migration + repo tests: forward-only
+- [x] T032 [US4] Write the profile migration + repo tests: forward-only
       `packages/database/src/migrations/006_learner_profile.sql`
       (`ALTER TABLE users ADD COLUMN preferred_lesson_length … , ADD COLUMN goals …`), applied
       via `pnpm db:migrate`; update `User` in `packages/database/src/repositories/types.ts` and
@@ -272,17 +272,17 @@ for differing diagnostics/profiles/mastery and asserts measurably different curr
 
 ### Implementation for User Story 4
 
-- [ ] T033 [US4] Implement `packages/domain/src/curriculum/personalisation.ts`
+- [x] T033 [US4] Implement `packages/domain/src/curriculum/personalisation.ts`
       (`derivePlanInputs` + `personalisePlan`: recall-conversion of satisfied prerequisites,
       re-demonstration scheduling for decayed, activity rescaling for
       `preferredLessonLength`, Day-1 difficulty from the diagnostic, goals in the brief) and
       export from `packages/domain/src/index.ts` (depends T031)
-- [ ] T034 [US4] Thread the five inputs into `compileGap`
+- [x] T034 [US4] Thread the five inputs into `compileGap`
       (`apps/worker/src/pipeline/compile.ts`): read the profile via `uow.users.find(owner)`,
       mastery evidence via `uow.mastery.listEvidenceForCurriculum` + `classifyPriorCapabilities`;
       render profile + mastery into `learnerBrief`; apply `personalisePlan` before
       `uow.curricula.create` (depends T032, T033)
-- [ ] T035 [US4] Write `tests/evaluation/differentiation.test.ts`: same gap + same sources with
+- [x] T035 [US4] Write `tests/evaluation/differentiation.test.ts`: same gap + same sources with
       differing profile/diagnostic/mastery → curricula differ measurably (SC-004); `eval_10`
       prior-mastery fixture: mastered prerequisites are not retaught (at most a Day-1 recall
       check) (depends T034)
@@ -304,13 +304,13 @@ tolerance, naming the dimension.
 
 ### Tests for User Story 5 (write FIRST, ensure they FAIL before implementation) ⚠️
 
-- [ ] T036 [US5] Extend `tests/evaluation/live-provider.test.ts`: every live fixture clears the
+- [x] T036 [US5] Extend `tests/evaluation/live-provider.test.ts`: every live fixture clears the
       `human_sounding` floor and no dimension regresses beyond `REGRESSION_TOLERANCE` against
       `tasks/evaluation-baselines.json` (depends T013, T015)
-- [ ] T037 [US5] Record baselines including `human_sounding` via
+- [x] T037 [US5] Record baselines including `human_sounding` via
       `scripts/record-eval-baselines.ts` into `tasks/evaluation-baselines.json` (deliberate,
       review-gated flow; record the command + result in `tasks/status.json` — never silent)
-- [ ] T038 [US5] Audit the degradation suite in `tests/evaluation/reference-pack.test.ts`: every
+- [x] T038 [US5] Audit the degradation suite in `tests/evaluation/reference-pack.test.ts`: every
       dimension (including `human_sounding`) has a defect case that fails it; add any missing
       case so the gate cannot be decorative (FR-021)
 
@@ -323,18 +323,18 @@ clears the floor, and every claimed improvement is reproducible from a recorded 
 
 **Purpose**: Documentation, governance wiring and final evidence (Constitution §4, AGENTS.md §6).
 
-- [ ] T039 [P] Update `docs/PRODUCT.md` (LearnerProfile fields, hit-rate measurement,
+- [x] T039 [P] Update `docs/PRODUCT.md` (LearnerProfile fields, hit-rate measurement,
       `audit_claims` step), `docs/ARCHITECTURE.md` (stage notes: `plan_curriculum` output shape
       `{ plan, attempts }`, `audit_claims` in `auditing`, latency note for the added audit call),
       and `specs/quality.md` §10/§12 (add the `human_sounding` row to the enforcement table)
-- [ ] T040 [P] Mirror the E24 task set into `tasks/backlog.yaml` (new GAP ids, `epic: E24`,
+- [x] T040 [P] Mirror the E24 task set into `tasks/backlog.yaml` (new GAP ids, `epic: E24`,
       dependencies per the graph below) so the AGENTS.md controller can pick tasks from
       `tasks/backlog.yaml` and record progress in `tasks/status.json`
-- [ ] T041 [P] Run the full gate `env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm verify` and
+- [x] T041 [P] Run the full gate `env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm verify` and
       record the result in `tasks/status.json`
-- [ ] T042 [P] Run every scenario in `specs/001-content-engine-epic/quickstart.md` and record the
+- [x] T042 [P] Run every scenario in `specs/001-content-engine-epic/quickstart.md` and record the
       outputs (SC-008 reproducibility)
-- [ ] T043 Review the final diff for unrelated changes, secrets and scope drift; commit one
+- [x] T043 Review the final diff for unrelated changes, secrets and scope drift; commit one
       coherent change per logical group (AGENTS.md §3, §10)
 
 ---

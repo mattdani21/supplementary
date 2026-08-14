@@ -47,15 +47,22 @@ mastery.
 | Objectives present in both teaching and assessment | 100% |
 | Audio lessons with matching transcript | 100% |
 | Completed capabilities discoverable through search | 100% |
+| First planner attempt valid on the reference packs (E24 US3) | at least 80%, measured by `scripts/measure-plan-hit-rate.ts` |
+| Objectives, lessons and questions tracing to a source locator or an explicit general-knowledge label (E24 US2) | 100%, asserted on the compiled reference curriculum |
 
 Learning-quality invariants, enforced by tests rather than by intent:
 
 - every curriculum has explicit measurable objectives;
 - every objective maps to at least one lesson, two retrieval items and one application item;
 - every generated problem is independently solved or rubric-checked before publication;
+- every published lesson script clears the human-sounding rubric floor (concrete opening, one
+  idea per segment, worked example, checkpoint question);
 - a gap is only `filled` after evidence from at least two sessions including one cumulative or
   transfer task;
-- unsupported factual claims are removed, repaired or labelled;
+- unsupported factual claims are removed, repaired or labelled, with the resolution recorded
+  (the `audit_claims` step, E24 US2);
+- every objective, lesson and question cites a real source locator or is explicitly labelled
+  general knowledge;
 - reported confusion and repeated errors create remediation items.
 
 ## Journeys
@@ -105,7 +112,7 @@ The generation log is user-readable: stages and recoverable errors, never model 
 | Entity | Important fields |
 | --- | --- |
 | User | id, locale, timezone, accessibility preferences |
-| LearnerProfile | goals, preferred lesson length, baseline domains |
+| LearnerProfile | goals, preferred lesson length, baseline domains — plan-shape inputs: the curriculum is a deterministic function of gap, sources, diagnostic, learner profile and mastery evidence (E24 US4) |
 | Gap | title, raw statement, current state, target capability, deadline, daily minutes, status |
 | Source | owner, gap, filename, media type, checksum, processing status |
 | SourceChunk | source, text, locator, embedding, extraction confidence |
@@ -119,7 +126,7 @@ The generation log is user-readable: stages and recoverable errors, never model 
 | MasteryEvidence | learner, objective, evidence type, score, independence, timestamp |
 | ReviewItem | learner, objective or question, due time, interval, state |
 | GenerationRun | gap, pipeline version, status, timing, estimated cost |
-| GenerationStep | run, name, attempt, status, input version, output version, error |
+| GenerationStep | run, name, attempt, status, input version, output version, error; `plan_curriculum` output is `{ plan, attempts }` (E24 US3) |
 | AuditFinding | run, target, severity, category, finding, repair status |
 | KnowledgeEdge | source capability, target capability, relationship, confidence |
 
@@ -133,7 +140,10 @@ change status; database clients must not write status values directly.
 
 `queued → ingesting → planning → generating_lessons → generating_assessment → auditing →
 repairing → synthesising_audio → publishing → complete`, with `partial`, `failed` and `cancelled`
-as alternative outcomes. Every step is idempotent.
+as alternative outcomes. Every step is idempotent. The `auditing` stage runs `audit_claims` per
+lesson (keyed by a hash of the lesson, so a repaired lesson is re-audited and a resumed run never
+re-charges); the `plan_curriculum` step records `{ plan, attempts }` — every planner call with the
+invariants it violated — which is what the hit-rate measurement reads.
 
 ## Mastery model
 

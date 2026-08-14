@@ -71,9 +71,10 @@ Enforced by lint (`no-restricted-imports`) and by review:
 | A | Normalise the gap | topic, current state, target capability, observable success condition, assumed prerequisites, ambiguities, recommended diagnostic |
 | B | Ingest and ground sources | typed extraction, semantic chunks with page/slide/heading/timestamp locators, index, coverage summary |
 | C | Diagnose | five to ten adaptive questions, or a labelled conservative inference plus a Day 1 calibration activity |
-| D | Plan the curriculum | measurable objectives, prerequisite graph, exclusions, daily sequence, time estimates, assessment blueprint, source coverage, audio and visual requirements |
+| D | Plan the curriculum | measurable objectives, prerequisite graph, exclusions, daily sequence, time estimates, assessment blueprint, source coverage, audio and visual requirements; the `plan_curriculum` step records `{ plan, attempts }` (every planner call + the invariants it violated, E24 US3) and the accepted plan is passed through deterministic personalisation (profile + mastery, E24 US4) before storage |
 | E | Generate lessons in parallel | script, transcript, summary, examples, pause prompts, retrieval and application questions, answers and rubrics, source references, accessibility text |
-| F | Verify independently | solve each question independently, test distractors, check rubric tolerance, detect answer leakage, check difficulty, maths and logic, source support, spoken clarity, duration, coverage |
+| F | Verify independently | solve each question independently, test distractors, check rubric tolerance, detect answer leakage, check difficulty, maths and logic, source support, spoken clarity, duration, coverage, lesson structure (concrete opening / one idea per segment / worked example / checkpoint), refusal of items citing injected chunks (E24 US2) |
+| F2 | Audit claims | a separate model pass per lesson finds claims the sources do not support; each is recorded with its resolution (removed / repaired / labelled) and an unresolved claim blocks publication (E24 US2) |
 | G | Repair | only failed artefacts, at most two automated attempts, then exclude or mark the run partial |
 | H | Synthesise and publish | stable audio segments, parallel synthesis, integrity checks, incremental publication starting with Day 1, frozen published version |
 
@@ -81,13 +82,18 @@ Stage A requests clarification only when the ambiguity would materially change t
 otherwise it records a labelled assumption and continues.
 
 Stage D rejects a plan that exceeds the learner's available time, leaves an objective unassessed,
-or depends on an unaddressed prerequisite.
+or depends on an unaddressed prerequisite. The first-attempt valid-plan rate is measured from
+the recorded `{ plan, attempts }` output (`scripts/measure-plan-hit-rate.ts`) and the validation
+gate is guarded by tests so a higher hit rate can never come from a weaker gate (E24 US3).
 
 Stage E treats the plan, glossary and objective identifiers as immutable inputs, so parallel
 generation cannot cause terminology drift.
 
 Stage F is a genuinely independent verifier: it solves, it does not merely critique prose, and a
-failed verifier can never approve its own output.
+failed verifier can never approve its own output. Stage F2 (claim audit) adds one budgeted model
+call per lesson inside the existing `auditing` stage, keyed idempotently by `hash(lesson)` — a
+repaired lesson is audited again; a resumed run reuses the recorded output and never re-charges.
+The added call is inside the existing latency budget's verification window.
 
 Edits create new versions. Published artefacts used by recorded attempts are frozen.
 

@@ -95,7 +95,8 @@ voice as onboarding. Empty states teach the product.
   already assert this — it is the floor, not the ceiling).
 - Lesson scripts read like a human teacher, not a model dump: concrete opening, one idea per
   segment, worked example, checkpoint question. A "human-sounding" rubric lives in
-  `packages/evaluation` and is scored against reference packs.
+  `packages/evaluation` (published at `packages/evaluation/HUMAN_SOUNDING_RUBRIC.md`), is scored
+  against reference packs, and is enforced by the `script_structure` verifier before publication.
 - Sources are the curriculum's spine: every objective traces to a source locator; unsupported
   claims are removed/repaired/labelled (existing invariant).
 - The planner refuses invalid curricula (already true — TOPIK's failed compile is the gate
@@ -119,6 +120,8 @@ voice as onboarding. Empty states teach the product.
 | Contrast AA | token choices are AA by construction (documented pairs) |
 | Speed controls | component test on audio-player |
 | Content invariants | existing invariant test suite (extends, never weakens) |
+| Human-sounding rubric (E24 US1/US5) | `human_sounding` floor + 4 degradation cases in `tests/evaluation/reference-pack.test.ts`; regression gate compares against `tasks/evaluation-baselines.json` on every verify |
+| Traceability (E24 US2) | invariant on the compiled reference curriculum (`tests/evaluation/traceability.test.ts`); claim audit + source links covered by pipeline and render tests |
 
 A screen is "quality-done" when: all interactive states exist, all empty states are designed,
 feedback moments are present, a11y passes, and no legacy tokens remain. That is the Definition

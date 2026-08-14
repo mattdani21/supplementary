@@ -945,3 +945,562 @@ tasks:
       - 'fresh-user render test walks the 3 steps and lands on compile-in-progress'
       - 'skip path renders Today without onboarding'
       - 'pnpm verify passes'
+  - id: GAP-040
+    title: 'E24 T001: Baseline the quality gate on a clean tree (Setup)'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: []
+    goal: 'Run env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm verify and record pass/skip counts + commit hash in tasks/status.json'
+    acceptance:
+      - task T001 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-041
+    title: 'E24 T002: Add script_structure verification category (Foundational)'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: [GAP-040]
+    goal: 'VERIFICATION_CATEGORIES + FindingCategory gain script_structure; contracts.test.ts; pnpm specs:generate'
+    acceptance:
+      - task T002 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-042
+    title: 'E24 T003: Add ClaimAuditContract + CLAIM_RESOLUTIONS (Foundational)'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: [GAP-040]
+    goal: 'claim_audit contract in ai-contracts, registered in ALL_CONTRACTS/CONTRACT_NAMES; specs:generate'
+    acceptance:
+      - task T003 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-043
+    title: 'E24 T004: Add audit_claims generation step (Foundational)'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: [GAP-040]
+    goal: 'GENERATION_STEPS += audit_claims; state-machine.test.ts'
+    acceptance:
+      - task T004 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-044
+    title: 'E24 T005: Plan attempt record { plan, attempts } + PIPELINE_VERSION 1.1.0 (Foundational)'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: [GAP-040]
+    goal: 'planCurriculum returns PlanCurriculumResult; plan-hit-rate.test.ts compiles eval_01 and reads the step'
+    acceptance:
+      - task T005 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-045
+    title: 'E24 T006: assertTraceability invariant helper (Foundational)'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: [GAP-040]
+    goal: 'packages/evaluation/src/traceability.ts; traceability.test.ts'
+    acceptance:
+      - task T006 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-046
+    title: 'E24 T007: US1: four human-sounding degradation tests (Tests)'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: [GAP-041, GAP-051]
+    goal: 'reference-pack.test.ts — meta-opening / list prose / no example / no checkpoint below floor, named element'
+    acceptance:
+      - task T007 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-047
+    title: 'E24 T008: US1: checkLessonStructure unit tests (Tests)'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: [GAP-041, GAP-051]
+    goal: 'verifier.test.ts — missing element gives a critical script_structure finding'
+    acceptance:
+      - task T008 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-048
+    title: 'E24 T009: US1: faulty-lesson pipeline test (Tests)'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: [GAP-041, GAP-051]
+    goal: 'compile-math-gap.test.ts — missing-checkpoint lesson repaired or excluded, never published'
+    acceptance:
+      - task T009 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-049
+    title: 'E24 T010: US1: checkpoint UI tests (Tests)'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: [GAP-041, GAP-051]
+    goal: 'screens.test.tsx + audio-player.test.tsx — pause at pausePrompt, response required'
+    acceptance:
+      - task T010 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-050
+    title: 'E24 T011: US1: add human_sounding to SCORE_DIMENSIONS/SCORE_FLOORS (Implementation)'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: [GAP-051]
+    goal: 'fixture.ts dimension + floor'
+    acceptance:
+      - task T011 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-051
+    title: 'E24 T012: US1: four element detectors in script-structure.ts (Implementation)'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: [GAP-041]
+    goal: 'single source of truth for scorer + verifier'
+    acceptance:
+      - task T012 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-052
+    title: 'E24 T013: US1: scoreHumanSounding in scorer.ts (Implementation)'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: [GAP-050, GAP-051]
+    goal: 'registered in scoreCurriculum; observations name the element'
+    acceptance:
+      - task T013 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-053
+    title: 'E24 T014: US1: publish HUMAN_SOUNDING_RUBRIC.md (Implementation)'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: [GAP-052]
+    goal: 'prose rubric + deterministic rules + floor + calibration record'
+    acceptance:
+      - task T014 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-054
+    title: 'E24 T015: US1: calibrate SCORE_FLOORS.human_sounding (Implementation)'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: [GAP-052]
+    goal: 'reference curricula clear the floor; command + scores recorded'
+    acceptance:
+      - task T015 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-055
+    title: 'E24 T016: US1: checkLessonStructure in verifier (Implementation)'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: [GAP-041, GAP-051]
+    goal: 'wired into verifyLesson'
+    acceptance:
+      - task T016 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-056
+    title: 'E24 T017: US1: generateLesson instruction demands the four elements (Implementation)'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: [GAP-048]
+    goal: 'compile.ts instruction + lessonMissingCheckpoint fixture'
+    acceptance:
+      - task T017 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-057
+    title: 'E24 T018: US1: checkpoint surface (Implementation)'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: [GAP-049]
+    goal: 'checkpoint.tsx + audio-player pause + study page render'
+    acceptance:
+      - task T018 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-058
+    title: 'E24 T019: US2: traceability invariant on compiled eval_01 (Tests)'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: [GAP-045]
+    goal: '100% locator/general-knowledge, every locator resolves'
+    acceptance:
+      - task T019 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-059
+    title: 'E24 T020: US2: claim-audit pipeline tests (Tests)'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: [GAP-042, GAP-043]
+    goal: 'unresolved blocks; labelled publishes with repairStatus accepted; clean unchanged'
+    acceptance:
+      - task T020 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-060
+    title: 'E24 T021: US2: injection-chunk refusal tests (Tests)'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: [GAP-045]
+    goal: 'verifier.test.ts — item citing an injected chunk gives a critical finding'
+    acceptance:
+      - task T021 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-061
+    title: 'E24 T022: US2: source-links render tests (Tests)'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: []
+    goal: 'screens.test.tsx — locator links to #chunk-{chunkId}, general-knowledge label, focus-visible'
+    acceptance:
+      - task T022 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-062
+    title: 'E24 T023: US2: wire audit_claims into the auditing stage (Implementation)'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: [GAP-059]
+    goal: 'compile.ts — runStep hash(lesson); findings with repairStatus = resolution; none -> critical'
+    acceptance:
+      - task T023 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-063
+    title: 'E24 T024: US2: injection-chunk refusal in verifier + threading (Implementation)'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: [GAP-060]
+    goal: 'checkSourceSupport refuses injectionSignals chunkIds; compileGap threads signals'
+    acceptance:
+      - task T024 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-064
+    title: 'E24 T025: US2: source-links component + study page wiring (Implementation)'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: [GAP-061]
+    goal: 'source-links.tsx; Listen + per-question locators; chunk anchors'
+    acceptance:
+      - task T025 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-065
+    title: 'E24 T026: US2: claim-audit fixtures (Implementation)'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: [GAP-042]
+    goal: 'claimAuditClean/Unresolved/Labelled in faulty-fixtures.ts'
+    acceptance:
+      - task T026 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-066
+    title: 'E24 T027: US3: plan-hit-rate test with per-invariant breakdown (Tests)'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: [GAP-044]
+    goal: 'eval_01 first attempt passes; breakdown helper locked'
+    acceptance:
+      - task T027 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-067
+    title: 'E24 T028: US3: plan-gate-guard test (Tests)'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: []
+    goal: 'every known-bad shape rejected, all violations together'
+    acceptance:
+      - task T028 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-068
+    title: 'E24 T029: US3: measure-plan-hit-rate.ts harness (Tooling)'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: [GAP-066]
+    goal: 'fake eval_01 / live ten fixtures; first-attempt valid X/Y (Z%) + table; fake run recorded'
+    acceptance:
+      - task T029 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-069
+    title: 'E24 T030: US3: planner instruction checklist pass (Implementation)'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: [GAP-066, GAP-067, GAP-068]
+    goal: 'per-invariant checklist + failure-mode glossary; >=80% live while guard stays green'
+    acceptance:
+      - task T030 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-070
+    title: 'E24 T031: US4: personalisation unit tests (Tests)'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: []
+    goal: 'differing inputs -> differing plans; recall check; re-demonstration; revalidated'
+    acceptance:
+      - task T031 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-071
+    title: 'E24 T032: US4: profile migration + repo tests (Tests)'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: []
+    goal: '006_learner_profile.sql; User fields; memory+postgres; defaults + union validation'
+    acceptance:
+      - task T032 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-072
+    title: 'E24 T033: US4: personalisation module (Implementation)'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: [GAP-070]
+    goal: 'derivePlanInputs + personalisePlan, pure, exported'
+    acceptance:
+      - task T033 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-073
+    title: 'E24 T034: US4: thread the five inputs into compileGap (Implementation)'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: [GAP-071, GAP-072]
+    goal: 'profile via uow.users.find; mastery via listEvidenceForCurriculum + classifyPriorCapabilities; learnerBrief; personalisePlan before create'
+    acceptance:
+      - task T034 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-074
+    title: 'E24 T035: US4: differentiation tests (Tests)'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: [GAP-073]
+    goal: 'same gap+sources, differing inputs -> curricula differ; eval_10 prior mastery not retaught'
+    acceptance:
+      - task T035 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-075
+    title: 'E24 T036: US5: live gate human_sounding floor + regression (Tests)'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: [GAP-052, GAP-054]
+    goal: 'live-provider.test.ts — floor per fixture; no regression beyond tolerance'
+    acceptance:
+      - task T036 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-076
+    title: 'E24 T037: US5: record baselines including human_sounding (Implementation)'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: []
+    goal: 'record-eval-baselines.ts (incl --fake); tasks/evaluation-baselines.json; deliberate flow'
+    acceptance:
+      - task T037 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-077
+    title: 'E24 T038: US5: audit the degradation suite (Tests)'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: []
+    goal: 'every dimension has a defect case that fails it'
+    acceptance:
+      - task T038 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-078
+    title: 'E24 T039: Polish: docs (PRODUCT/ARCHITECTURE/quality)'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: []
+    goal: 'LearnerProfile, hit-rate, audit_claims, {plan, attempts}, human_sounding row'
+    acceptance:
+      - task T039 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-079
+    title: 'E24 T040: Polish: mirror E24 task set into backlog.yaml'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: []
+    goal: 'GAP ids, epic E24, dependencies per graph'
+    acceptance:
+      - task T040 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-080
+    title: 'E24 T041: Polish: full gate run recorded'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: []
+    goal: 'env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm verify; result in status.json'
+    acceptance:
+      - task T041 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-081
+    title: 'E24 T042: Polish: run every quickstart.md scenario'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: []
+    goal: 'record outputs (SC-008)'
+    acceptance:
+      - task T042 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+  - id: GAP-082
+    title: 'E24 T043: Polish: final diff review + coherent commits'
+    epic: E24
+    priority: P0
+    status: done
+    dependencies: []
+    goal: 'no unrelated changes, secrets, scope drift'
+    acceptance:
+      - task T043 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false

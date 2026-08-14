@@ -1,6 +1,6 @@
 {
  "schemaVersion": 1,
- "updatedAt": "2026-08-14T20:59:49.314361Z",
+ "updatedAt": "2026-08-14T21:05:09.263170Z",
  "controller": "gapos-controller",
  "tasks": {
   "GAP-035": {
@@ -1473,6 +1473,66 @@
      "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm verify",
      "result": "pass",
      "note": "US5 checkpoint: the regression gate absorbed human_sounding — the fake gate (every verify) compares eval_01 against its recorded baseline including the new dimension; the live gate (human-gated) asserts the floor + no regression; every dimension has a failing defect case. Full suite: 573 passed | 26 loud skips (baseline 517)."
+    }
+   ]
+  },
+  "E24-T039": {
+   "status": "done",
+   "startedAt": "2026-08-14T23:00:00.000Z",
+   "completedAt": "2026-08-14T21:03:36.102245Z",
+   "evidence": [
+    {
+     "command": "read + edit docs/PRODUCT.md, docs/ARCHITECTURE.md, specs/quality.md",
+     "result": "pass",
+     "note": "PRODUCT.md: success measures gained the hit-rate target (>=80% via scripts/measure-plan-hit-rate.ts) and the 100% traceability invariant; learning-quality invariants gained the human-sounding floor, the audit_claims resolution record and the traceability invariant; generation lifecycle notes audit_claims + {plan, attempts}; LearnerProfile/GenerationStep rows updated. ARCHITECTURE.md: stage D output notes {plan, attempts} + deterministic personalisation; new stage F2 'Audit claims'; stage D/F notes on the measured hit rate, the guarded gate, and the idempotent per-lesson audit call inside the latency budget. quality.md: human-sounding rubric + traceability rows added to the §12 enforcement table; §10 text points at the published rubric and the script_structure verifier."
+    }
+   ]
+  },
+  "E24-T040": {
+   "status": "done",
+   "startedAt": "2026-08-14T23:01:00.000Z",
+   "completedAt": "2026-08-14T21:03:36.102245Z",
+   "evidence": [
+    {
+     "command": "python generator -> tasks/backlog.yaml (43 tasks)",
+     "result": "pass",
+     "note": "E24 task set mirrored into tasks/backlog.yaml as GAP-040..GAP-082 (T001..T043), epic: E24, dependencies per the tasks.md graph (US1 -> T002/T012; US2 -> T003/T004/T006; US3 -> T005; US4 -> T031..T034 chain; US5 -> T013/T015; Polish after stories), all dependencies resolve; specs/001-content-engine-epic/tasks.md checkboxes marked done."
+    }
+   ]
+  },
+  "E24-T042": {
+   "status": "done",
+   "startedAt": "2026-08-14T23:02:30.000Z",
+   "completedAt": "2026-08-14T21:03:36.102245Z",
+   "evidence": [
+    {
+     "command": "quickstart.md scenarios 1-5 + contract/schema refresh",
+     "result": "pass",
+     "note": "S1 pnpm verify -> green (final counts recorded in T041). S2 plan-hit-rate.test.ts 4/4 + measure-plan-hit-rate.ts -> 'first-attempt valid 1/1 (100%)', zero rejections. S3 traceability.test.ts 7/7 + screens.test.tsx 19/19 (source links). S4 personalisation.test.ts 9/9 + differentiation.test.ts 5/5. S5 record-eval-baselines.ts --fake -> eval_01 baseline incl human_sounding (1.0), live baselines preserved (git diff: only eval_01 added). Contract refresh: pnpm specs:generate writes 7 schemas byte-identical to committed (no drift); pnpm db:migrate applies 006_learner_profile.sql (alreadyApplied 6 on re-run -> idempotent; users.preferred_lesson_length + goals + CHECK constraint verified via \\d users). SC-008: every command above is reproducible."
+    }
+   ]
+  },
+  "E24-T041": {
+   "status": "done",
+   "startedAt": "2026-08-14T23:04:00.000Z",
+   "completedAt": "2026-08-14T21:05:09.263170Z",
+   "evidence": [
+    {
+     "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm verify (final)",
+     "result": "pass",
+     "note": "573 passed | 26 loud skips (599 total), 43 test files passed | 4 skipped (47). Format, lint, typecheck, full suite green. Baseline at T001 was 483 passed | 26 skipped; US1-5 + Polish added 90 passing tests (517 -> 573)."
+    }
+   ]
+  },
+  "E24-T043": {
+   "status": "done",
+   "startedAt": "2026-08-14T23:05:00.000Z",
+   "completedAt": "2026-08-14T21:05:09.263170Z",
+   "evidence": [
+    {
+     "command": "git status + git diff --stat + secret scan (sk-/api-key/password/secret patterns)",
+     "result": "pass",
+     "note": "Final diff reviewed: only docs (PRODUCT/ARCHITECTURE/quality), tasks.md checkboxes (T001-T043 marked done), the E24 backlog mirror (GAP-040..GAP-082), the eval_01 baseline re-record timestamps, and tasks/status.json evidence. No unrelated changes, no secrets, no scope drift. Commits per logical group: US1 (pre-existing), US2, US3, US4, US5, and this Polish commit."
     }
    ]
   }
