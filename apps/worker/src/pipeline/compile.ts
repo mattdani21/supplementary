@@ -644,6 +644,12 @@ export interface PlanAttempt {
   readonly attempt: number;
   /** Violation messages from `findPlanViolations`, empty when the plan passed. */
   readonly violations: readonly string[];
+  /**
+   * The violation codes (`DomainErrorCode`), one per `violations` entry, so the hit-rate
+   * diagnosis counts rejections per invariant exactly (US3, FR-014). Optional for
+   * backward-compatible reads of a step output recorded before this field existed.
+   */
+  readonly codes?: readonly string[];
   readonly passed: boolean;
 }
 
@@ -680,21 +686,45 @@ const planCurriculum = async (params: {
       userId: owner,
       subject: gapId,
       instruction:
-        `${params.learnerBrief} Produce a curriculum plan that satisfies every invariant the ` +
-        "product enforces: (1) every day's activities fit within the learner's daily minutes; " +
-        '(2) every objective is taught on at least one day, and no day teaches an objective the ' +
-        'plan does not declare; (3) the assessment blueprint has exactly one entry per objective, ' +
-        'each with at least 2 retrieval and 1 application items, and no entry for an undeclared ' +
-        'objective; (4) the prerequisite graph is acyclic, and every prerequisiteObjectiveId names ' +
-        'an objective the plan teaches; (5) every source-grounded objective cites locators from ' +
-        'the evidence; (6) externalPrerequisites must be copied verbatim from the list of what ' +
-        'the learner is assumed to already hold — never invent a prerequisite outside it; teach ' +
-        'it as an objective instead, or remove the dependency; (7) an audio lesson is a ' +
-        'five-minute listening activity (~750 spoken words), scheduled alongside practice ' +
-        'activities that together fit the daily budget; (8) targetDifficulty must not decrease ' +
-        'across the course — later objectives are harder than earlier ones.' +
+        `${params.learnerBrief} Produce a curriculum plan that passes every invariant the ` +
+        'product enforces. Work through this checklist before you output the plan; each item ' +
+        'names the exact failure mode that rejects a plan, so a plan that fails any item comes ' +
+        'back for repair.\n' +
+        'CHECKLIST\n' +
+        '(1) DAILY BUDGET ARITHMETIC: sum the estimatedMinutes of every activity on each day. ' +
+        "The sum must be <= the learner's daily minutes. Do the arithmetic explicitly per day " +
+        '— a day that is over budget is rejected outright. Failure mode: ' +
+        'plan_exceeds_time_budget ("Day N needs X minutes but the learner has Y").\n' +
+        '(2) TEACH-AND-ASSESS COVERAGE: every objective in the plan must appear in at least one ' +
+        "day's objectiveIds, and no day may list an objective the plan does not declare. " +
+        'Failure modes: objective_not_taught ("never scheduled" / "teaches X, which is not an ' +
+        'objective").\n' +
+        '(3) ASSESSMENT BLUEPRINT: exactly one blueprint entry per objective, each promising at ' +
+        'least 2 retrieval and 1 application items, and no entry for an undeclared objective. ' +
+        'Failure modes: objective_not_assessed.\n' +
+        '(4) PREREQUISITE GRAPH: the prerequisiteObjectiveIds must form an acyclic graph, and ' +
+        'every prerequisiteObjectiveId must name an objective the plan teaches. Failure modes: ' +
+        'prerequisite_cycle (the cycle is named) and prerequisite_unmet (dangling dependency).\n' +
+        '(5) EXTERNAL PREREQUISITES: copy externalPrerequisites VERBATIM from the list of what ' +
+        'the learner is assumed to already hold — never invent, reword or reorder one. If a ' +
+        'prerequisite is not on that list, either teach it as an objective or remove the ' +
+        'dependency. Failure mode: prerequisite_unmet ("assumes X, which the learner has not ' +
+        'been shown to hold").\n' +
+        '(6) EVIDENCE GROUNDING: every source-grounded objective must cite locators from the ' +
+        'evidence block; only an objective explicitly labelled general_knowledge may omit them. ' +
+        'Failure mode: an objective "claims source grounding but cites no locator".\n' +
+        '(7) LESSON SHAPE: an audio lesson is a five-minute listening activity (~750 spoken ' +
+        'words), scheduled alongside practice activities that together fit the daily budget. ' +
+        "Set estimatedMinutes to the activity's real length, not the day's total.\n" +
+        '(8) DIFFICULTY PROGRESSION: targetDifficulty must not decrease across the course — ' +
+        'later objectives are harder than earlier ones. Failure mode: a backwards ramp.\n' +
+        'COMMON FAILURE MODES TO AVOID: inventing external prerequisites; listing an objective ' +
+        'on a day but forgetting its blueprint entry; summing activities without including the ' +
+        'review/recall items; a prerequisite cycle from objectives that depend on each other; ' +
+        'citing a locator that is not in the evidence block.' +
         (previousViolations.length > 0
-          ? ` The previous plan was rejected for: ${previousViolations.join('; ')}. Fix all of them.`
+          ? ` The previous plan was rejected for: ${previousViolations.join('; ')}. ` +
+            'Fix every one of them — each rejected invariant is a defect in the plan, not a suggestion.'
           : ''),
       evidence,
     });
@@ -705,6 +735,7 @@ const planCurriculum = async (params: {
     attempts.push({
       attempt,
       violations: violations.map((v) => v.message),
+      codes: violations.map((v) => v.code),
       passed: violations.length === 0,
     });
     if (violations.length === 0) return { plan: response.value, attempts };

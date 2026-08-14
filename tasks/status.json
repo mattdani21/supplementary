@@ -1,6 +1,6 @@
 {
  "schemaVersion": 1,
- "updatedAt": "2026-08-14T20:45:08.000988Z",
+ "updatedAt": "2026-08-14T20:48:55.087174Z",
  "controller": "gapos-controller",
  "tasks": {
   "GAP-035": {
@@ -1283,6 +1283,71 @@
      "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm exec vitest run tests/evaluation tests/end-to-end/security.test.ts tests/end-to-end/embedding-retrieval.test.ts packages/domain packages/database apps/web",
      "result": "pass",
      "note": "US2 checkpoint: traceability invariant green on the compiled eval_01 reference curriculum (100% locator/labelled, every locator resolves); unresolved claims block publication; labelled resolutions publish with the finding recorded; injected chunks are never cited; source links render one step from the source. Full suite at this point: 528 passed | 26 loud skips."
+    }
+   ]
+  },
+  "E24-T027": {
+   "status": "done",
+   "startedAt": "2026-08-14T22:46:00.000Z",
+   "completedAt": "2026-08-14T20:48:55.087174Z",
+   "evidence": [
+    {
+     "command": "pnpm exec vitest run tests/evaluation/plan-hit-rate.test.ts (red run before T029)",
+     "result": "fail",
+     "note": "Extended with the per-invariant breakdown assertions (depends T005): a passing first attempt records no violations and no codes, countViolationsByCode counts rejections per invariant code across attempts, legacy attempts (recorded before codes existed) degrade safely, and formatHitRateReport prints 'first-attempt valid X/Y (Z%)' plus the table. Red before implementation: PlanAttempt carried no codes and the harness did not exist."
+    },
+    {
+     "command": "pnpm exec vitest run tests/evaluation/plan-hit-rate.test.ts (after T029)",
+     "result": "pass",
+     "note": "4 tests pass. PlanAttempt now also records the violation codes (DomainErrorCode) alongside messages, so the per-invariant diagnosis is exact (FR-014); the harness helpers are exported from scripts/measure-plan-hit-rate.ts and locked by this file."
+    }
+   ]
+  },
+  "E24-T028": {
+   "status": "done",
+   "startedAt": "2026-08-14T22:46:30.000Z",
+   "completedAt": "2026-08-14T20:48:55.087174Z",
+   "evidence": [
+    {
+     "command": "pnpm exec vitest run tests/evaluation/plan-gate-guard.test.ts",
+     "result": "pass",
+     "note": "Guard test written first and passing immediately — it locks existing strictness: over-budget day, untaught objective, stray objective, unassessed objective, thin blueprint, phantom blueprint entry, prerequisite cycle (named), dangling prerequisite, unmet external prerequisite, and a source-grounded objective with no locator are all still rejected; a plan with three independent defects returns all three violations together (FR-014/FR-015). This file is the tripwire if any later hit-rate work weakens the gate."
+    }
+   ]
+  },
+  "E24-T029": {
+   "status": "done",
+   "startedAt": "2026-08-14T22:47:00.000Z",
+   "completedAt": "2026-08-14T20:48:55.087174Z",
+   "evidence": [
+    {
+     "command": "pnpm exec tsx scripts/measure-plan-hit-rate.ts (fake mode, recorded)",
+     "result": "pass",
+     "note": "MEASURED first-attempt valid-plan rate, eval_01 through the real pipeline: 'first-attempt valid 1/1 (100%)' and 'per-invariant rejections: none across all recorded attempts'. Live mode (GAPOS_PROVIDER_MODE=live) compiles all ten fixtures minus the clarification fixture and prints the same report — a paid run behind the human approval gate, not run here. FR-022: the command and its output are the evidence."
+    }
+   ]
+  },
+  "E24-T030": {
+   "status": "done",
+   "startedAt": "2026-08-14T22:48:00.000Z",
+   "completedAt": "2026-08-14T20:48:55.087174Z",
+   "evidence": [
+    {
+     "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm exec tsx scripts/measure-plan-hit-rate.ts + pnpm exec vitest run tests/evaluation/plan-gate-guard.test.ts",
+     "result": "pass",
+     "note": "Planner instruction strengthened into a per-invariant checklist with explicit budget arithmetic, verbatim external prerequisites, the exact failure-mode names the gate returns (plan_exceeds_time_budget / objective_not_taught / objective_not_assessed / prerequisite_cycle / prerequisite_unmet / no-locator), and a common-failure glossary; repair rounds quote the rejected invariants as defects. Re-measured: first-attempt valid 1/1 (100%) fake mode, per-invariant table empty. The guard test (T028) stays green — findPlanViolations untouched. Live-pack >=80% (SC-001) is a paid run behind the human approval gate; the harness measures it on demand."
+    }
+   ]
+  },
+  "E24-US3-validation": {
+   "status": "done",
+   "startedAt": "2026-08-14T22:48:30.000Z",
+   "completedAt": "2026-08-14T20:48:55.087174Z",
+   "evidence": [
+    {
+     "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm exec vitest run tests/evaluation",
+     "result": "pass",
+     "note": "US3 checkpoint: hit rate is a measured, reproducible number (1/1 = 100% fake mode on eval_01); the per-invariant breakdown is exact; the gate guard rejects every known-bad shape with all violations returned together. Full suite green."
     }
    ]
   }
