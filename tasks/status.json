@@ -1,6 +1,6 @@
 {
  "schemaVersion": 1,
- "updatedAt": "2026-08-03T15:39:20.000Z",
+ "updatedAt": "2026-08-14T12:30:00.000Z",
  "controller": "gapos-controller",
  "tasks": {
   "GAP-000": {
@@ -514,6 +514,11 @@
      "command": "pnpm test apps/web/src/server/api.test.ts",
      "result": "pass",
      "note": "The educator review queue (E19). Migration 005 adds review_status + review_note to lessons; CurriculumRepository.setReview records the decision owner-scoped. GET /api/review lists lessons whose generation run recorded audit findings (with their findings and any decision), POST /api/review/:lessonId approves or rejects with a note, and the note is visible on the lesson. /review page renders the queue with severity-coloured findings and approve/reject controls; the gaps header links to it. Tests cover flag -> reject-with-note -> visible-note, and owner isolation."
+    },
+    {
+     "command": "pnpm verify",
+     "result": "pass",
+     "note": "Full quality gate on wt/gap-031: format:check, lint, typecheck and 402 tests passed (27 skipped loudly: Postgres block and live-provider pack). The E19 review suite (flagged lesson appears in the queue -> rejected with a note -> note visible on the lesson, plus owner isolation) is green without re-implementation, confirming GAP-031 was already met by commit cc54c55."
     }
    ]
   }
