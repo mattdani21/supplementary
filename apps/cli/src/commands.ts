@@ -26,7 +26,7 @@ export interface CliIO {
   readonly prompt?: (question: string) => Promise<string>;
 }
 
-export const OWNER: OwnerId = (process.env.GAPOS_OWNER ?? 'cli-learner') as OwnerId;
+export const OWNER: OwnerId = (process.env.GAPOS_OWNER ?? 'local-learner') as OwnerId;
 
 const arg = (args: readonly string[], name: string): string | undefined => {
   const index = args.indexOf(name);
