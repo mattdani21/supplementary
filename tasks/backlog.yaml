@@ -680,7 +680,7 @@ tasks:
     title: Operations documentation for the deployment surface
     epic: E20
     priority: P1
-    status: ready
+    status: done
     goal: A fresh deployment is startable from the docs.
     scope:
       - OPERATIONS.md: API, daemon, UI, MinIO, live-mode env table, CLI usage

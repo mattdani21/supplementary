@@ -1,6 +1,6 @@
 {
  "schemaVersion": 1,
- "updatedAt": "2026-08-03T15:39:20.000Z",
+ "updatedAt": "2026-08-14T10:40:00.000Z",
  "controller": "gapos-controller",
  "tasks": {
   "GAP-000": {
@@ -454,7 +454,12 @@
     "git clone \u2192 pnpm install \u2192 pnpm verify: 400 passed | 26 skipped (loud)",
     "pnpm --filter @gapos/web start (no env): /api/health 200; in-memory warning logged",
     "pnpm --filter @gapos/worker start + SIGTERM: \"gapos-worker stopped cleanly\", exit 0",
-    "pnpm tsx scripts/smoke-compile.ts: SMOKE OK: published course, 3 lessons, audio/mpeg (43 bytes)"
+    "pnpm tsx scripts/smoke-compile.ts: SMOKE OK: published course, 3 lessons, audio/mpeg (43 bytes)",
+    {
+     "command": "dsh --profile headless (deepseek-harness, worktree t_17956e5e) + wrapper verify",
+     "result": "pass",
+     "note": "Takeover migration 2026-08-14: dsh headless exit 0; diff reviewed against code (budget vars corrected to *_MILLICENTS daemon names, live-mode env table, CLI command set, README quickstart). Independent pnpm verify: 402 passed | 27 skipped (Postgres/live-key suites, expected). Commit 3d7d0fb on wt/gap-026. Not pushed, not merged."
+    }
    ]
   },
   "GAP-027": {

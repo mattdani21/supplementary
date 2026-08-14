@@ -23,11 +23,28 @@ pool, and exits 0. Restart recovery is the lease protocol: a job whose lease exp
 re-claimed and re-enters its run, reusing completed steps (idempotency) instead of duplicating
 artefacts or charges.
 
-**Live mode.** `GAPOS_PROVIDER_MODE=live` assembles all four adapters from `GAPOS_*` env
-(language model, speech-to-text, text-to-speech, embeddings). The constructors refuse to boot
-without keys — configuring the keys *is* the human approval gate. `GAPOS_LLM_MODE=local`
-selects the Ollama/llama.cpp preset (localhost:11434/v1, no key); a local model only earns
-production use by clearing the evaluation threshold (see Release gates).
+**Live mode.** `GAPOS_PROVIDER_MODE=live` assembles the live adapters from `GAPOS_*` env
+(language model, speech-to-text, embeddings; text-to-speech uses the keyless Google Translate
+engine by default). The keyed constructors refuse to boot without their keys — configuring the
+keys *is* the human approval gate. `GAPOS_LLM_MODE=local` selects the Ollama/llama.cpp preset
+(localhost:11434/v1, no key); a local model only earns production use by clearing the
+evaluation threshold (see Release gates). The full live-mode env table:
+
+| Variable | Adapter | Default |
+| --- | --- | --- |
+| `GAPOS_LLM_API_KEY` / `GAPOS_LLM_BASE_URL` / `GAPOS_LLM_MODEL` | language model | DeepSeek (`https://api.deepseek.com`, `deepseek-chat`) |
+| `GAPOS_LLM_PRICE_INPUT_MILLICENTS_PER_MT` / `GAPOS_LLM_PRICE_OUTPUT_MILLICENTS_PER_MT` | language model pricing | deepseek-chat list prices |
+| `GAPOS_LLM_MODE=local` | local preset (Ollama/llama.cpp, no key) | — |
+| `GAPOS_MODEL_ROUTING` | per-purpose routing, e.g. `planning:model-a,teaching:model-b` | — |
+| `GAPOS_STT_API_KEY` / `GAPOS_STT_BASE_URL` / `GAPOS_STT_MODEL` | speech-to-text | OpenAI-compatible (`https://api.openai.com/v1`, `whisper-1`) |
+| `GAPOS_STT_PRICE_MILLICENTS_PER_MINUTE` | speech-to-text pricing | — |
+| `GAPOS_EMBEDDINGS_API_KEY` / `_BASE_URL` / `_MODEL` / `_DIMENSIONS` | embeddings | OpenAI-compatible (`https://api.openai.com/v1`, `text-embedding-3-small`, 384) |
+| `GAPOS_EMBEDDINGS_PRICE_MILLICENTS_PER_MT` | embeddings pricing | — |
+
+Prices are in millicents per million tokens (per minute for speech-to-text). For the
+evaluation harness, `tests/evaluation/live-helpers.ts` accepts a cents convenience —
+`GAPOS_BUDGET_PER_RUN_CENTS` / `GAPOS_BUDGET_PER_USER_DAILY_CENTS`; the daemon itself reads the
+`*_MILLICENTS` budget variables below.
 
 **Object storage.** `GAPOS_STORAGE=s3` with `GAPOS_S3_*` env uses the SigV4 client (plain
 fetch) against MinIO or any S3 endpoint. Uploads are screened before storage; identical files
@@ -38,6 +55,19 @@ users, gaps (create/list/get/transition/compile), sources (register/list), today
 lesson, artefact audio URL, attempts, mastery, knowledge map, review queue, voice gap capture.
 Bodies are zod-validated; errors map to HTTP statuses (400 validation, 401 owner header, 404
 missing, 402 budget, 409 conflict, 422 screening).
+
+**Command line (CLI).** `pnpm --filter @gapos/cli start -- <command>` runs the `gapos` study
+client. Env: `GAPOS_DATABASE_URL` (Postgres; else in-memory), `GAPOS_OWNER` (learner id,
+default `cli-learner`):
+
+    gap new [--title T] [--statement S] [--minutes N]
+    gap list
+    gap <id>
+    source add <gapId> [--file PATH | --text TEXT]
+    compile <gapId>
+    plan <gapId>
+    study <gapId>
+    mastery <gapId>
 
 **Offline (PWA).** The service worker caches same-origin GETs stale-while-revalidate; after a
 first load the current lesson renders with the network cut. Writes never cache — offline they
@@ -65,7 +95,12 @@ Variables on web **and** worker (identical, so either process can be the first b
     GAPOS_S3_REGION=us-east-1
     GAPOS_S3_BUCKET=gapos
     GAPOS_S3_ACCESS_KEY_ID / GAPOS_S3_SECRET_ACCESS_KEY
-    GAPOS_BUDGET_PER_RUN_CENTS / GAPOS_BUDGET_PER_USER_DAILY_CENTS
+
+Daemon-only — the worker reads these; the web ignores them, but setting them on both keeps the
+env identical:
+
+    GAPOS_BUDGET_PER_RUN_MILLICENTS / GAPOS_BUDGET_DAILY_MILLICENTS
+    GAPOS_QUEUE_POLL_INTERVAL_MS / GAPOS_QUEUE_LEASE_DURATION_MS / GAPOS_QUEUE_CLAIM_BATCH
 
 Both processes migrate on boot and self-provision the bucket (`ensureBucket`), so the
 deploy order is: postgres + minio up, then web and worker (either first). The worker polls
