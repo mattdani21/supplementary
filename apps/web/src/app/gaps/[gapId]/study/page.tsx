@@ -2,8 +2,9 @@ import Link from 'next/link';
 import { randomUUID } from 'node:crypto';
 import { AttemptForm, type AttemptQuestion } from '../../../../components/attempt-form';
 import { AudioPlayer } from '../../../../components/audio-player';
+import { EmptyState } from '../../../../components/empty-state';
 import { WorkspaceTabs } from '../../../../components/workspace-tabs';
-import { getLesson, todayView } from '../../../../server/api';
+import { getLesson, listSources, todayView } from '../../../../server/api';
 import { getServerContext } from '../../../../server/bootstrap';
 import { viewerOwner } from '../../../../lib/viewer';
 
@@ -15,14 +16,29 @@ interface ArtefactView {
   mediaType: string;
 }
 
+interface LessonQuestionView {
+  id: string;
+  objectiveId: string;
+  payload: {
+    prompt: string;
+    options?: string[];
+    hint?: string;
+    evidence: {
+      basis: string;
+      locators: readonly { sourceId: string; chunkId: string; locator: string }[];
+    };
+  };
+}
+
 interface LessonView {
   id: string;
   day: number;
   title: string;
   estimatedMinutes?: number;
   objectiveIds?: string[];
-  questions: (AttemptQuestion & { answer?: string })[];
+  questions: LessonQuestionView[];
   artefacts: ArtefactView[];
+  package: { transcript: string };
 }
 
 export default async function StudyPage({ params }: { params: Promise<{ gapId: string }> }) {
@@ -44,6 +60,15 @@ export default async function StudyPage({ params }: { params: Promise<{ gapId: s
           <h1>Nothing due today</h1>
           <p className="page-head__meta">Come back when a lesson is scheduled.</p>
         </header>
+        <EmptyState
+          title="Nothing is due right now."
+          body="The review queue fills as your course publishes — check back later or keep practising."
+          action={
+            <Link href={`/gaps/${gapId}`} className="btn">
+              Open the workspace
+            </Link>
+          }
+        />
       </main>
     );
   }
@@ -52,9 +77,33 @@ export default async function StudyPage({ params }: { params: Promise<{ gapId: s
     lesson: LessonView;
   };
 
+  const { sources } = (await listSources(context, owner, gapId)) as {
+    sources: { id: string; filename: string }[];
+  };
+  const sourceNames = new Map(sources.map((source) => [source.id, source.filename]));
+
+  // The verified solution and its source locators are resolved server-side; only the feedback
+  // surface ever shows them, after the attempt is graded. Questions are stored as envelopes
+  // with a `payload` — the fields the practice form needs live inside it.
+  const questions: AttemptQuestion[] = lesson.questions.map((question) => ({
+    id: question.id,
+    objectiveId: question.objectiveId,
+    prompt: question.payload.prompt,
+    ...(question.payload.options ? { options: question.payload.options } : {}),
+    ...(question.payload.hint ? { hint: question.payload.hint } : {}),
+    locators: question.payload.evidence.locators.map((locator) => ({
+      sourceId: locator.sourceId,
+      chunkId: locator.chunkId,
+      locator: locator.locator,
+      sourceName: sourceNames.get(locator.sourceId),
+    })),
+  }));
+
   const sessionId = `web-${gapId}-${randomUUID().slice(0, 8)}`;
   const audio = lesson.artefacts.filter((a) => a.kind === 'audio');
-  const transcripts = lesson.artefacts.filter((a) => a.kind === 'transcript');
+  // The transcript ships inside the lesson package (it is never uploaded as a byte artefact) —
+  // this is what the audio fallback points at when a segment cannot play.
+  const transcriptText = lesson.package.transcript;
 
   return (
     <main>
@@ -79,20 +128,37 @@ export default async function StudyPage({ params }: { params: Promise<{ gapId: s
         {audio.length === 0 && <p className="muted">No audio for this lesson.</p>}
       </section>
 
-      {transcripts.map((artefact) => (
-        <section key={artefact.id} className="card" aria-labelledby="transcript-heading">
-          <h2 id="transcript-heading">Transcript</h2>
-          <p className="muted">Playback text</p>
-          <p className="transcript__id">{artefact.id}</p>
-        </section>
-      ))}
+      <section className="card" aria-labelledby="transcript-heading">
+        <h2 id="transcript-heading">Transcript</h2>
+        {transcriptText ? (
+          <p className="transcript">{transcriptText}</p>
+        ) : (
+          <p className="muted">Transcript unavailable for this lesson.</p>
+        )}
+      </section>
 
       <section id="questions" className="practice-section" aria-labelledby="questions-heading">
         <h2 id="questions-heading">Questions</h2>
-        {lesson.questions.map((question) => (
-          <AttemptForm key={question.id} gapId={gapId} sessionId={sessionId} question={question} />
-        ))}
-        {lesson.questions.length === 0 && <p className="muted">No questions in this lesson.</p>}
+        {lesson.questions.length === 0 ? (
+          <EmptyState
+            title="No practice items yet."
+            body="Compile the gap — verified practice items appear here once the course is published."
+            action={
+              <Link href={`/gaps/${gapId}`} className="btn">
+                Open the workspace
+              </Link>
+            }
+          />
+        ) : (
+          questions.map((question) => (
+            <AttemptForm
+              key={question.id}
+              gapId={gapId}
+              sessionId={sessionId}
+              question={question}
+            />
+          ))
+        )}
       </section>
     </main>
   );

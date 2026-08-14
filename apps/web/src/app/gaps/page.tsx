@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { Gap } from '@gapos/database';
+import { EmptyState } from '../../components/empty-state';
 import { GapForm } from '../../components/gap-form';
 import { OwnerSwitcher } from '../../components/owner-switcher';
 import { VoiceCapture } from '../../components/voice-capture';
@@ -29,16 +30,15 @@ export default async function GapsPage() {
       </header>
 
       {gaps.length === 0 ? (
-        <div className="empty-state">
-          <p className="empty-state__title">No gaps yet.</p>
-          <p className="empty-state__body">
-            Name the thing you want to be able to do — GapOS turns it into a source-grounded,
-            audio-first course with verified practice.
-          </p>
-          <Link href="#new-gap" className="btn btn--primary">
-            Name your first gap
-          </Link>
-        </div>
+        <EmptyState
+          title="No gaps yet."
+          body="Name the thing you want to be able to do — GapOS turns it into a source-grounded, audio-first course with verified practice."
+          action={
+            <Link href="#new-gap" className="btn btn--primary">
+              Name your first gap
+            </Link>
+          }
+        />
       ) : (
         <ul className="track-list">
           {gaps.map((gap) => (

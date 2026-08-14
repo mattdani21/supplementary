@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { EmptyState } from '../../../../components/empty-state';
 import { knowledgeMap, type KnowledgeEdgeView, type KnowledgeNode } from '../../../../server/api';
 import { getServerContext } from '../../../../server/bootstrap';
 import { viewerOwner } from '../../../../lib/viewer';
@@ -57,6 +58,9 @@ export default async function KnowledgeMapPage({ params }: { params: Promise<{ g
   const positions = layout(nodes, edges, gapId);
   const gapNode = nodes.find((node) => node.id === gapId);
 
+  // A gap with no curriculum yet is a lone node with no links — a map with nothing to show.
+  const isEmpty = nodes.length === 1 && edges.length === 0;
+
   return (
     <main>
       <Link href={`/gaps/${gapId}`} className="back-link">
@@ -70,57 +74,69 @@ export default async function KnowledgeMapPage({ params }: { params: Promise<{ g
         </p>
       </header>
 
-      <svg viewBox="-400 -400 800 800" className="map" role="img" aria-label="Knowledge map">
-        {edges.map((edge, index) => {
-          const from = positions.get(edge.from);
-          const to = positions.get(edge.to);
-          if (!from || !to) return null;
-          return (
-            <line
-              key={index}
-              x1={from.x}
-              y1={from.y}
-              x2={to.x}
-              y2={to.y}
-              stroke={
-                edge.relationship === 'prerequisite_of' ? 'var(--warn)' : 'var(--hairline-strong)'
-              }
-              strokeWidth="1.5"
-            />
-          );
-        })}
-        {nodes.map((node) => {
-          const position = positions.get(node.id) ?? { x: 0, y: 0 };
-          const isGap = node.kind === 'gap';
-          return (
-            <g key={node.id} transform={`translate(${position.x} ${position.y})`}>
-              {isGap ? (
-                <a href={`/gaps/${node.id}`}>
+      {isEmpty ? (
+        <EmptyState
+          title="No map yet."
+          body="Compile the gap first — the capabilities it teaches and their prerequisites grow into this map."
+          action={
+            <Link href={`/gaps/${gapId}`} className="btn btn--primary">
+              Open the workspace
+            </Link>
+          }
+        />
+      ) : (
+        <svg viewBox="-400 -400 800 800" className="map" role="img" aria-label="Knowledge map">
+          {edges.map((edge, index) => {
+            const from = positions.get(edge.from);
+            const to = positions.get(edge.to);
+            if (!from || !to) return null;
+            return (
+              <line
+                key={index}
+                x1={from.x}
+                y1={from.y}
+                x2={to.x}
+                y2={to.y}
+                stroke={
+                  edge.relationship === 'prerequisite_of' ? 'var(--warn)' : 'var(--hairline-strong)'
+                }
+                strokeWidth="1.5"
+              />
+            );
+          })}
+          {nodes.map((node) => {
+            const position = positions.get(node.id) ?? { x: 0, y: 0 };
+            const isGap = node.kind === 'gap';
+            return (
+              <g key={node.id} transform={`translate(${position.x} ${position.y})`}>
+                {isGap ? (
+                  <a href={`/gaps/${node.id}`}>
+                    <circle
+                      r="14"
+                      fill="var(--accent)"
+                      stroke="var(--accent-hover)"
+                      strokeWidth="1.5"
+                    />
+                    <title>{node.label}</title>
+                  </a>
+                ) : (
                   <circle
-                    r="14"
-                    fill="var(--accent)"
-                    stroke="var(--accent-hover)"
+                    r="9"
+                    fill="var(--surface-2)"
+                    stroke="var(--hairline-strong)"
                     strokeWidth="1.5"
-                  />
-                  <title>{node.label}</title>
-                </a>
-              ) : (
-                <circle
-                  r="9"
-                  fill="var(--surface-2)"
-                  stroke="var(--hairline-strong)"
-                  strokeWidth="1.5"
-                >
-                  <title>{node.label}</title>
-                </circle>
-              )}
-              <text y="30" textAnchor="middle" fontSize="10" fill="var(--text-tertiary)">
-                {node.label.length > 28 ? `${node.label.slice(0, 27)}…` : node.label}
-              </text>
-            </g>
-          );
-        })}
-      </svg>
+                  >
+                    <title>{node.label}</title>
+                  </circle>
+                )}
+                <text y="30" textAnchor="middle" fontSize="10" fill="var(--text-tertiary)">
+                  {node.label.length > 28 ? `${node.label.slice(0, 27)}…` : node.label}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      )}
     </main>
   );
 }

@@ -52,6 +52,7 @@ vi.mock('../server/bootstrap', async () => {
 import RootLayout from '../app/layout';
 import GapsPage from '../app/gaps/page';
 import GapDetailPage from '../app/gaps/[gapId]/page';
+import StudyPage from '../app/gaps/[gapId]/study/page';
 import { getServerContext } from '../server/bootstrap';
 import {
   compile,
@@ -152,6 +153,9 @@ describe('the gaps list with the shell (GAP-035)', () => {
   });
 });
 
+/** The compiled gap the GAP-037 progress-surface describe reuses. */
+let compiledGapId = '';
+
 describe('the gap detail workspace with the shell (GAP-035)', () => {
   let gapId: string;
 
@@ -163,6 +167,7 @@ describe('the gap detail workspace with the shell (GAP-035)', () => {
       dailyMinutes: 35,
     })) as { gap: { id: string } };
     gapId = created.gap.id;
+    compiledGapId = gapId;
     await transitionGap(context, OWNER, gapId, { type: 'define' });
     await registerSourceHandler(context, OWNER, {
       gapId,
@@ -209,7 +214,7 @@ describe('the gap detail workspace with the shell (GAP-035)', () => {
     expect(html).toContain(REFERENCE_GAP_STATEMENT);
     expect(html).toMatch(/class="pill/);
     expect(html).toContain('Today');
-    expect(html).toContain('Generation log');
+    expect(html).toContain('Compile progress');
     expect(html).toContain('class="log-line"');
     expect(html).toContain('complete'); // the run status pill
   });
@@ -226,6 +231,69 @@ describe('the gap detail workspace with the shell (GAP-035)', () => {
     expect(html).toMatch(/class="chip/); // locator chips
     expect(html).toContain('chunks');
     expect(html).toContain('Add a source');
+  });
+});
+
+describe('the generation progress surface (GAP-037)', () => {
+  it('renders a phase label, per-step status chips and a collapsible debug toggle', async () => {
+    const html = await renderWithShell(
+      await GapDetailPage({
+        params: Promise.resolve({ gapId: compiledGapId }),
+        searchParams: Promise.resolve({}),
+      }),
+    );
+
+    // The designed surface: a phase label for the run, not the raw step list.
+    expect(html).toMatch(/class="progress-phase"/);
+    expect(html).toContain('Complete'); // phase label for a finished run
+
+    // Per-step status chips carry the four pipeline states.
+    expect(html).toContain('class="progress-steps"');
+    expect(html).toContain('progress-chip--succeeded');
+    expect(html).toContain('>succeeded<');
+
+    // The raw generation log lives behind a debug toggle, closed by default.
+    expect(html).toMatch(/<details class="progress-debug"[^>]*>/); // no `open` attribute
+    expect(html).toContain('<summary>Debug log</summary>');
+    const detailsStart = html.indexOf('class="progress-debug"');
+    const rawLogIndex = html.indexOf('class="log"');
+    expect(rawLogIndex).toBeGreaterThan(detailsStart); // raw log is inside the toggle
+  });
+
+  it('keeps the raw log lines inside the debug view only', async () => {
+    const html = await renderWithShell(
+      await GapDetailPage({
+        params: Promise.resolve({ gapId: compiledGapId }),
+        searchParams: Promise.resolve({}),
+      }),
+    );
+    // Every raw log line lives within the debug <details> element.
+    const detailsStart = html.indexOf('<details class="progress-debug"');
+    const detailsEnd = html.indexOf('</details>', detailsStart);
+    expect(detailsStart).toBeGreaterThan(-1);
+    expect(detailsEnd).toBeGreaterThan(detailsStart);
+    const inside = html.slice(detailsStart, detailsEnd);
+    const outside = html.slice(0, detailsStart) + html.slice(detailsEnd);
+    expect(inside).toContain('class="log-line"');
+    expect(outside).not.toContain('class="log-line"');
+  });
+});
+
+describe('the study surface (GAP-037)', () => {
+  it('renders the transcript text and the single-tap confidence control', async () => {
+    const html = await renderWithShell(
+      await StudyPage({ params: Promise.resolve({ gapId: compiledGapId }) }),
+    );
+
+    // The transcript is rendered as readable text below the player — the audio fallback's
+    // "text below" promise (E23 quality spec §8).
+    expect(html).toContain('class="transcript"');
+    expect(html).not.toContain('transcript__id'); // placeholder id display is gone
+
+    // Practice items carry the segmented confidence control (not three radios).
+    expect(html).toContain('role="radiogroup"');
+    expect(html).toMatch(/role="radio"/g);
+    expect(html).not.toContain('type="radio"');
   });
 });
 
@@ -262,7 +330,9 @@ describe('design tokens replace the slate palette (GAP-035)', () => {
 
     expect(css).toMatch(/a:focus-visible/);
     expect(css).toMatch(/button:focus-visible/);
-    expect(css).toMatch(/summary:focus-visible/); // source chunk disclosure
-    expect(css).toMatch(/confidence.*focus-visible/); // confidence capture radios
+    expect(css).toMatch(/summary:focus-visible/); // source chunk disclosure + debug toggle
+    // Confidence capture (GAP-037) is a segmented control of buttons, so the shared
+    // button:focus-visible rule covers it — no separate selector needed.
+    expect(css).toMatch(/button:focus-visible/);
   });
 });

@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { AudioFallback } from './audio-fallback';
 
 /** Plays an artefact's audio through the signed-URL endpoint. */
 export function AudioPlayer({ gapId, artefactId }: { gapId: string; artefactId: string }) {
   const audioRef = useRef<HTMLAudioElement>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -30,13 +31,15 @@ export function AudioPlayer({ gapId, artefactId }: { gapId: string; artefactId: 
           if (!cancelled) audioRef.current.src = body.url;
         }
       })
-      .catch((cause) => setError(cause instanceof Error ? cause.message : String(cause)));
+      .catch(() => setFailed(true));
 
     return () => {
       cancelled = true;
     };
   }, [gapId, artefactId]);
 
-  if (error) return <span className="error">{error}</span>;
+  // A designed fallback: the raw error string is never the user-facing surface — the study
+  // page renders the transcript below the player instead (E23 quality spec §8).
+  if (failed) return <AudioFallback />;
   return <audio ref={audioRef} controls preload="metadata" style={{ width: '100%' }} />;
 }

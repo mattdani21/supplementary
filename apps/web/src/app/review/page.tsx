@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { EmptyState } from '../../components/empty-state';
 import { ReviewButtons } from '../../components/review-buttons';
 import { reviewQueue } from '../../server/api';
 import { getServerContext } from '../../server/bootstrap';
@@ -58,10 +59,15 @@ export default async function ReviewPage() {
       ))}
 
       {pending.length === 0 && (
-        <div className="empty-state">
-          <p className="empty-state__title">Queue is clear.</p>
-          <p className="empty-state__body">Nothing waiting — every lesson is clean or decided.</p>
-        </div>
+        <EmptyState
+          title="Queue is clear."
+          body="Nothing waiting — every lesson is clean or decided."
+          action={
+            <Link href="/gaps" className="btn">
+              Back to gaps
+            </Link>
+          }
+        />
       )}
 
       {decided.length > 0 && (

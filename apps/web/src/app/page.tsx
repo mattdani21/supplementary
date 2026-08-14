@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { Gap } from '@gapos/database';
+import { EmptyState } from '../components/empty-state';
 import { isActionableGap } from '../lib/tab-bar-items';
 import { pillClass } from '../lib/status-pill';
 import { viewerOwner } from '../lib/viewer';
@@ -69,16 +70,15 @@ export default async function HomePage() {
         <h2 id="tracks-heading">Your tracks</h2>
 
         {gaps.length === 0 ? (
-          <div className="empty-state">
-            <p className="empty-state__title">No tracks yet.</p>
-            <p className="empty-state__body">
-              Name the thing you want to be able to do, and GapOS will build a source-grounded audio
-              course for it.
-            </p>
-            <Link href="/gaps" className="btn btn--primary">
-              Name your first gap
-            </Link>
-          </div>
+          <EmptyState
+            title="No tracks yet."
+            body="Name the thing you want to be able to do, and GapOS will build a source-grounded audio course for it."
+            action={
+              <Link href="/gaps" className="btn btn--primary">
+                Name your first gap
+              </Link>
+            }
+          />
         ) : (
           <ul className="track-list">
             {gaps.map((gap) => (

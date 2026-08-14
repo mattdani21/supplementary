@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiFetch } from './api';
+import { ConfidenceControl, type ConfidenceLevel } from './confidence-control';
+import { PracticeFeedback, type FeedbackLocator } from './practice-feedback';
 
 export interface AttemptQuestion {
   id: string;
@@ -10,9 +12,9 @@ export interface AttemptQuestion {
   prompt: string;
   options?: string[];
   hint?: string;
+  /** The source locators behind the verified solution, shown in the correction surface. */
+  locators?: readonly FeedbackLocator[];
 }
-
-const CONFIDENCE_LEVELS = ['low', 'medium', 'high'] as const;
 
 export function AttemptForm({
   gapId,
@@ -26,17 +28,15 @@ export function AttemptForm({
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ correct: boolean; feedback: { answer: string } } | null>(
-    null,
-  );
+  const [result, setResult] = useState<{ correct: boolean; answer: string } | null>(null);
   const [revealedHint, setRevealedHint] = useState(false);
+  const [confidence, setConfidence] = useState<ConfidenceLevel>();
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setBusy(true);
     setError(null);
     const form = new FormData(event.currentTarget);
-    const confidence = String(form.get('confidence') ?? '');
     try {
       const outcome = (await apiFetch(`/api/gaps/${gapId}/attempts`, {
         method: 'POST',
@@ -48,7 +48,10 @@ export function AttemptForm({
           idempotencyKey: `web-${question.id}-${Date.now()}`,
         }),
       })) as { attempt: { correct: boolean; feedback: { answer: string } } };
-      setResult(outcome.attempt);
+      setResult({
+        correct: outcome.attempt.correct,
+        answer: outcome.attempt.feedback.answer,
+      });
       router.refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -59,11 +62,14 @@ export function AttemptForm({
 
   if (result) {
     return (
-      <div
-        className={`attempt-result ${result.correct ? 'attempt-result--correct' : 'attempt-result--wrong'}`}
-      >
-        <p className="attempt-result__verdict">{result.correct ? '✓ Correct' : '✗ Not quite'}</p>
-        <p className="attempt-result__answer">Verified solution: {result.feedback.answer}</p>
+      <div className="card attempt-form">
+        <p className="prompt">{question.prompt}</p>
+        <PracticeFeedback
+          correct={result.correct}
+          answer={result.answer}
+          locators={question.locators}
+          sourcesTabHref={`/gaps/${gapId}?tab=sources`}
+        />
         <button type="button" className="btn" onClick={() => setResult(null)}>
           Try the next one
         </button>
@@ -99,15 +105,10 @@ export function AttemptForm({
           {revealedHint && <span className="hint"> {question.hint}</span>}
         </p>
       )}
-      <fieldset className="confidence">
-        <legend>How sure are you?</legend>
-        {CONFIDENCE_LEVELS.map((level) => (
-          <label key={level} className="confidence__option">
-            <input type="radio" name="confidence" value={level} />
-            <span>{level}</span>
-          </label>
-        ))}
-      </fieldset>
+      <div className="confidence-group">
+        <span className="confidence-group__label">How sure are you?</span>
+        <ConfidenceControl value={confidence} onChange={setConfidence} />
+      </div>
       {error && <p className="error">{error}</p>}
       <button type="submit" className="btn btn--primary" disabled={busy}>
         {busy ? 'Checking…' : 'Answer'}

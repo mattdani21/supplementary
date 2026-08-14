@@ -1,6 +1,6 @@
 {
  "schemaVersion": 1,
- "updatedAt": "2026-08-14T15:54:11.000Z",
+ "updatedAt": "2026-08-14T19:25:00.000Z",
  "controller": "gapos-controller",
  "tasks": {
   "GAP-035": {
@@ -716,6 +716,49 @@
    ],
    "notes": "Focused fix (direct request, not a backlog task): the synthesise_audio generation step now records a small summary {checksum, bytes, segments, storageKey} in generation_steps.output instead of the raw audio payload. checksum and storageKey are per-segment, index-aligned, and identical to the artefacts table rows, so the step log can still verify object storage (traceability kept); bytes is the total byte size and segments the count. No migration needed (the output column is already JSONB; only its content for this step changes \u2014 forward-only rule respected), no API/specs change (generationLog surfaces step/state/attempt/error only), no accessibility impact, telemetry unchanged (compilation_stage_duration_ms + audio_generation_failure_total still cover the step; the step log row is the operational record). Architecture constraints untouched: steps remain idempotent \u2014 side effects now live inside the step work function, so a re-entered run reuses the recorded summary and never re-pays for synthesis or re-uploads.",
    "completedAt": "2026-08-14T15:54:11.000Z"
+  },
+  "GAP-037": {
+   "status": "done",
+   "startedAt": "2026-08-14T16:00:00.000Z",
+   "completedAt": "2026-08-14T19:25:00.000Z",
+   "evidence": [
+    {
+     "command": "git status + git log; read specs/quality.md, tasks/backlog.yaml GAP-037, AGENTS.md",
+     "result": "pass",
+     "note": "Controller loop: clean tree on autopilot/m1-fresh-checkout; GAP-037 ready, dependency GAP-035 done. specs/quality.md is the contract: feedback moments (correct = accent flash + verified-solution reveal within 200ms; incorrect = repair-framed correction with solution + source link, never red-heavy; confidence = single-tap segmented control), designed progress surface for generation (raw log only as a debugging view), designed empty states per list surface, audio fallback renders transcript not raw errors."
+    },
+    {
+     "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm verify (baseline)",
+     "result": "pass",
+     "note": "435 passed | 26 loud skips after formatting the pre-existing prettier violation in tasks/backlog.yaml (quote-style only \u2014 37 semantically identical line pairs, verified by normalization diff; GAP-034 hit the same file). Sandbox injects GAPOS_PROVIDER_MODE=live without a key, so verify runs with env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL."
+    },
+    {
+     "command": "pnpm exec vitest run feedback.test.tsx empty-states.test.tsx screens.test.tsx (test-first)",
+     "result": "pass",
+     "note": "Red run before implementation, for exactly the right reasons: new components (practice-feedback, confidence-control, empty-state, audio-fallback) don't exist; the Overview still shows the raw generation log instead of the progress surface; sources/map/review/study surfaces lack concrete next actions; the old study page had no transcript text. New tests: apps/web/src/components/feedback.test.tsx (10: correct flash + solution reveal, repair-framed correction with source link + no danger tone, confidence radiogroup = 3 one-tap segments not radio inputs + single aria-checked, empty-state title/body/action, audio fallback never echoes a raw error, CSS tokens: accent-flash keyframes at var(--duration-base)=200ms and no .attempt-feedback--danger), empty-states.test.tsx (5: gaps list, sources tab, knowledge map, review queue, study nothing-due \u2014 each explains + gives an action, fresh in-memory context per file), screens.test.tsx extended (progress surface: phase label + succeeded chips + closed-by-default debug toggle with the raw log inside; study surface: transcript text renders + confidence radiogroup, no radio inputs)."
+    },
+    {
+     "command": "pnpm exec vitest run apps/web (targeted)",
+     "result": "pass",
+     "note": "52 tests across 6 files \u2014 feedback 10, empty-states 5, screens 12, tab-bar 9, web API 15, health 1 \u2014 no regressions. The new study-surface test caught a real latent bug: getLesson returns StoredQuestion envelopes (fields nested in payload), and the old study page passed them straight to AttemptForm, so question.prompt/options were undefined at runtime; fixed by mapping payload fields server-side (verified solution + locators are resolved server-side and never sent to the client before grading). Also discovered the transcript is never uploaded as a byte artefact \u2014 it lives in the lesson package \u2014 so the study page reads lesson.package.transcript for the audio fallback's 'text below' promise."
+    },
+    {
+     "command": "pnpm typecheck && pnpm lint && pnpm format:check",
+     "result": "pass",
+     "note": "Strict TS clean (noUncheckedIndexedAccess needed guarded array reads in the confidence control); ESLint clean; Prettier clean. .prettierignore gained .specify: the Spec Kit CLI rewrote its tracked machine-local state files mid-session (mtimes 19:14:58+, after the 19:14:03 baseline), undoing a prettier-clean working tree and failing format:check \u2014 tool-generated state, ignored with the same rationale as specs/generation-schemas."
+    },
+    {
+     "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm verify (final)",
+     "result": "pass",
+     "note": "453 passed | 26 loud skips (baseline 435 -> +18: 10 feedback + 5 empty-states + 2 progress surface + 1 study surface). Format, lint, typecheck and the full suite green."
+    },
+    {
+     "command": "pnpm --filter @gapos/web build",
+     "result": "pass",
+     "note": "next build compiles every route including the reworked /gaps/[gapId]/study (2.33 kB) and /gaps/[gapId] (1.53 kB)."
+    }
+   ],
+   "notes": "E23 quality spec \u00a73+\u00a74 on the E22/GAP-035 shell. (1) Practice feedback: new PracticeFeedback component \u2014 correct = accent-flash surface (200ms keyframe on --duration-base, starts immediately) + 'Verified solution:' reveal; incorrect = repair-framed correction (warn-tinted .attempt-feedback--repair) showing the verified solution and a Source link (locators resolved to filenames via listSources on the study page, linking to ?tab=sources) \u2014 no red-heavy danger treatment anywhere. (2) Confidence: new ConfidenceControl \u2014 one segmented control (role=radiogroup over role=radio buttons, aria-checked, arrow-key/Home/End navigation), single tap selects immediately and rides with the attempt payload; replaces the three-radio fieldset. (3) Generation progress: new GenerationProgress on the Overview \u2014 phase label per pipeline status ('Complete \u2014 your course is ready'), per-step status chips (queued/running/succeeded/failed from the domain StepState), run pill, findings count, and a closed-by-default <details> Debug log holding the raw step list; the raw log is never the user-facing surface. (4) Empty states: shared EmptyState (title + one-line body + concrete action) used on gaps list, home tracks, sources tab (Add your first source -> #add-source id on the form), curriculum tab, study practice items, study nothing-due, review queue (Back to gaps) and knowledge map (Open the workspace when a gap has no curriculum yet). (5) Audio fallback: AudioPlayer failure renders the designed AudioFallback ('Audio unavailable \u2014 the transcript is below'), never the raw error string; the study page now renders the real transcript text (readable 68ch measure) below the players. Also fixed the pre-existing study-page bug where StoredQuestion envelopes (payload-nested) were passed to AttemptForm directly, leaving prompts/options undefined at runtime. No API/schema change (specs/ untouched), no migration, no new telemetry (UI-only); a11y: role=status live regions on feedback, radiogroup keyboard pattern, focus-visible via shared button rule, prefers-reduced-motion already kills the flash. Out of scope, untouched: audio-player speed/seek (GAP-038), onboarding (GAP-039)."
   }
  },
  "GAP-014b": {

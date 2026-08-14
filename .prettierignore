@@ -9,3 +9,6 @@ tasks/status.json
 # Generated from the zod contracts by `pnpm specs:generate`; reformatting them would
 # break the drift check in tests/architecture/specs.test.ts.
 specs/generation-schemas
+
+# Spec Kit CLI state — machine-local, rewritten by the tool on every run; not source formatting.
+.specify

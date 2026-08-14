@@ -54,7 +54,7 @@ export function SourceForm({ gapId }: { gapId: string }) {
   };
 
   return (
-    <form onSubmit={submit} className="card">
+    <form onSubmit={submit} className="card" id="add-source">
       <h2>Add a source</h2>
       <label>
         Filename

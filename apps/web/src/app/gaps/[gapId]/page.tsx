@@ -1,5 +1,7 @@
 import Link from 'next/link';
 import type { Gap } from '@gapos/database';
+import { EmptyState } from '../../../components/empty-state';
+import { GenerationProgress } from '../../../components/generation-progress';
 import { SourceForm } from '../../../components/source-form';
 import { TransitionButtons } from '../../../components/transition-buttons';
 import { WorkspaceTabs, type WorkspaceTab } from '../../../components/workspace-tabs';
@@ -33,12 +35,6 @@ const TRANSITIONS: Record<string, { type: string; label: string }[]> = {
 const SECTION_TABS: Record<string, Extract<WorkspaceTab, 'sources' | 'curriculum'>> = {
   sources: 'sources',
   curriculum: 'curriculum',
-};
-
-const RUN_TONE: Record<string, string> = {
-  complete: 'pill--ok',
-  partial: 'pill--warn',
-  failed: 'pill--error',
 };
 
 interface CurriculumLessonView {
@@ -153,41 +149,12 @@ export default async function GapDetailPage({
             <Link href={`/gaps/${gapId}/map`}>Knowledge map</Link>
           </p>
 
-          <section className="card log-card" aria-labelledby="log-heading">
-            <div className="log-card__head">
-              <h2 id="log-heading">Generation log</h2>
-              {log.run && (
-                <span className={`pill ${RUN_TONE[log.run.status] ?? ''}`}>{log.run.status}</span>
-              )}
-            </div>
-            {!log.run ? (
-              <p className="muted">
-                Not compiled yet — add sources and compile the gap to see the pipeline here.
-              </p>
-            ) : (
-              <ul className="log">
-                {log.steps.map((step) => (
-                  <li key={`${step.step}-${step.attempt}`} className="log-line">
-                    <span className="log-line__step">{step.step}</span>
-                    <span
-                      className={
-                        step.error ? 'log-line__state log-line__state--error' : 'log-line__state'
-                      }
-                    >
-                      {step.state}
-                      {step.attempt > 1 ? ` (attempt ${step.attempt})` : ''}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {log.findings.length > 0 && (
-              <p className="muted">
-                {log.findings.length} audit finding{log.findings.length === 1 ? '' : 's'} — see the
-                review queue.
-              </p>
-            )}
-          </section>
+          <GenerationProgress
+            run={log.run}
+            steps={log.steps}
+            findingsCount={log.findings.length}
+            sourcesHref={`/gaps/${gapId}?tab=sources`}
+          />
         </>
       )}
 
@@ -199,13 +166,15 @@ export default async function GapDetailPage({
           </header>
 
           {sources.length === 0 ? (
-            <div className="empty-state">
-              <p className="empty-state__title">No sources yet.</p>
-              <p className="empty-state__body">
-                The planner needs material to build from — paste notes, a chapter or a transcript
-                below.
-              </p>
-            </div>
+            <EmptyState
+              title="No sources yet."
+              body="The planner needs material to build from — paste notes, a chapter or a transcript below."
+              action={
+                <a href="#add-source" className="btn btn--primary">
+                  Add your first source
+                </a>
+              }
+            />
           ) : (
             <ul className="source-list">
               {sources.map((source) => (
@@ -253,12 +222,15 @@ export default async function GapDetailPage({
           </header>
 
           {!curriculum ? (
-            <div className="empty-state">
-              <p className="empty-state__title">No curriculum yet.</p>
-              <p className="empty-state__body">
-                Compile the gap first — the plan, lessons and practice items appear here.
-              </p>
-            </div>
+            <EmptyState
+              title="No curriculum yet."
+              body="Compile the gap first — the plan, lessons and practice items appear here."
+              action={
+                <Link href={`/gaps/${gapId}`} className="btn">
+                  Open the workspace
+                </Link>
+              }
+            />
           ) : (
             <>
               <h2>Objectives</h2>
