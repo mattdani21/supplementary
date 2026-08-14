@@ -576,7 +576,7 @@ tasks:
     title: Worker daemon entrypoint
     epic: E11
     priority: P0
-    status: ready
+    status: done
     goal: The queue loop runs as a process that can be deployed.
     scope:
       - an executable entrypoint (env-driven bootstrap: database URL, provider mode, poll interval)
