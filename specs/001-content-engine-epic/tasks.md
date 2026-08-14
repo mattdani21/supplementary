@@ -466,3 +466,42 @@ With multiple developers:
   independently.
 - Avoid: vague tasks, same-file conflicts (see sequencing table), cross-story dependencies that
   break independence.
+
+---
+
+## Phase 9: Convergence
+
+**Input**: `/speckit-converge` assessment of the shipped implementation (commits 8610f99…1219947)
+against [spec.md](spec.md), [plan.md](plan.md) and this task list. Full gate at the time of the
+assessment: `pnpm verify` → 573 passed | 26 skipped. Five partial gaps remain; none are
+constitution violations (constitution is an unfilled template). T046/T047 require the live
+provider key (AGENTS.md §5 human approval gate) — the harnesses and tests are already in place,
+only the paid run and recorded evidence are missing.
+
+- [ ] T044 Update the `generateLesson` instruction in `apps/worker/src/pipeline/compile.ts`
+      (lines 892–906) to demand the four structural elements — concrete opening, one idea per
+      segment, a worked example worked inside the script, and a checkpoint via `pausePrompts` —
+      so live-mode generation targets the `human_sounding` contract on the first pass rather than
+      relying on verify-and-repair alone, per FR-007 / T017 (partial)
+- [ ] T045 Run the live hit-rate harness across the reference pack
+      (`GAPOS_PROVIDER_MODE=live pnpm exec tsx scripts/measure-plan-hit-rate.ts`) and iterate the
+      `planCurriculum` instruction until the first-attempt valid-plan rate reaches ≥ 80%, keeping
+      `tests/evaluation/plan-gate-guard.test.ts` green; record the command + result in
+      `tasks/status.json` per SC-001 / FR-013 / FR-022 (partial; human approval gate)
+- [ ] T046 Drive the review-due list from the learner's mastery evidence: compute `reviewDue`
+      from evidence records (e.g. `uow.mastery.listEvidenceForCurriculum`) in the compile
+      threading (`apps/worker/src/pipeline/compile.ts` currently hardcodes `reviewDue: []` at line
+      368) so `derivePlanInputs` schedules review inside the new curriculum, per FR-020 /
+      data-model.md "review-due list (FR-020)" (partial)
+- [ ] T047 Re-record the live evaluation baselines including `human_sounding` via
+      `scripts/record-eval-baselines.ts` (paid, deliberate review-gated flow; merge, never silent
+      overwrite) so `tests/evaluation/live-provider.test.ts`'s no-regression check covers the new
+      dimension on every live fixture — currently only eval_01's baseline carries
+      `human_sounding` in `tasks/evaluation-baselines.json` per FR-021 / T037 (partial; human
+      approval gate)
+- [ ] T048 Record SC-007 p90 latency evidence (Day 1 < 3 minutes, full course < 10 minutes) on
+      the reference workload from the existing `day_one_publication_latency_ms` /
+      `full_course_publication_latency_ms` telemetry (`packages/observability/src/metrics.ts`,
+      observed in `apps/worker/src/pipeline/compile.ts`), so the latency budget is a recorded,
+      reproducible number per SC-007 (partial)
+
