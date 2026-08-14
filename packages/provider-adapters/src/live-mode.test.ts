@@ -334,6 +334,29 @@ describe('live-mode factory', () => {
     ).rejects.toThrow(/GAPOS_STT_API_KEY is not set/);
   });
 
+  it('boots live mode without an embeddings key (retrieval stays lexical)', async () => {
+    process.env = {
+      ...ORIGINAL_ENV,
+      GAPOS_LLM_API_KEY: 'llm-key',
+      // Deliberately no GAPOS_EMBEDDINGS_API_KEY: the worker must boot, and the
+      // embeddings contract allows `undefined` (lexical retrieval, no charge).
+    };
+    const providers = createProviders({
+      mode: 'live',
+      costAccountant: new CostAccountant(),
+      metrics: createMetrics(),
+      logger: createLogger({}, { level: 'error' }),
+    });
+    expect(providers.mode).toBe('live');
+    expect(providers.embeddings.name).toBe('unconfigured');
+    const result = await providers.embeddings.embed({
+      texts: ['hello'],
+      runId: 'run_x',
+      userId: 'u',
+    });
+    expect(result).toBeUndefined();
+  });
+
   it('exposes a live embeddings backend for explicit assembly', async () => {
     const backend = createLiveEmbeddings({
       endpoint: 'https://embeddings.example/v1',

@@ -118,10 +118,13 @@ export const createLiveEmbeddingsFromEnv = (
 ): EmbeddingsBackend => {
   const apiKey = env.GAPOS_EMBEDDINGS_API_KEY;
   if (!apiKey) {
-    throw new Error(
-      'GAPOS_EMBEDDINGS_API_KEY is not set. A live provider is a paid external resource: set ' +
-        'the key before selecting live mode (AGENTS.md §5).',
-    );
+    // Embeddings are optional: without a key the deployment has no embedding
+    // capability, retrieval stays lexical and nothing is charged (the interface
+    // contract for `Embeddings.embed` explicitly allows `undefined`).
+    return {
+      name: 'unconfigured',
+      embed: async () => undefined,
+    };
   }
   return createLiveEmbeddings({
     endpoint: env.GAPOS_EMBEDDINGS_BASE_URL ?? 'https://api.openai.com/v1',
