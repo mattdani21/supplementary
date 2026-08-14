@@ -22,34 +22,45 @@ deterministic fakes, so no API keys and no external services are needed to run t
 
 ### Run it
 
-Everything is configured by environment (see the table below). With Postgres + MinIO up
-(`pnpm local:up`):
+Everything is configured by environment (see the table below) — three processes, no config
+files. With Postgres + MinIO up (`pnpm local:up`):
 
-    pnpm db:migrate
-    GAPOS_DATABASE_URL=<dsn> pnpm --filter @gapos/web dev       # the web app + HTTP API on :3000
-    GAPOS_DATABASE_URL=<dsn> pnpm --filter @gapos/worker start  # the durable compile worker
+    GAPOS_DATABASE_URL=<dsn> pnpm --filter @gapos/web dev        # UI (PWA) + HTTP API on :3000
+    GAPOS_DATABASE_URL=<dsn> pnpm --filter @gapos/worker start   # the durable compile daemon
+    GAPOS_DATABASE_URL=<dsn> pnpm --filter @gapos/cli start -- gap list   # the CLI, optional
 
-Without a database the same commands run against in-memory repositories (throwaway data, with a
-loud warning) — enough to try the UI and the CLI immediately.
+Both the web app and the worker migrate the database on boot, so `pnpm db:migrate` is only
+needed to run migrations on their own. Without a database the same commands run against
+in-memory repositories (throwaway data, with a loud warning) — enough to try the UI and the
+CLI immediately.
 
 ### The command line
 
-    GAPOS_DATABASE_URL=<dsn> pnpm --filter @gapos/cli start -- gap new --title "..." --statement "..."
+    GAPOS_OWNER=<learner-id> pnpm --filter @gapos/cli start -- gap new --title "..." --statement "..."
+    pnpm --filter @gapos/cli start -- gap list
+    pnpm --filter @gapos/cli start -- gap <gapId>
     pnpm --filter @gapos/cli start -- source add <gapId> --file notes.md
+    pnpm --filter @gapos/cli start -- source add <gapId> --text "one line of notes"
     pnpm --filter @gapos/cli start -- compile <gapId>
+    pnpm --filter @gapos/cli start -- plan <gapId>
     pnpm --filter @gapos/cli start -- study <gapId>
+    pnpm --filter @gapos/cli start -- mastery <gapId>
 
 ### Environment
 
 | Variable | Purpose | Default |
 | --- | --- | --- |
-| `GAPOS_DATABASE_URL` | Postgres DSN; the API, daemon and CLI migrate on boot | in-memory |
+| `GAPOS_DATABASE_URL` | Postgres DSN; the web app and worker migrate on boot | in-memory (throwaway) |
+| `GAPOS_TEST_DATABASE_URL` | Postgres DSN for the Postgres-backed test suites (skipped unless set) | — |
 | `GAPOS_PROVIDER_MODE` | `fake` or `live` (live refuses to boot without keys) | `fake` |
 | `GAPOS_LLM_API_KEY` / `_BASE_URL` / `_MODEL` | live language model | DeepSeek |
+| `GAPOS_LLM_PRICE_INPUT_MILLICENTS_PER_MT` / `_OUTPUT_MILLICENTS_PER_MT` | live LLM price overrides (millicents per million tokens) | deepseek-chat list prices |
 | `GAPOS_LLM_MODE=local` | local preset (Ollama/llama.cpp, no key) | — |
 | `GAPOS_MODEL_ROUTING` | per-purpose routing, e.g. `planning:model-a,teaching:model-b` | — |
 | `GAPOS_STT_API_KEY` / `_BASE_URL` / `_MODEL` | live speech-to-text | OpenAI-compatible |
+| `GAPOS_STT_PRICE_MILLICENTS_PER_MINUTE` | live speech-to-text price override | — |
 | `GAPOS_EMBEDDINGS_API_KEY` / `_BASE_URL` / `_MODEL` / `_DIMENSIONS` | live embeddings | OpenAI-compatible |
+| `GAPOS_EMBEDDINGS_PRICE_MILLICENTS_PER_MT` | live embeddings price override | — |
 | `GAPOS_STORAGE` | `memory` or `s3` (requires the `GAPOS_S3_*` vars) | `memory` |
 | `GAPOS_S3_ENDPOINT` / `_REGION` / `_BUCKET` / `_ACCESS_KEY_ID` / `_SECRET_ACCESS_KEY` | S3-compatible object storage (MinIO) | — |
 | `GAPOS_QUEUE_POLL_INTERVAL_MS` / `_LEASE_DURATION_MS` / `_CLAIM_BATCH` | worker loop tuning | 2000 / 300000 / 4 |
