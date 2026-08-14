@@ -23,6 +23,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@gapos/cli": "workspace:*",
     "@types/node": "^22.10.2",
     "eslint": "^9.39.1",
     "prettier": "^3.4.2",

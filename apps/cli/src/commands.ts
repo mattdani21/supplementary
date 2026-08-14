@@ -81,7 +81,11 @@ export const gapList = async (
     io.out('no gaps yet');
     return;
   }
-  for (const gap of gaps) io.out(`${gap.id}\t${gap.status}\t${gap.title}`);
+  for (const gap of gaps)
+    io.out(
+      `${gap.id}\t${gap.status}\t${gap.title}` +
+        (gap.targetCapability ? `\t${gap.targetCapability}` : ''),
+    );
 };
 
 export const gapShow = async (

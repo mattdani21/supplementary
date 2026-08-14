@@ -112,6 +112,11 @@ epics:
     priority: P2
     dependencies: [E13]
     evidence: A reviewer can approve or repair artefacts
+  - id: E21
+    title: Curriculum excursion — house Matt's real learning tracks
+    priority: P1
+    dependencies: [E2, E3, E4, E11, E14]
+    evidence: The three seeded tracks compile and pass plan validation
 
 tasks:
   - id: E20
@@ -769,3 +774,42 @@ tasks:
     acceptance:
       - a flagged lesson appears in the queue, is rejected with a note, and the note is visible on
         the lesson
+  - id: GAP-032
+    title: Seed Matt's three learning tracks as gaps with real sources (E21)
+    epic: E21
+    priority: P1
+    status: ready
+    goal: GapOS starts with the actual curriculum — math-to-ML fluency, frontier papers, TOPIK
+      Korean — as gaps with real sources, so the app houses this learning out of the box.
+    scope:
+      - a seed script (scripts/seed-curriculum.ts) that creates three gaps via the CLI service
+        layer, matching the reference-curriculum fixture pattern
+      - 'sources: SKILLS-CURRICULUM.md and TOPIK-TRACKER.md content (from ~/Seoul-plan/) plus real URLs (arXiv paper IDs, MIT OCW 18.06, 3Blue1Brown playlists, TTMIK, topik.go.kr) so the pipeline ingests genuine material'
+      - deterministic repository test asserting the three gaps + source counts + locators
+    out_of_scope:
+      - live compile during seed (GAP-033 does that)
+      - provider calls in the seed path
+    dependencies: [GAP-004, GAP-005, GAP-006, GAP-025]
+    acceptance:
+      - 'pnpm exec gapos gap list shows the three seeded gaps with target capabilities'
+      - each gap has at least two sources with structural locators
+      - a repository test asserts seed idempotency (re-running does not duplicate)
+  - id: GAP-033
+    title: Compile the math track end-to-end with plan validation (E21)
+    epic: E21
+    priority: P1
+    status: ready
+    goal: One seeded track (math-to-ML fluency) survives the full slice — sources → normalise →
+      diagnose → plan → lessons — with the deterministic fake provider, proving the app can
+      actually produce the learning it houses.
+    scope:
+      - extend scripts/smoke-compile.ts (or a sibling) to compile the seeded math gap
+      - plan validation must pass; Day-1 package publishes with audio stub + transcript
+    out_of_scope:
+      - live provider calls in CI
+      - full seven-day compile at p90 (already covered elsewhere)
+    dependencies: [GAP-008, GAP-009, GAP-011, GAP-032]
+    acceptance:
+      - compiling the seeded math gap yields a valid plan (plan-validation tests pass)
+      - every objective maps to ≥1 lesson, ≥2 retrieval items and ≥1 application item
+      - the compile is idempotent: a second run does not duplicate lessons or charges

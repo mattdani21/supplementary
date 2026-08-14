@@ -1,6 +1,6 @@
 {
  "schemaVersion": 1,
- "updatedAt": "2026-08-03T15:39:20.000Z",
+ "updatedAt": "2026-08-14T01:35:51.000Z",
  "controller": "gapos-controller",
  "tasks": {
   "GAP-000": {
@@ -516,6 +516,39 @@
      "note": "The educator review queue (E19). Migration 005 adds review_status + review_note to lessons; CurriculumRepository.setReview records the decision owner-scoped. GET /api/review lists lessons whose generation run recorded audit findings (with their findings and any decision), POST /api/review/:lessonId approves or rejects with a note, and the note is visible on the lesson. /review page renders the queue with severity-coloured findings and approve/reject controls; the gaps header links to it. Tests cover flag -> reject-with-note -> visible-note, and owner isolation."
     }
    ]
+  },
+  "GAP-032": {
+   "status": "done",
+   "startedAt": "2026-08-14T01:27:31.000Z",
+   "completedAt": "2026-08-14T01:35:51.000Z",
+   "evidence": [
+    {
+     "command": "pnpm exec vitest run tests/end-to-end/seed-curriculum.test.ts apps/cli/src/cli.test.ts apps/web/src/server/api.test.ts packages/domain/src/sources/chunking.test.ts",
+     "result": "pass",
+     "note": "37 tests. The 4 new deterministic repository tests: exactly the three tracks exist as gaps (gap_math_to_ml, gap_frontier_papers, gap_topik_korean) with target capabilities; every gap has >= 2 sources, all indexed with chunks carrying structural §-addressed locators (never '§ Document'); re-running the seed does not duplicate gaps, sources or chunks; gap list output carries the capabilities. CLI session, HTTP API and chunking suites unaffected."
+    },
+    {
+     "command": "GAPOS_DATABASE_URL=postgres://gapos@127.0.0.1:5432/gapos pnpm tsx scripts/seed-curriculum.ts (run 1)",
+     "result": "pass",
+     "note": "Local Postgres 16 (Homebrew, ephemeral test instance): bootstrap migrated the schema, seed created the owner user + 3 gaps and registered 7 sources (math 2, papers 3, TOPIK 2), chunking each into §-addressed sections so locators exist before any compile."
+    },
+    {
+     "command": "GAPOS_DATABASE_URL=postgres://gapos@127.0.0.1:5432/gapos pnpm exec gapos gap list (separate process)",
+     "result": "pass",
+     "note": "Acceptance criterion 1: the CLI shows the three seeded gaps with target capabilities, e.g. 'gap_math_to_ml draft Math foundations to ML fluency Read frontier ML papers cold: linear algebra ...'. pnpm exec gapos resolves because @gapos/cli is now a root devDependency."
+    },
+    {
+     "command": "seed run 2 (idempotency) + psql counts",
+     "result": "pass",
+     "note": "Acceptance criteria 2-3: re-running reports all 3 gaps 'exists' and all 7 sources reused via the checksum cache. SQL: gap_frontier_papers 3 sources / 14 chunks, gap_math_to_ml 2 / 11, gap_topik_korean 2 / 12; sample locators '§ Phase 2 (Wks 9-16) Calculus + optimization', '§ TTMIK - talktomeinkorean.com', '§ DeepSeek-R1: ... (arXiv:2501.12948)'."
+    },
+    {
+     "command": "pnpm verify",
+     "result": "pass",
+     "note": "405 passed + 26 loud skips (Postgres/S3 suites, skipped without env). Note: the autopilot sandbox injects GAPOS_PROVIDER_MODE=live without a key, which breaks the hermetic suite, so verify ran with env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL; CI does not set the variable."
+    }
+   ],
+   "notes": "scripts/seed-curriculum.ts creates the three gaps via the CLI service layer (createGap + registerSource) with deterministic ids, matching the reference-curriculum fixture pattern: the content lives in packages/test-fixtures/src/seoul-curriculum.ts (real SKILLS-CURRICULUM.md / TOPIK-TRACKER.md material plus real URLs: arXiv 2405.04434 / 2412.19437 / 2501.12948 / 1706.03762 ..., MIT OCW 18.06, 3Blue1Brown playlists, TTMIK, topik.go.kr). Sources are ingested immediately (chunkDocument + replaceChunks + indexed) so structural locators exist without a compile and with no provider calls (GAP-033 compiles later). Supporting changes: createGap accepts optional id + targetCapability; gap list shows the capability column; the CLI now builds its context from the shared env-driven bootstrap (it previously always used in-memory repositories even with GAPOS_DATABASE_URL set, contradicting its own docs) so seed and gap list share Postgres; @gapos/cli is a root devDependency so 'pnpm exec gapos' resolves. No API/schema change (createGap additions are service-layer only), so specs/ is untouched; no migration; no new runtime telemetry (the seed is an ops script, not a service path)."
   }
  },
  "GAP-014b": {

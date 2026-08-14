@@ -18,6 +18,13 @@ export interface CreateGapInput {
   readonly dailyMinutes: number;
   readonly deadline?: string;
   readonly sourcePolicy?: Gap['sourcePolicy'];
+  /**
+   * Deterministic id for seed scripts, so re-running a seed finds the gap instead of
+   * duplicating it. Defaults to a generated id.
+   */
+  readonly id?: string;
+  /** The capability the learner is building toward; surfaced by `gapos gap list`. */
+  readonly targetCapability?: string;
 }
 
 export const createGap = async (
@@ -27,11 +34,12 @@ export const createGap = async (
 ): Promise<Gap> => {
   const at = context.now();
   return context.uow.gaps.create(owner, {
-    id: context.newId('gap'),
+    id: input.id ?? context.newId('gap'),
     title: input.title,
     rawStatement: input.rawStatement,
     dailyMinutes: input.dailyMinutes,
     ...(input.deadline ? { deadline: input.deadline } : {}),
+    ...(input.targetCapability ? { targetCapability: input.targetCapability } : {}),
     sourcePolicy: input.sourcePolicy ?? 'general_knowledge_allowed',
     status: 'draft',
     assumptions: [],

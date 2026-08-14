@@ -5,8 +5,7 @@
  * commands scriptable.
  */
 
-import { createServerContext } from '../../web/src/server/context.js';
-import { createLogger } from '@gapos/observability';
+import { getServerContext } from '../../web/src/server/bootstrap.js';
 import {
   compileCommand,
   gapList,
@@ -29,14 +28,9 @@ const out = (line: string): void => {
 const isTty = process.stdin.isTTY === true;
 
 const main = async (): Promise<void> => {
-  const logger = createLogger({}, { level: 'warn' });
-  const context = createServerContext({ logLevel: 'warn' });
-
-  if (!process.env.GAPOS_DATABASE_URL) {
-    logger.warn(
-      'GAPOS_DATABASE_URL is not set; using in-memory repositories. Data does not survive the process.',
-    );
-  }
+  // The same env-driven bootstrap the web and worker processes use: Postgres when
+  // GAPOS_DATABASE_URL is set, in-memory otherwise (with a loud warning).
+  const context = await getServerContext();
 
   const rl = isTty ? createInterface({ input: process.stdin, output: process.stdout }) : undefined;
   const io = {
