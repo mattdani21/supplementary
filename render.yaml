@@ -1,0 +1,97 @@
+# GapOS — Render blueprint (free tier, verified pattern).
+# Render reads this when creating a service from the GitHub repo.
+# Both processes use the same Docker image; the worker service overrides the start command.
+#
+# NOTE (free tier): Render spins down after ~15 min idle; first request after a pause
+# costs a 30-60s cold start. Railway is always-on if that matters more than $0.
+services:
+  - type: web
+    name: gapos-web
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    dockerfilePath: ./Dockerfile
+    dockerCommand: pnpm --filter @gapos/web start
+    envVars:
+      - key: GAPOS_PROVIDER_MODE
+        value: live
+      - key: GAPOS_STORAGE
+        value: s3
+      - key: GAPOS_S3_REGION
+        value: us-east-1
+      - key: GAPOS_S3_BUCKET
+        value: gapos
+      - key: GAPOS_DATABASE_URL
+        fromDatabase:
+          name: gapos-postgres
+          property: connectionString
+      - key: GAPOS_S3_ENDPOINT
+        fromService:
+          name: gapos-minio
+          type: web
+          property: host
+      - key: GAPOS_S3_ACCESS_KEY_ID
+        sync: false
+      - key: GAPOS_S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: GAPOS_LLM_API_KEY
+        sync: false
+      - key: GAPOS_LLM_MODEL
+        sync: false
+      - key: GAPOS_BUDGET_PER_RUN_CENTS
+        sync: false
+      - key: GAPOS_BUDGET_PER_USER_DAILY_CENTS
+        sync: false
+
+  - type: web
+    name: gapos-worker
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerCommand: pnpm --filter @gapos/worker start
+    envVars:
+      - key: GAPOS_PROVIDER_MODE
+        value: live
+      - key: GAPOS_STORAGE
+        value: s3
+      - key: GAPOS_S3_REGION
+        value: us-east-1
+      - key: GAPOS_S3_BUCKET
+        value: gapos
+      - key: GAPOS_DATABASE_URL
+        fromDatabase:
+          name: gapos-postgres
+          property: connectionString
+      - key: GAPOS_S3_ENDPOINT
+        fromService:
+          name: gapos-minio
+          type: web
+          property: host
+      - key: GAPOS_S3_ACCESS_KEY_ID
+        sync: false
+      - key: GAPOS_S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: GAPOS_LLM_API_KEY
+        sync: false
+      - key: GAPOS_LLM_MODEL
+        sync: false
+      - key: GAPOS_BUDGET_PER_RUN_CENTS
+        sync: false
+      - key: GAPOS_BUDGET_PER_USER_DAILY_CENTS
+        sync: false
+
+  - type: web
+    name: gapos-minio
+    runtime: image
+    plan: free
+    image:
+      url: minio/minio
+    dockerCommand: server /data
+    disk:
+      name: minio-data
+      mountPath: /data
+      sizeGB: 1
+
+databases:
+  - name: gapos-postgres
+    plan: free
