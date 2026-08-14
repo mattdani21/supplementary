@@ -106,10 +106,18 @@ export const createLiveSpeechToTextFromEnv = (
 ): SpeechToText => {
   const apiKey = env.GAPOS_STT_API_KEY;
   if (!apiKey) {
-    throw new Error(
-      'GAPOS_STT_API_KEY is not set. A live provider is a paid external resource: set the key ' +
-        'before selecting live mode (AGENTS.md §5).',
-    );
+    // Voice capture is optional: the worker and web both boot without an STT key,
+    // and only the voice endpoint fails (with a clear message) when actually used.
+    // This keeps the deployable surface decoupled from an optional paid capability.
+    return {
+      name: 'unconfigured',
+      transcribe: async () => {
+        throw new Error(
+          'GAPOS_STT_API_KEY is not set. Voice capture needs a live speech-to-text ' +
+            'provider (OpenAI-compatible /audio/transcriptions).',
+        );
+      },
+    };
   }
   return createLiveSpeechToText({
     endpoint: env.GAPOS_STT_BASE_URL ?? 'https://api.openai.com/v1',

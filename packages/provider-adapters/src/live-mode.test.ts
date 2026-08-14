@@ -307,6 +307,33 @@ describe('live-mode factory', () => {
     ).toThrow(/GAPOS_LLM_API_KEY/);
   });
 
+  it('boots live mode without an STT key (voice capture is optional)', async () => {
+    process.env = {
+      ...ORIGINAL_ENV,
+      GAPOS_LLM_API_KEY: 'llm-key',
+      GAPOS_EMBEDDINGS_API_KEY: 'embed-key',
+      // Deliberately no GAPOS_STT_API_KEY: the worker never transcribes and must
+      // still boot (E22 deploy fix).
+    };
+    const providers = createProviders({
+      mode: 'live',
+      costAccountant: new CostAccountant(),
+      metrics: createMetrics(),
+      logger: createLogger({}, { level: 'error' }),
+    });
+    expect(providers.mode).toBe('live');
+    expect(providers.speechToText.name).toBe('unconfigured');
+    await expect(
+      providers.speechToText.transcribe({
+        audio: new Uint8Array([1, 2, 3]),
+        mediaType: 'audio/mpeg',
+        locale: 'en',
+        runId: 'run_x',
+        userId: 'u',
+      }),
+    ).rejects.toThrow(/GAPOS_STT_API_KEY is not set/);
+  });
+
   it('exposes a live embeddings backend for explicit assembly', async () => {
     const backend = createLiveEmbeddings({
       endpoint: 'https://embeddings.example/v1',
