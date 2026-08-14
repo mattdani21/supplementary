@@ -1,6 +1,6 @@
 {
  "schemaVersion": 1,
- "updatedAt": "2026-08-14T05:17:57.000Z",
+ "updatedAt": "2026-08-14T15:54:11.000Z",
  "controller": "gapos-controller",
  "tasks": {
   "GAP-035": {
@@ -673,6 +673,49 @@
     }
    ],
    "notes": "scripts/compile-math-gap.ts is the sibling of smoke-compile.ts the task asked for. It exposes compileSeededMathGap(context, owner, key) - seed (idempotent, GAP-032) -> define -> compile -> assert all four acceptance criteria - used by both the script main and the deterministic test, so the script's assertions are exactly the test's. The compile key is fixed (gap-033-math-compile), making the script itself idempotent: a re-run deduplicates to the original run. Two pipeline facts surfaced while writing this: (1) a deduplicated repeat returns no curriculumId and a summary-only days list (audioSegments: 0), so the script resolves the run's curriculum via getForRun/getCurrentForGap and asserts Day 1 from repository artefacts rather than the outcome; (2) the per-process memory object store (GAP-026) cannot serve audio bytes on a cross-process re-run, so the FAKE-AUDIO: stub-byte check is strict on a fresh compile and explicitly reported (warn + audioStubBytesVerified=false) on a dedupe re-run - the pipeline verified audio integrity before publishing and the artefact rows (kind/mediaType/checksum) survive in Postgres. Plan validation uses the plan-validation.test.ts pattern: findPlanViolations on the stored plan with satisfiedExternalPrerequisites = referenceNormalisation().assumedPrerequisites + referenceDiagnostic().demonstratedCapabilities, exactly what compile.ts passes. No API/schema change (script + test only), so specs/ is untouched; no migration; no new runtime telemetry (the script drives the existing pipeline, which already emits full_course_publication_latency_ms and audit findings)."
+  },
+  "GAP-036": {
+   "status": "done",
+   "startedAt": "2026-08-14T15:54:11.000Z",
+   "evidence": [
+    {
+     "command": "git status + git log --oneline -5; read AGENTS.md, apps/worker/src/pipeline/compile.ts, step-runner.ts, packages/domain/src/generation/state-machine.ts, packages/database/src/repositories/{types,postgres,memory}.ts, tests/end-to-end/{compile-math-gap,worker,journey}.test.ts",
+     "result": "pass",
+     "note": "Controller loop: repo clean on autopilot/m1-fresh-checkout. Found the leak: compile.ts stage H records the whole synthesise_audio result array (per-segment {segmentId, checksum, durationSeconds, storageKey, mediaType, bytes: Uint8Array}) as the step output via runStep -> generation.upsertStep -> JSONB column generation_steps.output. With live TTS each segment's bytes are ~7MB, so a 7-day curriculum is 100+MB in Postgres. The audio bytes already live in S3 (artefacts table stores storageKey + checksum per segment). No backlog task defines this fix (direct request); generationLog (apps/web/src/server/api.ts) reads only step/state/attempt/error, not output, so the shape change has no HTTP-surface impact."
+    },
+    {
+     "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm verify (baseline)",
+     "result": "pass",
+     "note": "434 passed | 26 loud skips. Same hermetic note as GAP-034/035: the sandbox injects GAPOS_PROVIDER_MODE=live without a key, so verify runs with env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL."
+    },
+    {
+     "command": "pnpm exec vitest run tests/end-to-end/step-output-summary.test.ts (test-first, RED)",
+     "result": "fail",
+     "note": "New test tests/end-to-end/step-output-summary.test.ts written BEFORE the fix: compiles the seeded math gap on the in-memory context, reads generation.listSteps, and asserts every succeeded synthesise_audio step records exactly {checksum, bytes, segments, storageKey} (checksum/storageKey arrays index-aligned, length === segments, bytes/segments > 0), that the serialized output contains no raw audio ('FAKE-AUDIO:' envelope absent, size < 10_000), and that Day-1's recorded checksums/storageKeys equal the artefacts table rows for the same lesson. Red as designed: AssertionError 'expected ['0','1','2','3','4','5'] to deeply equal ['bytes','checksum','segments','storageKey']' \u2014 the current code records the per-segment payload array (6 segments with audio bytes), not a summary."
+    },
+    {
+     "command": "pnpm exec vitest run tests/end-to-end/step-output-summary.test.ts (after fix)",
+     "result": "pass",
+     "note": "Green. Implementation: (1) new exported AudioSynthesisStepOutput type in apps/worker/src/pipeline/compile.ts; (2) stage H restructured so the step's work function now performs synthesis, the integrity check, the S3 uploads and the artefact rows, then returns {checksum: per-segment checksums, bytes: total byte size, segments: count, storageKey: per-segment keys}; runStep records that summary. Side effects moved INSIDE the step so a re-entered run reuses the recorded summary without re-running anything (idempotency preserved: the step is recorded succeeded only after upload + artefacts complete, so a resumed worker never needs the bytes it previously stored in the log). audioSegments now reads recorded.segments. The text-only fallback is unchanged: any synthesis/integrity/budget failure throws inside the step (recorded failed), the caller catches and publishes transcript-only, and uploads happen only after ALL segments synthesise, so no audio artefacts leak into a text-only lesson."
+    },
+    {
+     "command": "pnpm exec vitest run tests/end-to-end/compile-math-gap.test.ts tests/end-to-end/worker.test.ts tests/end-to-end/journey.test.ts tests/end-to-end/embedding-retrieval.test.ts tests/end-to-end/capability-reuse.test.ts tests/end-to-end/seed-curriculum.test.ts (targeted)",
+     "result": "pass",
+     "note": "47 targeted tests pass, no regressions: compile-math-gap (Day-1 audio stub still in storage, idempotent repeats, charges unchanged), worker (mid-lease death, in-flight resume, retry, dead-letter), journey (incl. audioEnabled:false text-only and the budget-degradation-to-text-only test \u2014 the 'Step failed' log lines are the intended recorded-failed step for the degraded day, and assertions that text-only days carry no audio artefacts still hold), embedding-retrieval, capability-reuse, seed-curriculum."
+    },
+    {
+     "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm verify (final)",
+     "result": "pass",
+     "note": "435 passed | 26 loud skips (baseline 434 + 1 new step-output-summary test). Format, lint, typecheck and the full suite green."
+    },
+    {
+     "command": "pnpm exec tsx (measure recorded summary size after a fresh compile)",
+     "result": "pass",
+     "note": "Seeded math gap, 3 audio steps (one per day), 6-7 segments each: TOTAL serialized step output across all three days is 1,642 bytes (~500 B per step), sample {\"checksum\":[6 x 32-hex],\"bytes\":258,\"segments\":6,\"storageKey\":[6 x S3 keys]}. Before the fix each step carried the raw audio buffer per segment (~7MB with live TTS; a 7-day course was 100+MB in Postgres). Checksums/storageKeys in the summary match the artefacts table rows for the same lesson (Day-1: 6 audio artefacts)."
+    }
+   ],
+   "notes": "Focused fix (direct request, not a backlog task): the synthesise_audio generation step now records a small summary {checksum, bytes, segments, storageKey} in generation_steps.output instead of the raw audio payload. checksum and storageKey are per-segment, index-aligned, and identical to the artefacts table rows, so the step log can still verify object storage (traceability kept); bytes is the total byte size and segments the count. No migration needed (the output column is already JSONB; only its content for this step changes \u2014 forward-only rule respected), no API/specs change (generationLog surfaces step/state/attempt/error only), no accessibility impact, telemetry unchanged (compilation_stage_duration_ms + audio_generation_failure_total still cover the step; the step log row is the operational record). Architecture constraints untouched: steps remain idempotent \u2014 side effects now live inside the step work function, so a re-entered run reuses the recorded summary and never re-pays for synthesis or re-uploads.",
+   "completedAt": "2026-08-14T15:54:11.000Z"
   }
  },
  "GAP-014b": {

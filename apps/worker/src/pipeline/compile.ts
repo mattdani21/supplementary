@@ -118,6 +118,25 @@ export interface CompileOutcome {
   readonly deduplicated?: boolean;
 }
 
+/**
+ * What the `synthesise_audio` step records in the generation step log: a small summary instead of
+ * the audio payload itself. The bytes live in object storage — the artefacts table holds each
+ * segment's storage key and checksum — so persisting them a second time in
+ * `generation_steps.output` is what turned a 7-day curriculum into 100+ MB of JSONB per step row.
+ *
+ * `checksum` and `storageKey` are index-aligned per segment (segment i's checksum belongs to
+ * segment i's storage key), and match the artefacts table rows for the same lesson, so the log
+ * can verify exactly what object storage holds.
+ */
+export interface AudioSynthesisStepOutput {
+  readonly checksum: readonly string[];
+  /** Total byte size of the synthesised audio across all segments. */
+  readonly bytes: number;
+  /** Number of audio segments this step produced. */
+  readonly segments: number;
+  readonly storageKey: readonly string[];
+}
+
 const hash = (value: unknown): string =>
   createHash('sha256').update(JSON.stringify(value)).digest('hex').slice(0, 16);
 
@@ -934,58 +953,81 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
         pauseAtSeconds: lesson.pausePrompts.map((p) => p.atSecond),
       });
 
-      const results = await runStep(
+      const recorded = await runStep(
         step,
         { step: 'synthesise_audio', subject: lessonId, inputVersion: hash(lesson.script) },
-        async () =>
-          mapWithConcurrency(segments, deps.concurrency ?? 3, async (segment) => {
-            const audio = await providers.textToSpeech.synthesise({
-              text: segment.text,
-              segmentId: segment.id,
-              voice: 'default',
-              locale: 'en',
-              runId,
-              userId: owner,
+        async () => {
+          const results = await mapWithConcurrency(
+            segments,
+            deps.concurrency ?? 3,
+            async (segment) => {
+              const audio = await providers.textToSpeech.synthesise({
+                text: segment.text,
+                segmentId: segment.id,
+                voice: 'default',
+                locale: 'en',
+                runId,
+                userId: owner,
+              });
+              return {
+                segmentId: segment.id,
+                checksum: audio.checksum,
+                durationSeconds: audio.durationSeconds,
+                storageKey: `${lessonId}/${segment.id}`,
+                mediaType: audio.mediaType,
+                bytes: audio.audio,
+              };
+            },
+          );
+
+          // Publication integrity: the audio must correspond to the transcript beside it. The
+          // check runs inside the step, so a lesson is recorded as synthesised only once its
+          // audio is verified, uploaded and recorded as artefacts — a re-entered run reuses the
+          // recorded summary and never re-pays for synthesis.
+          const failures = checkAudioIntegrity(segments, results, shortChecksum);
+          if (failures.length > 0) {
+            throw new Error(
+              `Audio integrity check failed: ${failures.map((f) => f.code).join(', ')}`,
+            );
+          }
+
+          for (const [index, result] of results.entries()) {
+            await deps.storage.put(
+              owner,
+              result.storageKey,
+              Uint8Array.from(result.bytes ?? []),
+              result.mediaType,
+            );
+            await uow.curricula.addArtefact(owner, {
+              // Deterministic: a resumed run re-enters the same artefacts instead of duplicating
+              // them.
+              id: artefactId(lessonId, 'audio', index, repairAttempts + 1),
+              lessonId,
+              kind: 'audio',
+              storageKey: result.storageKey,
+              mediaType: result.mediaType,
+              checksum: result.checksum,
+              durationSeconds: result.durationSeconds,
+              version: repairAttempts + 1,
+              segmentOrdinal: index,
+              frozen: false,
             });
-            return {
-              segmentId: segment.id,
-              checksum: audio.checksum,
-              durationSeconds: audio.durationSeconds,
-              storageKey: `${lessonId}/${segment.id}`,
-              mediaType: audio.mediaType,
-              bytes: audio.audio,
-            };
-          }),
+          }
+
+          // The step log records a small summary — per-segment checksums, total byte size,
+          // segment count and storage keys — not the audio bytes themselves. The bytes already
+          // live in object storage (the artefacts table holds each segment's key + checksum);
+          // persisting them here as well is what turned a 7-day curriculum into 100+ MB of JSONB.
+          return {
+            checksum: results.map((result) => result.checksum),
+            bytes: results.reduce((total, result) => total + result.bytes.byteLength, 0),
+            segments: results.length,
+            storageKey: results.map((result) => result.storageKey),
+          } satisfies AudioSynthesisStepOutput;
+        },
       );
 
-      // Publication integrity: the audio must correspond to the transcript beside it.
-      const failures = checkAudioIntegrity(segments, results, shortChecksum);
-      if (failures.length > 0) {
-        throw new Error(`Audio integrity check failed: ${failures.map((f) => f.code).join(', ')}`);
-      }
-
-      for (const [index, result] of results.entries()) {
-        await deps.storage.put(
-          owner,
-          result.storageKey,
-          Uint8Array.from(result.bytes ?? []),
-          result.mediaType,
-        );
-        await uow.curricula.addArtefact(owner, {
-          // Deterministic: a resumed run re-enters the same artefacts instead of duplicating them.
-          id: artefactId(lessonId, 'audio', index, repairAttempts + 1),
-          lessonId,
-          kind: 'audio',
-          storageKey: result.storageKey,
-          mediaType: result.mediaType,
-          checksum: result.checksum,
-          durationSeconds: result.durationSeconds,
-          version: repairAttempts + 1,
-          segmentOrdinal: index,
-          frozen: false,
-        });
-      }
-      audioSegments = results.length;
+      audioSegments = recorded.segments;
     } catch (error) {
       // The curriculum survives an audio failure: the learner reads instead of listening.
       metrics.increment('audio_generation_failure_total', { day: dayPlan.day });
