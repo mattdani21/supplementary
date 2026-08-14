@@ -114,7 +114,10 @@ either S3 or a shared filesystem-backed store.
 
 The gate before flipping a deployed instance to real learners is the live-provider
 evaluation (GAP-014b): `GAPOS_PROVIDER_MODE=live GAPOS_LLM_API_KEY=… pnpm test
-tests/evaluation/live-provider.test.ts` against the exact model the instance runs.
+tests/evaluation/live-provider.test.ts` against the exact model the instance runs. A local
+model qualifies the same way — `GAPOS_PROVIDER_MODE=live GAPOS_LLM_MODE=local pnpm test
+tests/evaluation/live-provider.test.ts` against the Ollama/llama.cpp endpoint — and only
+earns production use by clearing that pack.
 
 ## Environments
 

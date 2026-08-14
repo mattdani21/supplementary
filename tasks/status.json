@@ -532,6 +532,11 @@
      "command": "pnpm test packages/provider-adapters/src/live-mode.test.ts",
      "result": "pass",
      "note": "Local-model execution preset (E18). GAPOS_LLM_MODE=local assembles the live backend against Ollama/llama.cpp's OpenAI-compatible endpoint (default http://localhost:11434/v1, model qwen2.5:7b-instruct) with no API key \u2014 the Authorization header is omitted when no key is set. The remote gate still applies without local mode (GAPOS_LLM_API_KEY required). Tested with a scripted fetch; model qualification against the evaluation pack is documented in OPERATIONS.md."
+    },
+    {
+     "command": "pnpm verify",
+     "result": "pass",
+     "note": "Verification round: the E18 test now also asserts the localhost base URL captured by the scripted fetch (http://localhost:11434/v1/chat/completions), so 'assembles against a localhost base URL and is exercised with a scripted fetch' is asserted rather than implied. OPERATIONS.md makes the local-model evaluation-pack qualification run explicit (GAPOS_PROVIDER_MODE=live GAPOS_LLM_MODE=local pnpm test tests/evaluation/live-provider.test.ts). 402 passed | 27 loud skips."
     }
    ]
   },
