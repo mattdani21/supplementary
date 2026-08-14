@@ -1462,6 +1462,71 @@ summary:focus-visible {
   border-color: transparent;
 }
 
+/* ------------------------------------------------------- onboarding first run (GAP-039) */
+
+.onboarding {
+  width: 100%;
+  margin: 0;
+  padding: 1.5rem 1.25rem 2rem;
+}
+
+.onboarding__head h1 {
+  margin-bottom: 0.375rem;
+}
+
+.onboarding__step {
+  margin: 0 0 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.onboarding__subtitle {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+}
+
+.onboarding__card {
+  display: flex;
+  flex-direction: column;
+  margin-top: 1.25rem;
+}
+
+.onboarding__url {
+  margin: 0.25rem 0 0.5rem;
+}
+
+.onboarding__url button {
+  margin-top: 0.5rem;
+}
+
+.onboarding__actions {
+  display: flex;
+  gap: 0.625rem;
+  margin-top: 1rem;
+}
+
+.onboarding__actions .btn {
+  flex: 1;
+}
+
+.onboarding__skip {
+  margin-top: 1.25rem;
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.onboarding__skip:hover {
+  background: none;
+  color: var(--text-secondary);
+}
+
 /* ------------------------------------------- motion: reduce for vestibular safety */
 
 @media (prefers-reduced-motion: reduce) {

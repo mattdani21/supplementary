@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiFetch } from './api';
+import { mediaTypeForFilename } from '../lib/sources';
 
 export function SourceForm({ gapId }: { gapId: string }) {
   const router = useRouter();
@@ -22,11 +23,7 @@ export function SourceForm({ gapId }: { gapId: string }) {
         method: 'POST',
         body: JSON.stringify({
           filename,
-          mediaType: filename.endsWith('.md')
-            ? 'text/markdown'
-            : filename.endsWith('.html')
-              ? 'text/html'
-              : 'text/plain',
+          mediaType: mediaTypeForFilename(filename),
           text: form.get('text'),
         }),
       })) as {
