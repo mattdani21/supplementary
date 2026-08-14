@@ -373,6 +373,11 @@
      "command": "pnpm test apps/worker/src/daemon.test.ts",
      "result": "pass",
      "note": "Worker daemon entrypoint. bootstrapDaemon resolves env (GAPOS_DATABASE_URL -> Postgres pool + migrate + Postgres queue, else memory; GAPOS_STORAGE memory|s3 with GAPOS_S3_*; poll/lease/batch; budgets) and returns a ready worker. daemon-main.ts starts the loop, holds the process open with a ref'd heartbeat (the poll timer is unref'd for tests), and shuts down cleanly on SIGTERM/SIGINT: stop claiming, finish in-flight, release the pool. apps/worker now has scripts.start + a gapos-worker bin. Found and fixed a real bug: with only the unref'd poll timer the daemon process exited immediately after boot."
+    },
+    {
+     "command": "pnpm verify",
+     "result": "pass",
+     "note": "Takeover verification on wt/gap-020: each acceptance criterion now has a dedicated automated check in apps/worker/src/daemon.test.ts. (1) 'completes an enqueued compile and shuts down cleanly' bootstraps the daemon against the in-memory queue, enqueues a compile, waits for the daemon's own loop to succeed it (gap active, curriculum published), then stops and closes cleanly. (2) 'stops claiming and releases the lease when stopped during a run' holds a run in flight with a slow fake provider, stops the worker (the exact call the SIGTERM handler makes), and asserts the in-flight job finished, its lease was released (succeeded, leasedUntil cleared), and a job parked behind it was never claimed. Gate: 404 passed / 0 failed / 27 skipped (Postgres suites loud-skip without GAPOS_TEST_DATABASE_URL)."
     }
    ]
   },
