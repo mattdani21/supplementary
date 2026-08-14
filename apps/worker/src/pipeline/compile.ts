@@ -53,7 +53,7 @@ import type { Logger, Metrics } from '@gapos/observability';
 import { ProviderContractError, type Providers } from '@gapos/provider-adapters';
 import { mapWithConcurrency, runStep, type StepContext } from './step-runner.js';
 
-export const PIPELINE_VERSION = '1.0.0';
+export const PIPELINE_VERSION = '1.1.0';
 
 /** How many times the planner is asked again after a rejected plan. */
 export const MAX_PLAN_ATTEMPTS = 2;
@@ -395,7 +395,7 @@ export const compileGap = async (
         : []),
     ].join(' ');
 
-    const plan = await runStep(
+    const planResult = await runStep(
       step,
       {
         step: 'plan_curriculum',
@@ -417,6 +417,10 @@ export const compileGap = async (
           logger,
         }),
     );
+    // The step output is the full { plan, attempts } record (C-04); the run's curriculum is the
+    // accepted plan itself. The attempts stay in the step log — that is what the hit-rate harness
+    // reads.
+    const plan = planResult.plan;
 
     // The run's own curriculum, if it already exists (a resumed run re-enters it rather than
     // creating a second course for the same gap — that is what keeps lesson and artefact ids
@@ -622,6 +626,26 @@ const ingestSources = async (params: {
 
 /* --------------------------------------------------------------------- stage D */
 
+/**
+ * One planner call in a run: which invariants the output violated and whether it passed the full
+ * validation gate. This is the record the hit-rate measurement reads (C-04, FR-012/FR-014) — a
+ * rejected plan's violations are returned together so the repair round can fix all of them at
+ * once and the weakest invariant stays diagnosable.
+ */
+export interface PlanAttempt {
+  /** 1-based planner call within this run. */
+  readonly attempt: number;
+  /** Violation messages from `findPlanViolations`, empty when the plan passed. */
+  readonly violations: readonly string[];
+  readonly passed: boolean;
+}
+
+/** The `plan_curriculum` step output: the accepted plan plus every attempt that produced it. */
+export interface PlanCurriculumResult {
+  readonly plan: CurriculumPlan;
+  readonly attempts: readonly PlanAttempt[];
+}
+
 const planCurriculum = async (params: {
   runId: string;
   owner: OwnerId;
@@ -632,8 +656,9 @@ const planCurriculum = async (params: {
   satisfiedExternalPrerequisites: readonly string[];
   deps: CompileDeps;
   logger: Logger;
-}): Promise<CurriculumPlan> => {
+}): Promise<PlanCurriculumResult> => {
   const { runId, owner, gapId, evidence, deps, logger } = params;
+  const attempts: PlanAttempt[] = [];
   let previousViolations: string[] = [];
 
   for (let attempt = 1; attempt <= MAX_PLAN_ATTEMPTS; attempt++) {
@@ -670,7 +695,12 @@ const planCurriculum = async (params: {
     const violations = findPlanViolations(response.value, {
       satisfiedExternalPrerequisites: params.satisfiedExternalPrerequisites,
     });
-    if (violations.length === 0) return response.value;
+    attempts.push({
+      attempt,
+      violations: violations.map((v) => v.message),
+      passed: violations.length === 0,
+    });
+    if (violations.length === 0) return { plan: response.value, attempts };
 
     previousViolations = violations.map((v) => v.message);
     deps.metrics.increment('repair_attempt_total', { stage: 'planning' });
