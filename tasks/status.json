@@ -515,6 +515,11 @@
      "command": "pnpm test packages/provider-adapters/src/live-mode.test.ts",
      "result": "pass",
      "note": "Provider routing by policy (E17). The live language model accepts a per-purpose routing table (purpose -> model); unlisted purposes fall back to the default model. createLiveLanguageModelFromEnv parses GAPOS_MODEL_ROUTING ('planning:model-a,teaching:model-b'). Tests prove a teaching call uses the teaching model, a planning call the planning model, and an unlisted purpose the default, plus env parsing."
+    },
+    {
+     "command": "pnpm verify",
+     "result": "pass",
+     "note": "wt/gap-029 verification: acceptance criteria re-confirmed on the current branch. The routing table (routing: {teaching: 'teacher-model', planning: 'planner-model'}) sends a teaching call to the teaching model, a planning call to the planning model, and an unlisted purpose to the default model; GAPOS_MODEL_ROUTING is parsed from the env into the same table. Full gate green: 402 passed | 27 skipped."
     }
    ]
   },
