@@ -4,6 +4,7 @@ dist
 coverage
 pnpm-lock.yaml
 tasks/status.json
+.worktrees
 *.md
 
 # Generated from the zod contracts by `pnpm specs:generate`; reformatting them would
