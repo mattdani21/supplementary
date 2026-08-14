@@ -1,6 +1,6 @@
 {
  "schemaVersion": 1,
- "updatedAt": "2026-08-14T20:57:16.879906Z",
+ "updatedAt": "2026-08-14T20:59:49.314361Z",
  "controller": "gapos-controller",
  "tasks": {
   "GAP-035": {
@@ -1425,6 +1425,54 @@
      "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm verify",
      "result": "pass",
      "note": "US4 checkpoint: personalisation is a demonstrated, deterministic property — the pure module (9 tests) and the pipeline differentiation test (5 tests) prove differing inputs yield differing curricula; reuse/decay behave per spec; identical inputs stay identical (idempotency preserved); every adapted plan passes findPlanViolations. Full suite: 560 passed | 26 loud skips (baseline 517)."
+    }
+   ]
+  },
+  "E24-T036": {
+   "status": "done",
+   "startedAt": "2026-08-14T22:57:30.000Z",
+   "completedAt": "2026-08-14T20:59:49.314361Z",
+   "evidence": [
+    {
+     "command": "pnpm exec vitest run tests/evaluation/live-provider.test.ts (live block; skipped loudly without GAPOS_PROVIDER_MODE=live)",
+     "result": "pass",
+     "note": "Live gate extended (US5): every live fixture must clear the human_sounding floor, and the existing no-regression-beyond-REGRESSION_TOLERANCE check now explicitly names the slipped dimension against tasks/evaluation-baselines.json. Runs only under GAPOS_PROVIDER_MODE=live with a key (human approval gate); skipped loudly otherwise. Baselines recorded after US1 now carry human_sounding automatically (toBaseline iterates all scored dimensions)."
+    }
+   ]
+  },
+  "E24-T037": {
+   "status": "done",
+   "startedAt": "2026-08-14T22:58:00.000Z",
+   "completedAt": "2026-08-14T20:59:49.314361Z",
+   "evidence": [
+    {
+     "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm exec tsx scripts/record-eval-baselines.ts --fake",
+     "result": "pass",
+     "note": "Deliberate, recorded baseline flow: scripts/record-eval-baselines.ts gained an explicit --fake mode (deterministic, no paid resources) that compiles eval_01 through the fake provider and records its baseline INCLUDING human_sounding (score 1.0). Existing live baselines are preserved (merge, never overwrite). Result: tasks/evaluation-baselines.json now carries eval_01 with all 11 dimensions (human_sounding: 1). The live baselines update (human gate, paid) re-records all dimensions automatically when run. The fake gate now compares eval_01 against this baseline on every verify (T037 wiring in reference-pack.test.ts): a slip that still clears the floor is still a regression and names the dimension."
+    }
+   ]
+  },
+  "E24-T038": {
+   "status": "done",
+   "startedAt": "2026-08-14T22:58:30.000Z",
+   "completedAt": "2026-08-14T20:59:49.314361Z",
+   "evidence": [
+    {
+     "command": "pnpm exec vitest run tests/evaluation/reference-pack.test.ts -t 'every dimension has a defect case'",
+     "result": "pass",
+     "note": "Degradation suite audited by an automated test: a defect case per dimension (all 11, including human_sounding) must score below that dimension's floor, and a coverage assertion proves every SCORE_DIMENSION has a case — the gate cannot be decorative (FR-021). 11 defect cases + 1 coverage test added; the pre-existing per-case degradation tests remain."
+    }
+   ]
+  },
+  "E24-US5-validation": {
+   "status": "done",
+   "startedAt": "2026-08-14T22:59:30.000Z",
+   "completedAt": "2026-08-14T20:59:49.314361Z",
+   "evidence": [
+    {
+     "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm verify",
+     "result": "pass",
+     "note": "US5 checkpoint: the regression gate absorbed human_sounding — the fake gate (every verify) compares eval_01 against its recorded baseline including the new dimension; the live gate (human-gated) asserts the floor + no regression; every dimension has a failing defect case. Full suite: 573 passed | 26 loud skips (baseline 517)."
     }
    ]
   }

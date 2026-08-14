@@ -21,6 +21,7 @@ import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
   EVALUATION_FIXTURES,
+  SCORE_FLOORS,
   compareToBaseline,
   fixtureById,
   formatScorecard,
@@ -90,7 +91,20 @@ if (LIVE) {
       },
     );
 
-    it('does not regress beyond tolerance against the stored baseline', () => {
+    it('clears the human_sounding floor on every live fixture (E24 US5, T036)', () => {
+      // The new dimension is part of the same contract as the old ones (SC-002/SC-005): a
+      // live script that reads like a model dump fails the gate even when every other
+      // dimension is fine.
+      for (const fixture of floorFixtures) {
+        const scorecard = scorecards.get(fixture.id)!;
+        expect(
+          scorecard.dimensions.human_sounding.score,
+          `${fixture.id}: ${formatScorecard(scorecard)}`,
+        ).toBeGreaterThanOrEqual(SCORE_FLOORS.human_sounding);
+      }
+    });
+
+    it('does not regress beyond tolerance against the stored baseline, naming the dimension', () => {
       for (const fixture of floorFixtures) {
         const scorecard = scorecards.get(fixture.id)!;
         const verdict = compareToBaseline(scorecard, baselines[fixture.id]);

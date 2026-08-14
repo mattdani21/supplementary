@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-08-03T08:59:38.534Z",
+  "recordedAt": "2026-08-14T20:58:41.529Z",
   "baselines": {
     "eval_02_relations_equivalence": {
       "fixtureId": "eval_02_relations_equivalence",
@@ -137,6 +137,24 @@
         "scope_discipline": 1
       },
       "recordedAt": "2026-08-03T08:59:38.534Z"
+    },
+    "eval_01_set_operations": {
+      "fixtureId": "eval_01_set_operations",
+      "overall": 1,
+      "dimensions": {
+        "objective_coverage": 1,
+        "source_faithfulness": 1,
+        "factual_accuracy": 1,
+        "question_solvability": 1,
+        "difficulty_progression": 1,
+        "audio_suitability": 1,
+        "duration_accuracy": 1,
+        "duplicate_content": 1,
+        "answer_leakage": 1,
+        "scope_discipline": 1,
+        "human_sounding": 1
+      },
+      "recordedAt": "2026-08-14T20:58:41.528Z"
     }
   }
 }

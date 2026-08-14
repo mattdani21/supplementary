@@ -11,6 +11,7 @@
  */
 
 import { beforeAll, describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import type { LessonPackage } from '@gapos/ai-contracts';
 import type { OwnerId } from '@gapos/database';
 import {
@@ -22,7 +23,9 @@ import {
   formatScorecard,
   scoreCurriculum,
   toBaseline,
+  type Baseline,
   type ProducedCurriculum,
+  type ScoreDimension,
 } from '@gapos/evaluation';
 import { createServerContext, type ServerContext } from '../../apps/web/src/server/context.js';
 import {
@@ -33,6 +36,18 @@ import {
 } from '../../apps/web/src/server/services/gap-service.js';
 
 const LEARNER: OwnerId = 'user_eval';
+
+/** The stored baselines the gate compares against (scripts/record-eval-baselines.ts). */
+const loadBaselines = (): Record<string, Baseline> => {
+  try {
+    const parsed = JSON.parse(readFileSync('tasks/evaluation-baselines.json', 'utf8')) as {
+      baselines: Record<string, Baseline>;
+    };
+    return parsed.baselines;
+  } catch {
+    return {};
+  }
+};
 
 /** Compile a fixture through the real pipeline and collect what it produced. */
 const compileFixture = async (
@@ -145,6 +160,24 @@ describe('the reference curriculum clears every floor', () => {
   it('grounds its claims in the supplied source rather than general knowledge', () => {
     const scorecard = scoreCurriculum(fixtureById('eval_01_set_operations')!, produced);
     expect(scorecard.dimensions.source_faithfulness.score).toBeGreaterThan(0.9);
+  });
+
+  it('does not regress beyond tolerance against the recorded baseline (E24 US5, T037)', () => {
+    // The gate runs on every verification: the fake-compiled reference curriculum is compared
+    // against its stored baseline (scripts/record-eval-baselines.ts --fake, deliberate flow).
+    // A slip that still clears the floor is still a regression and names the dimension.
+    const baseline = loadBaselines()['eval_01_set_operations'];
+    const scorecard = scoreCurriculum(fixtureById('eval_01_set_operations')!, produced);
+    const verdict = compareToBaseline(scorecard, baseline);
+    if (verdict.status === 'regressed') {
+      const dimensions = verdict.dimensions
+        .map((d) => `${d.dimension}: ${d.from} → ${d.to}`)
+        .join(', ');
+      expect(
+        false,
+        `eval_01 regressed by ${verdict.delta}: ${dimensions}. Record a new baseline only with evidence (scripts/record-eval-baselines.ts --fake).`,
+      ).toBe(true);
+    }
   });
 });
 
@@ -411,6 +444,153 @@ describe('the human-sounding rubric is not decorative (E24 US1)', () => {
     );
     expect(scorecard.dimensions.human_sounding.score).toBeLessThan(SCORE_FLOORS.human_sounding);
     expect(scorecard.dimensions.human_sounding.observations.join(' ')).toMatch(/checkpoint/i);
+  });
+});
+
+/**
+ * T038 (US5, E24 — FR-021): the degradation suite is audited, not assumed. Every dimension —
+ * including the new `human_sounding` — must have a defect case that actually fails it below its
+ * floor. If a dimension ever has no case, this test names it and the gate becomes decorative.
+ */
+describe('every dimension has a defect case that fails it (E24 US5, T038)', () => {
+  let baseline: ProducedCurriculum;
+  const fixture = fixtureById('eval_01_set_operations')!;
+
+  beforeAll(async () => {
+    let counter = 0;
+    const context = createServerContext({
+      newId: (prefix) => `${prefix}_${++counter}`,
+      logLevel: 'error',
+    });
+    await context.uow.users.create({
+      id: LEARNER,
+      email: 'eval@example.com',
+      locale: 'en',
+      timezone: 'UTC',
+    });
+    baseline = await compileFixture(context, 'eval_01_set_operations');
+  });
+
+  const degrade = (transform: (lesson: LessonPackage) => LessonPackage): ProducedCurriculum => ({
+    plan: baseline.plan,
+    lessons: baseline.lessons.map(transform),
+  });
+
+  /** The lesson's own checkpoint question, kept so other elements survive the degradation. */
+  const promptText = (lesson: LessonPackage): string => lesson.pausePrompts[0]?.prompt ?? '';
+
+  /** One defect per dimension. Each produced curriculum must score below that dimension's floor. */
+  const DEFECTS: readonly { dimension: ScoreDimension; produced: () => ProducedCurriculum }[] = [
+    {
+      dimension: 'objective_coverage',
+      produced: () => ({
+        plan: baseline.plan,
+        lessons: baseline.lessons.filter((l) => l.day !== 3),
+      }),
+    },
+    {
+      dimension: 'source_faithfulness',
+      produced: () =>
+        degrade((lesson) => ({
+          ...lesson,
+          evidence: { basis: 'general_knowledge', locators: [] },
+          questions: lesson.questions.map((q) => ({
+            ...q,
+            evidence: { basis: 'general_knowledge' as const, locators: [] },
+          })),
+        })),
+    },
+    {
+      dimension: 'factual_accuracy',
+      produced: () =>
+        degrade((lesson) =>
+          lesson.day === 1
+            ? { ...lesson, script: `${lesson.script} Cardinality counts the elements of a set.` }
+            : lesson,
+        ),
+    },
+    {
+      dimension: 'question_solvability',
+      produced: () =>
+        degrade((lesson) => ({
+          ...lesson,
+          questions: lesson.questions.map((q) =>
+            q.type === 'multiple_choice' ? { ...q, answer: 'an option that does not exist' } : q,
+          ),
+        })),
+    },
+    {
+      dimension: 'difficulty_progression',
+      produced: () =>
+        degrade((lesson) => ({
+          ...lesson,
+          questions: lesson.questions.map((q) => ({ ...q, difficulty: 6 - lesson.day })),
+        })),
+    },
+    {
+      dimension: 'audio_suitability',
+      produced: () =>
+        degrade((lesson) => ({
+          ...lesson,
+          script: `## Overview\n\n- first point\n- second point\n\nAs shown in the figure below.`,
+        })),
+    },
+    {
+      dimension: 'duration_accuracy',
+      produced: () => degrade((lesson) => ({ ...lesson, estimatedMinutes: 55 })),
+    },
+    {
+      dimension: 'duplicate_content',
+      produced: () =>
+        degrade((lesson) => ({
+          ...lesson,
+          questions: lesson.questions.map((q, index, all) =>
+            index === 0 && all[1] ? { ...q, prompt: all[1].prompt } : q,
+          ),
+        })),
+    },
+    {
+      dimension: 'answer_leakage',
+      produced: () =>
+        degrade((lesson) => ({
+          ...lesson,
+          questions: lesson.questions.map((q) => ({ ...q, prompt: `${q.prompt} ${q.answer}` })),
+        })),
+    },
+    {
+      dimension: 'scope_discipline',
+      produced: () =>
+        degrade((lesson) => ({
+          ...lesson,
+          objectiveIds: [...lesson.objectiveIds, 'obj_invented'],
+        })),
+    },
+    {
+      dimension: 'human_sounding',
+      produced: () =>
+        degrade((lesson) => ({
+          ...lesson,
+          script: `In this lesson we will cover the subset definition. ${promptText(lesson)} The proof follows the definition.`,
+        })),
+    },
+  ];
+
+  it.each(DEFECTS.map((d) => [d.dimension, d] as const))(
+    'a defect in %s scores below its floor',
+    (dimension, { produced }) => {
+      const scorecard = scoreCurriculum(fixture, produced());
+      expect(
+        scorecard.dimensions[dimension].score,
+        `${dimension}: ${formatScorecard(scorecard)}`,
+      ).toBeLessThan(SCORE_FLOORS[dimension]);
+    },
+  );
+
+  it('covers every dimension of the pack', () => {
+    const audited = new Set(DEFECTS.map((d) => d.dimension));
+    for (const dimension of SCORE_DIMENSIONS) {
+      expect(audited, `dimension ${dimension} has a defect case`).toContain(dimension);
+    }
   });
 });
 

@@ -1,21 +1,29 @@
 /**
- * GAP-014b recording run: score the nine live-provider fixtures against a real model and store
- * the baselines the gate compares against.
+ * Baseline recording for the evaluation gate (GAP-014b live; E24 US5/T037 fake).
  *
- * This is a paid run and a human approval gate (AGENTS.md §5). Usage:
+ * Two deliberate, review-gated flows — never silent:
  *
- *     GAPOS_PROVIDER_MODE=live \
- *     GAPOS_LLM_API_KEY=sk-... \
- *     [GAPOS_LLM_MODEL=deepseek-chat] \
- *     [GAPOS_BUDGET_PER_RUN_CENTS=200 GAPOS_BUDGET_PER_USER_DAILY_CENTS=1000] \
- *     pnpm tsx scripts/record-eval-baselines.ts
+ *   - **Live** (paid run, human approval gate, AGENTS.md §5): score the nine
+ *     `requiresLiveProvider` fixtures against a real model and store the baselines the live
+ *     gate compares against. Since E24 US1 the scorer includes the `human_sounding` dimension,
+ *     so recorded live baselines carry it automatically.
  *
- * Prints a formatted scorecard per fixture and exits non-zero if any fixture fails its floors.
- * Baselines are written to tasks/evaluation-baselines.json and should be committed with the
- * run's evidence in tasks/status.json.
+ *         GAPOS_PROVIDER_MODE=live \
+ *         GAPOS_LLM_API_KEY=sk-... \
+ *         [GAPOS_LLM_MODEL=deepseek-chat] \
+ *         pnpm tsx scripts/record-eval-baselines.ts
+ *
+ *   - **Fake** (deterministic, no paid resources): compile eval_01 through the fake provider
+ *     and record its baseline, including `human_sounding`, so the on-every-verify gate
+ *     (tests/evaluation/reference-pack.test.ts) has a stored comparison point.
+ *
+ *         pnpm tsx scripts/record-eval-baselines.ts --fake
+ *
+ * Existing baselines are preserved: each run updates only the fixtures it scored. Print the
+ * command and its result in tasks/status.json with every recording (SC-008).
  */
 
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import {
   EVALUATION_FIXTURES,
   formatScorecard,
@@ -30,6 +38,15 @@ import {
   createLiveEvalProviders,
   EVAL_OWNER,
 } from '../tests/evaluation/live-helpers.js';
+import { createServerContext } from '../apps/web/src/server/context.js';
+import type { OwnerId } from '@gapos/database';
+import { fixtureById } from '@gapos/evaluation';
+import {
+  applyTransition,
+  compile,
+  createGap,
+  registerSource,
+} from '../apps/web/src/server/services/gap-service.js';
 
 const out = (line: string): void => {
   process.stdout.write(`${line}\n`);
@@ -40,12 +57,37 @@ const CLARIFICATION_FIXTURE = 'eval_08_underspecified';
 /** The adversarial fixture must surface its injection attempt as a recorded finding. */
 const INJECTION_FIXTURE = 'eval_07_prompt_injection';
 
-const main = async (): Promise<void> => {
+const BASELINE_FILE = 'tasks/evaluation-baselines.json';
+
+const loadExisting = (): Record<string, Baseline> => {
+  try {
+    const parsed = JSON.parse(readFileSync(BASELINE_FILE, 'utf8')) as {
+      baselines: Record<string, Baseline>;
+    };
+    return parsed.baselines;
+  } catch {
+    return {};
+  }
+};
+
+const writeBaselines = (baselines: Record<string, Baseline>): void => {
+  const record = {
+    schemaVersion: 1,
+    recordedAt: new Date().toISOString(),
+    baselines,
+  };
+  writeFileSync(BASELINE_FILE, `${JSON.stringify(record, null, 2)}\n`);
+  out(
+    `Baselines written to ${BASELINE_FILE} (${Object.keys(baselines).length} fixtures with a scorecard).`,
+  );
+};
+
+const recordLive = async (): Promise<number> => {
   const context = createLiveEvalContext(createLiveEvalProviders());
   await createEvalUser(context);
 
   const liveFixtures = EVALUATION_FIXTURES.filter((f) => f.requiresLiveProvider);
-  const baselines: Record<string, Baseline> = {};
+  const baselines = loadExisting();
   let failed = false;
 
   out(
@@ -102,17 +144,68 @@ const main = async (): Promise<void> => {
     out('');
   }
 
-  const record = {
-    schemaVersion: 1,
-    recordedAt: new Date().toISOString(),
-    baselines,
-  };
-  writeFileSync('tasks/evaluation-baselines.json', `${JSON.stringify(record, null, 2)}\n`);
-  out(
-    `Baselines written to tasks/evaluation-baselines.json (${Object.keys(baselines).length} fixtures scored; ${liveFixtures.length - Object.keys(baselines).length} without a scorecard).`,
-  );
+  writeBaselines(baselines);
+  return failed ? 1 : 0;
+};
 
-  process.exit(failed ? 1 : 0);
+const recordFake = async (): Promise<number> => {
+  const FAKE_OWNER: OwnerId = 'user_baseline_fake';
+  let counter = 0;
+  const context = createServerContext({
+    newId: (prefix) => `${prefix}_${++counter}`,
+    logLevel: 'error',
+  });
+  await context.uow.users.create({
+    id: FAKE_OWNER,
+    email: 'baseline-fake@example.com',
+    locale: 'en',
+    timezone: 'UTC',
+  });
+
+  const fixture = fixtureById('eval_01_set_operations')!;
+  const gap = await createGap(context, FAKE_OWNER, {
+    title: fixture.title,
+    rawStatement: fixture.learnerStatement,
+    dailyMinutes: fixture.dailyMinutes,
+  });
+  if (fixture.source) {
+    await registerSource(context, FAKE_OWNER, {
+      gapId: gap.id,
+      filename: fixture.source.filename,
+      mediaType: fixture.source.mediaType,
+      text: fixture.source.text,
+    });
+  }
+  await applyTransition(context, FAKE_OWNER, gap.id, { type: 'define' });
+  const outcome = await compile(context, FAKE_OWNER, {
+    gapId: gap.id,
+    idempotencyKey: 'record_baseline_eval_01',
+  });
+  if (!outcome.curriculumId) {
+    out(
+      `eval_01: FAIL — no curriculum (${outcome.status}${outcome.error ? ` / ${outcome.error}` : ''})`,
+    );
+    return 1;
+  }
+
+  const curriculum = await context.uow.curricula.get(FAKE_OWNER, outcome.curriculumId);
+  const lessons = await context.uow.curricula.listLessons(FAKE_OWNER, outcome.curriculumId);
+  const scorecard = scoreCurriculum(fixture, {
+    plan: curriculum!.plan,
+    lessons: lessons.map((lesson) => lesson.package),
+  });
+  out(formatScorecard(scorecard));
+  out(`eval_01 human_sounding: ${scorecard.dimensions.human_sounding.score}`);
+
+  const baselines = loadExisting();
+  baselines[fixture.id] = toBaseline(scorecard, new Date());
+  writeBaselines(baselines);
+  return scorecard.passed ? 0 : 1;
+};
+
+const main = async (): Promise<void> => {
+  const fake = process.argv.includes('--fake');
+  process.exit(fake ? await recordFake() : await recordLive());
 };
 
 main().catch((error: unknown) => {
