@@ -122,6 +122,16 @@ epics:
     priority: P1
     dependencies: [E14]
     evidence: The PWA renders a near-black, Linear/Vercel-style minimal shell with a bottom tab bar
+  - id: E23
+    title: "Quality (taste) — feels like Duolingo/Brilliant per specs/quality.md"
+    priority: P0
+    dependencies: [E22]
+    evidence: All quality-spec sections are enforced by tests; no legacy tokens; feedback moments and designed empty states everywhere
+  - id: E24
+    title: "Content — user-specific curriculum quality (the moat)"
+    priority: P0
+    dependencies: [E4, E13, E23]
+    evidence: Higher valid-plan hit rate; lesson scripts score against the human-sounding rubric; every objective traces to source locators
 
 tasks:
   - id: E20
@@ -876,6 +886,62 @@ tasks:
       - App Store / Play Store distribution
     dependencies: [GAP-035]
     acceptance:
-      - 'manifest icons resolve; lighthouse PWA installability passes on the home route'
-      - 'opening /gaps/<id>/study directly renders the study surface'
-      - 'pnpm verify passes'
+      - "manifest icons resolve; lighthouse PWA installability passes on the home route"
+      - "opening /gaps/<id>/study directly renders the study surface"
+      - "pnpm verify passes"
+  - id: GAP-037
+    title: "Feedback moments + designed states (E23 — quality spec §3, §4)"
+    epic: E23
+    priority: P0
+    status: ready
+    goal: "Every action has a visible consequence; practice feedback is fast and framed as repair; compile-in-progress is a designed surface, not a raw log."
+    scope:
+      - "practice answer feedback: correct → accent flash + verified-solution reveal within 200ms; incorrect → correction surface with solution + source link (never red-heavy)"
+      - "confidence capture as a single-tap segmented control (low/medium/high)"
+      - "generation progress surface: phase label, step list with per-step status, cancel; raw generation log only as a collapsible debugging view"
+      - "designed empty states for every list surface (tracks, sources, practice, review, map): one-line explanation + next action"
+    out_of_scope:
+      - "streaks/XP/gamification (roadmap Phase 1)"
+      - "illustration/mascot art"
+    dependencies: [GAP-035]
+    acceptance:
+      - "component tests cover: correct-answer feedback, incorrect-answer correction, confidence one-tap, empty states render per surface"
+      - "generation log page shows a progress surface with per-step status and a debug toggle"
+      - "no raw error strings repeated in the study audio fallback (renders transcript instead)"
+      - "pnpm verify passes"
+  - id: GAP-038
+    title: "Audio player quality pass (E23 — quality spec §8)"
+    epic: E23
+    priority: P0
+    status: ready
+    goal: "The audio-first core feels like a podcast app: speed controls, seek, synced transcript, graceful failure."
+    scope:
+      - "playback speed control (0.75/1/1.25/1.5/2) persisted per session"
+      - "transcript scroll-sync while playing + tap-to-seek"
+      - "designed audio-unavailable fallback (401/missing) rendering transcript + note, never repeated raw errors"
+      - "duration shown on Day cards and lesson headers"
+    out_of_scope:
+      - "offline audio download"
+      - "background playback controls (OS-level)"
+    dependencies: [GAP-035, GAP-037]
+    acceptance:
+      - "audio-player component test asserts speed cycle, seek, and fallback render"
+      - "transcript is scroll-synced (test with a small fixture)"
+      - "pnpm verify passes"
+  - id: GAP-039
+    title: "Onboarding + first-run flow (E23 — quality spec §5)"
+    epic: E23
+    priority: P1
+    status: ready
+    goal: "First visit goes gap → source → minutes → compile in three steps, and Today is never empty after onboarding."
+    scope:
+      - "3-step guided first-run: name a gap → supply a source (upload or URL) → set daily minutes → auto-compile"
+      - "skip always available; app usable without onboarding"
+      - "Today surface shows compile-in-progress until Day 1 lands (progress surface from GAP-037)"
+    out_of_scope:
+      - "account creation (Phase 0 trust work, separate)"
+    dependencies: [GAP-037]
+    acceptance:
+      - "fresh-user render test walks the 3 steps and lands on compile-in-progress"
+      - "skip path renders Today without onboarding"
+      - "pnpm verify passes"
