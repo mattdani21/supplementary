@@ -1,6 +1,6 @@
 {
  "schemaVersion": 1,
- "updatedAt": "2026-08-15T19:55:00.000Z",
+ "updatedAt": "2026-08-15T19:16:00.000Z",
  "controller": "gapos-controller",
  "tasks": {
   "GAP-035": {
@@ -1710,7 +1710,75 @@
   ],
   "notes": "T051 (per-step reasoning effort): the pipeline now tells DeepSeek v4 how hard to reason per step. ReasoningEffort ('low'|'medium'|'high') rides StructuredRequest -> RawCompletionRequest -> the live body as reasoning_effort (omitted when unset, so backends that reject unknown fields stay reachable). Contract-first steps — normalise_gap, interpret_diagnostic (diagnose), plan_curriculum, verify_artefact and audit_claims — run at 'low': their output must be direct and compliant, and a low effort cannot eat the shared max_tokens budget at the expense of the JSON. The content step (generateLesson, including repair calls) runs at 'high' with LESSON_MAX_OUTPUT_TOKENS raised 16384 -> 32768 so the reasoning trace AND the lesson JSON both fit (observed live before T051: 'Live provider returned no message content' when high-effort reasoning consumed the whole budget); PLAN_MAX_OUTPUT_TOKENS stays 16384 with 'low'. Tests written first: live body includes reasoning_effort when set / omits it when not; wrapper forwards it (or omits it); the per-step wiring is asserted through the real pipeline into a recording fake backend (low on all five contract steps, high on every lesson call, budgets 16384/32768); budget constants match. No contract/schema change (the request type is internal to provider-adapters; no published contract or HTTP API changed), so specs/ is untouched; no migration; no new telemetry (the existing model_call_total / cost accounting already carry the call); reasoning content is never logged — the adapter only uses reasoning_content presence to name the empty-content failure mode, matching the docs' never-expose-reasoning rule.",
   "completedAt": "2026-08-15T19:55:00.000Z"
-  }
+  },
+  "E24-T052":  {
+  "status": "done",
+  "startedAt": "2026-08-15T18:08:00.000Z",
+  "evidence": [
+   {
+    "command": "git status + git log --oneline -6; read AGENTS.md, tasks/status.json E24-T051, apps/worker/src/pipeline/compile.ts, tests/end-to-end/per-step-reasoning-effort.test.ts, apps/worker/src/pipeline/compile.test.ts, tests/end-to-end/worker.test.ts, packages/domain/src/curriculum/script-structure.ts, packages/evaluation/src/scorer.ts, tests/evaluation/live-helpers.ts, scripts/record-eval-baselines.ts",
+    "result": "pass",
+    "note": "Controller loop: tree on autopilot/m1-fresh-checkout with only the pre-existing unrelated mode change (apps/cli/src/main.ts 100644->100755, present before this task, left uncommitted). T052 is a direct-request rework like T050/T051 (not a backlog mirror). Context: the T051 live hit-rate run scored 0/9 with plan_curriculum at reasoning_effort 'low' - all nine failures were prerequisite_unmet ('assumes X, which the learner has not been shown to hold') with zero recorded invariant rejections: at 'low' the planner stopped reasoning about learner knowledge and fabricated prerequisites. THE FIX (part 1): the planner is a reasoning task and needs 'medium' (normalise/diagnose/verify/audit stay 'low', generateLesson stays 'high', budgets unchanged 16384/32768). THE EXPERIMENT (part 2): measure CONTENT QUALITY of PUBLISHED lessons (the axis that matters for learning, not first-pass compliance) - compile eval_01_set_operations through the real pipeline in live mode per model (GAPOS_LLM_MODEL override) and score every published lesson's script with the human_sounding rubric (packages/domain/src/curriculum/script-structure.ts checkStructuralElements - the four detectors scoreHumanSounding uses: concrete opening, one idea per segment, worked example, checkpoint)."
+   },
+   {
+    "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm verify (baseline)",
+    "result": "pass",
+    "note": "604 passed | 26 loud skips (630 total), 47 test files passed | 4 skipped (51) - matches the T051 final gate. Hermetic note as always: the sandbox injects GAPOS_PROVIDER_MODE=live without a key, so verify runs with env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL."
+   },
+   {
+    "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm exec vitest run tests/end-to-end/per-step-reasoning-effort.test.ts (test-first, red run)",
+    "result": "fail",
+    "note": "Expected red before implementation for exactly the right reason: the new test \"runs plan_curriculum at medium reasoning effort\" failed - \"plan_curriculum runs at medium effort: expected 'low' to be 'medium'\". The other two tests (contract-first steps at 'low', lesson generation at 'high' with budgets 16384/32768) stayed green."
+   },
+   {
+    "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm exec vitest run tests/end-to-end/per-step-reasoning-effort.test.ts apps/worker/src/pipeline/compile.test.ts tests/end-to-end/worker.test.ts (after implementation)",
+    "result": "pass",
+    "note": "12 tests green. Implementation: apps/worker/src/pipeline/compile.ts planCurriculum reasoningEffort 'low' -> 'medium' (the planner is a reasoning task; at 'low' it fabricated prerequisites - 0/9 hit-rate, T052 context). PLAN_MAX_OUTPUT_TOKENS stays 16384: medium reasoning still leaves room for the plan JSON (only the lesson generator needs 32768 for high-effort reasoning + content). Comments in compile.ts, compile.test.ts and worker.test.ts updated for truthfulness."
+   },
+   {
+    "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm exec vitest run packages/provider-adapters tests/end-to-end/compile-math-gap.test.ts tests/end-to-end/journey.test.ts tests/end-to-end/security.test.ts tests/end-to-end/generate-lesson-instruction.test.ts tests/end-to-end/capability-reuse.test.ts tests/end-to-end/step-output-summary.test.ts tests/evaluation/plan-hit-rate.test.ts tests/evaluation/differentiation.test.ts (regression surface)",
+    "result": "pass",
+    "note": "139 tests green across the adapter package and every pipeline consumer - no regressions from the planner effort change."
+   },
+   {
+    "command": "pnpm exec prettier --check <changed files> && pnpm exec eslint <changed files> && pnpm exec tsc -p tsconfig.json",
+    "result": "pass",
+    "note": "Prettier, ESLint (strict TS, no-any, no-restricted-imports) and tsc clean on the changed files."
+   },
+   {
+    "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm verify (part-1 final gate)",
+    "result": "pass",
+    "note": "605 passed | 26 loud skips (631 total), 47 test files passed | 4 skipped (51). Baseline 604 -> +1 new test (plan_curriculum at medium). Format, lint, typecheck and the full suite green."
+   },
+   {
+    "command": "git commit 984c8e6 (fix(E24): plan_curriculum runs at medium reasoning effort (T052))",
+    "result": "pass",
+    "note": "Part 1 committed as ONE coherent change: compile.ts + per-step-reasoning-effort.test.ts + compile.test.ts + worker.test.ts (56 insertions, 28 deletions). The pre-existing apps/cli/src/main.ts mode change stayed uncommitted."
+   },
+   {
+    "command": "pnpm exec prettier --write scripts/compare-lesson-quality.ts && pnpm exec eslint scripts/compare-lesson-quality.ts && pnpm exec tsc -p tsconfig.json",
+    "result": "pass",
+    "note": "New experiment script scripts/compare-lesson-quality.ts: compiles eval_01_set_operations through the real pipeline in live mode (createLiveEvalProviders / createLiveEvalContext / compileRaw), filters lessons to publicationStatus 'published' (repairs are fine - published quality is what matters), scores each published lesson's script with checkStructuralElements (the 4 detectors: concrete opening, one idea per segment, worked example, checkpoint - identical to scoreHumanSounding's rubric), aggregates per model, and prints a comparison table (rubric floor 0.75 = SCORE_FLOORS.human_sounding, the share of published lessons passing all four; average per-lesson detector score; per-detector hit rates; published lesson count). A model that fails to compile or publishes nothing is reported as published 0 / floor FAIL and the comparison still completes. Measurement only - no gate weakened."
+   },
+   {
+    "command": "set -a; . ./.env; set +a; pnpm exec tsx scripts/compare-lesson-quality.ts (live; deepseek-chat leg - GAPOS_LLM_MODEL override set inside the script per model)",
+    "result": "pass",
+    "note": "deepseek-chat: compile status complete, 5 lessons recorded, 5 PUBLISHED; every published lesson passes all four detectors (4/4 each): Day 1 Set Notation Refresher, Day 2 Double Inclusion, Day 3 Relations, Day 4 Equivalence Relations and Equivalence Classes, Day 5 Equivalence Classes Partition the Set. human_sounding floor PASS (share 1.000)."
+   },
+   {
+    "command": "set -a; . ./.env; set +a; pnpm exec tsx scripts/compare-lesson-quality.ts --model deepseek-v4-flash (live; v4-flash leg)",
+    "result": "fail",
+    "note": "deepseek-v4-flash: compile FAILED - the planner could not produce a valid plan in 2 attempts. Both attempts rejected on prerequisite_unmet: every objective assumed the learner's own normalisation currentState phrase ('Understands basic set notation: sets, membership, subset, union, intersection, difference, ordered pairs, Cartesian product.') as an external prerequisite, which the held list (normalisation.assumedPrerequisites + diagnostic.demonstratedCapabilities + mastery.satisfied) does not contain verbatim. 0 published lessons, floor FAIL (published 0). The validation gate correctly refused the fabricated prerequisites - the run fails rather than teaching something that does not fit. The medium fix cures deepseek-chat (valid plan + perfect published content) but does NOT cure v4-flash's prerequisite fabrication on eval_01."
+   },
+   {
+    "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm verify (final gate with part 2 in tree)",
+    "result": "pass",
+    "note": "605 passed | 26 loud skips (631 total), 47 test files passed | 4 skipped (51). Format, lint, typecheck and the full suite green with the experiment script in the tree."
+   }
+  ],
+  "notes": "T052 (planner medium effort + content-quality experiment), part 1 + part 2. PART 1: plan_curriculum now runs at reasoning_effort 'medium' (was 'low' from T051). The planner is a reasoning task: at 'low' the live hit-rate run scored 0/9 - all prerequisite_unmet ('assumes X, which the learner has not been shown to hold') with zero recorded invariant rejections, i.e. the planner stopped reasoning about learner knowledge. Test-first: the per-step wiring test asserts curriculum_plan sends reasoningEffort 'medium' through the real pipeline into the recording fake backend (red run: expected 'low' to be 'medium'); normalise/diagnose/verify/audit stay 'low', generateLesson stays 'high'; budgets unchanged (plan 16384, lesson 32768). PART 2 (scripts/compare-lesson-quality.ts): content quality of PUBLISHED lessons for eval_01_set_operations, live per model (GAPOS_LLM_MODEL override). COMPARISON TABLE (rubric floor 0.75 = SCORE_FLOORS.human_sounding, share of published lessons passing all four detectors; avg score = mean per-lesson share of the 4 detectors; detector columns = hit rates over published lessons): deepseek-chat: published=5, pass-all-4=5, share=1.000, floor=PASS, avg=1.000, concrete_opening=1.000 (5/5), one_idea_per_segment=1.000 (5/5), worked_example=1.000 (5/5), checkpoint=1.000 (5/5). deepseek-v4-flash: published=0, pass-all-4=0, share=0.000, floor=FAIL, avg=0.000, detectors n/a (compile failed: the planner could not produce a valid plan in 2 attempts - every objective assumed the learner's own normalisation currentState phrase as an external prerequisite, which the held list does not contain verbatim). The medium fix makes deepseek-chat publish a perfect human_sounding course; deepseek-v4-flash still fabricates prerequisites on eval_01 and publishes nothing - the invariant gate catches it and fails the run rather than teaching something that does not fit. No gate weakened (the script is a measurement; a failed model is reported as published 0 / floor FAIL). No contract/schema change, no migration, no new telemetry; specs/ untouched.",
+  "completedAt": "2026-08-15T19:16:00.000Z"
+ }
  },
  "GAP-014b": {
   "status": "in_progress",
