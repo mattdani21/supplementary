@@ -69,9 +69,14 @@ export const MAX_LESSON_CONTRACT_ATTEMPTS = 3;
  * The largest structured payloads (plans, lesson packages) get an explicit output budget:
  * provider defaults (~4096 tokens) truncate a long JSON mid-string, and truncation parses as
  * an unparseable-JSON failure that no repair loop can see.
+ *
+ * On the v4 architecture max_tokens is shared between the reasoning trace and the content, so
+ * 8192 could be consumed by reasoning alone, leaving the JSON with no room at all (observed
+ * live: 'Live provider returned no message content' on v4-pro). 16384 gives reasoning + content
+ * room to fit on v4 while still capping the largest payloads.
  */
-export const PLAN_MAX_OUTPUT_TOKENS = 8192;
-export const LESSON_MAX_OUTPUT_TOKENS = 8192;
+export const PLAN_MAX_OUTPUT_TOKENS = 16384;
+export const LESSON_MAX_OUTPUT_TOKENS = 16384;
 
 export interface CompileDeps {
   readonly uow: UnitOfWork;

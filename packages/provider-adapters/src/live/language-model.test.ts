@@ -4,6 +4,10 @@ import {
   createLiveLanguageModel,
   createLiveLanguageModelFromEnv,
   DEFAULT_LIVE_BASE_URL,
+  DEFAULT_LIVE_MODEL,
+  DEEPSEEK_V4_FLASH_PRICE_CACHE_HIT_INPUT_MILLICENTS_PER_MT,
+  DEEPSEEK_V4_FLASH_PRICE_INPUT_MILLICENTS_PER_MT,
+  DEEPSEEK_V4_FLASH_PRICE_OUTPUT_MILLICENTS_PER_MT,
   LiveProviderError,
 } from './language-model.js';
 
@@ -20,10 +24,37 @@ const baseRequest = (overrides: Partial<RawCompletionRequest> = {}): RawCompleti
 
 const completion = (content: unknown, overrides: Record<string, unknown> = {}) => ({
   id: 'chatcmpl-test',
-  model: 'deepseek-chat',
+  model: 'deepseek-v4-flash',
   choices: [{ index: 0, message: { role: 'assistant', content: JSON.stringify(content) } }],
   usage: { prompt_tokens: 1000, completion_tokens: 2000 },
   ...overrides,
+});
+
+/**
+ * A v4-architecture completion: the assistant message carries a reasoning trace in
+ * `reasoning_content` alongside the JSON `content`, and usage reports the reasoning tokens
+ * separately in `completion_tokens_details.reasoning_tokens`.
+ */
+const v4Completion = (content: unknown, usageOverrides: Record<string, unknown> = {}) => ({
+  id: 'chatcmpl-test',
+  model: 'deepseek-v4-flash',
+  choices: [
+    {
+      index: 0,
+      message: {
+        role: 'assistant',
+        reasoning_content:
+          'I should map each objective to the days that teach it, then check the daily budget...',
+        content: JSON.stringify(content),
+      },
+    },
+  ],
+  usage: {
+    prompt_tokens: 1000,
+    completion_tokens: 2000,
+    completion_tokens_details: { reasoning_tokens: 500 },
+    ...usageOverrides,
+  },
 });
 
 interface CapturedCall {
@@ -73,12 +104,28 @@ describe('live language model', () => {
     const result = await backend.complete(baseRequest());
 
     expect(result.json).toEqual({ hello: 'world' });
-    expect(result.model).toBe('deepseek-chat');
+    expect(result.model).toBe('deepseek-v4-flash');
     expect(result.inputTokens).toBe(1000);
     expect(result.outputTokens).toBe(2000);
-    // 1000 × $0.27/M + 2000 × $1.10/M = 27 + 220 = 247 millicents
-    expect(result.costMillicents).toBe(247);
-    expect(backend.name).toBe('live:deepseek-chat');
+    // 1000 × $0.14/M + 2000 × $0.28/M = 14 + 56 = 70 millicents
+    expect(result.costMillicents).toBe(70);
+    expect(backend.name).toBe('live:deepseek-v4-flash');
+  });
+
+  it('defaults to deepseek-v4-flash, the v4 fast/cheap tier (deepseek-chat stays reachable by override)', async () => {
+    expect(DEFAULT_LIVE_MODEL).toBe('deepseek-v4-flash');
+    const { backend, calls } = build(completion({ ok: true }));
+    await backend.complete(baseRequest());
+    expect(backend.name).toBe('live:deepseek-v4-flash');
+    expect(JSON.parse(String(calls[0]!.init.body))).toMatchObject({
+      model: 'deepseek-v4-flash',
+    });
+  });
+
+  it('prices the v4-flash table: $0.14/M input, $0.28/M output, $0.0028/M cache-hit input', () => {
+    expect(DEEPSEEK_V4_FLASH_PRICE_INPUT_MILLICENTS_PER_MT).toBe(14_000);
+    expect(DEEPSEEK_V4_FLASH_PRICE_OUTPUT_MILLICENTS_PER_MT).toBe(28_000);
+    expect(DEEPSEEK_V4_FLASH_PRICE_CACHE_HIT_INPUT_MILLICENTS_PER_MT).toBe(280);
   });
 
   it('sends an OpenAI-compatible request: bearer auth, json mode, contract named, evidence fenced', async () => {
@@ -104,7 +151,7 @@ describe('live language model', () => {
       max_tokens: number;
       stream: boolean;
     };
-    expect(body.model).toBe('deepseek-chat');
+    expect(body.model).toBe('deepseek-v4-flash');
     expect(body.stream).toBe(false);
     expect(body.response_format).toEqual({ type: 'json_object' });
     expect(body.temperature).toBe(0.2);
@@ -124,7 +171,7 @@ describe('live language model', () => {
       completion({}, { usage: { prompt_tokens: 1, completion_tokens: 1 } }),
     );
     const result = await backend.complete(baseRequest());
-    // ceil((27000 + 110000) / 1e6) = ceil(0.137) = 1
+    // ceil((14000 + 28000) / 1e6) = ceil(0.042) = 1
     expect(result.costMillicents).toBe(1);
   });
 
@@ -193,6 +240,85 @@ describe('live language model', () => {
   it('throws when the provider returns no message content', async () => {
     const { backend } = build(completion({ ok: true }, { choices: [] }));
     await expect(backend.complete(baseRequest())).rejects.toThrow(/no message content/);
+  });
+
+  it('parses a v4 response: content stays the JSON source, reasoning_content is metadata', async () => {
+    const { backend } = build(v4Completion({ ok: true }));
+    const result = await backend.complete(baseRequest());
+
+    // The JSON comes from `content`, never from the reasoning trace.
+    expect(result.json).toEqual({ ok: true });
+    expect(result.model).toBe('deepseek-v4-flash');
+  });
+
+  it('bills reasoning tokens as output tokens so they count against the run budget', async () => {
+    const { backend } = build(v4Completion({ ok: true }));
+    const result = await backend.complete(baseRequest());
+
+    // completion_tokens 2000 + reasoning_tokens 500 = 2500 billed output tokens.
+    expect(result.outputTokens).toBe(2500);
+    // 1000 × 14000/1e6 + 2500 × 28000/1e6 = 14 + 70 = 84 millicents
+    expect(result.costMillicents).toBe(84);
+  });
+
+  it('treats empty content after reasoning as retryable, naming the shared max_tokens failure', async () => {
+    // On v4, max_tokens is shared between reasoning and content: a long reasoning trace can
+    // consume the whole budget and leave content empty (observed live on v4-pro).
+    const { backend } = build({
+      model: 'deepseek-v4-flash',
+      choices: [
+        {
+          index: 0,
+          message: {
+            role: 'assistant',
+            reasoning_content: 'A very long reasoning trace that consumed the whole budget...',
+            content: '',
+          },
+        },
+      ],
+      usage: {
+        prompt_tokens: 100,
+        completion_tokens: 0,
+        completion_tokens_details: { reasoning_tokens: 8192 },
+      },
+    });
+    await expect(backend.complete(baseRequest())).rejects.toMatchObject({
+      name: 'LiveProviderError',
+      retryable: true,
+    });
+    await expect(backend.complete(baseRequest())).rejects.toThrow(/no message content/);
+    await expect(backend.complete(baseRequest())).rejects.toThrow(/reasoning/);
+  });
+
+  it('bills prompt cache hits at the v4-flash cache-hit rate', async () => {
+    const { backend } = build(
+      completion(
+        { ok: true },
+        {
+          usage: {
+            prompt_tokens: 1000,
+            prompt_cache_hit_tokens: 800,
+            prompt_tokens_details: { cached_tokens: 800 },
+            completion_tokens: 1000,
+          },
+        },
+      ),
+    );
+    const result = await backend.complete(baseRequest());
+    // 200 × $0.14/M + 800 × $0.0028/M + 1000 × $0.28/M = 2.8 + 0.224 + 28 = 31.024 → ceil 32
+    expect(result.costMillicents).toBe(32);
+  });
+
+  it('mentions reasoning latency when the request times out', async () => {
+    const timedOutFetch = (async (): Promise<Response> => {
+      throw new DOMException('The operation was aborted due to timeout', 'TimeoutError');
+    }) as typeof fetch;
+    const { backend } = build(null, { fetchImpl: timedOutFetch });
+    await expect(backend.complete(baseRequest())).rejects.toMatchObject({
+      name: 'LiveProviderError',
+      retryable: true,
+    });
+    await expect(backend.complete(baseRequest())).rejects.toThrow(/reasoning/);
   });
 
   it('retries a transient non-JSON body and succeeds on the second attempt', async () => {

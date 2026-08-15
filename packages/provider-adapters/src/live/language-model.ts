@@ -30,24 +30,34 @@ export interface LiveLanguageModelOptions {
   readonly routing?: Readonly<Partial<Record<CallPurpose, string>>>;
   /** Injectable for tests; defaults to the global fetch. */
   readonly fetchImpl?: typeof fetch;
-  /** Millicents per million tokens. Defaults track deepseek-chat list prices. */
+  /** Millicents per million tokens. Defaults track deepseek-v4-flash list prices. */
   readonly priceInputMillicentsPerMToken?: number;
   readonly priceOutputMillicentsPerMToken?: number;
+  /** Millicents per million tokens for tokens served from DeepSeek's prompt cache. */
+  readonly priceCacheHitInputMillicentsPerMToken?: number;
   /** Backoff between retries of a retryable failure; an empty array disables retrying. */
   readonly retryDelaysMs?: readonly number[];
 }
 
 export const DEFAULT_LIVE_BASE_URL = 'https://api.deepseek.com';
-export const DEFAULT_LIVE_MODEL = 'deepseek-chat';
+/**
+ * The v4 fast/cheap tier. deepseek-chat (the pre-v4 architecture) stays reachable through the
+ * `GAPOS_LLM_MODEL` override for backwards compatibility.
+ */
+export const DEFAULT_LIVE_MODEL = 'deepseek-v4-flash';
 export const DEFAULT_RETRY_DELAYS_MS = [1_000, 3_000, 8_000, 15_000] as const;
 
 /**
- * deepseek-chat list prices, in millicents per million tokens ($0.27/M input, $1.10/M output).
- * These are defaults so a misconfigured deployment still accounts conservatively; the
- * evaluation run (GAP-014b) pins the real table for the model that clears its floors.
+ * deepseek-v4-flash list prices, in millicents per million tokens ($0.14/M input, $0.28/M
+ * output, $0.0028/M cache-hit input). These are defaults so a misconfigured deployment still
+ * accounts conservatively; the evaluation run (GAP-014b) pins the real table for the model
+ * that clears its floors. Reasoning tokens are billed as output tokens — the v4 architecture
+ * reports them separately in `usage.completion_tokens_details.reasoning_tokens`, and the
+ * adapter adds them to billed output before pricing so they count against the run budget.
  */
-export const DEEPSEEK_CHAT_PRICE_INPUT_MILLICENTS_PER_MT = 27_000;
-export const DEEPSEEK_CHAT_PRICE_OUTPUT_MILLICENTS_PER_MT = 110_000;
+export const DEEPSEEK_V4_FLASH_PRICE_INPUT_MILLICENTS_PER_MT = 14_000;
+export const DEEPSEEK_V4_FLASH_PRICE_OUTPUT_MILLICENTS_PER_MT = 28_000;
+export const DEEPSEEK_V4_FLASH_PRICE_CACHE_HIT_INPUT_MILLICENTS_PER_MT = 280;
 
 export class LiveProviderError extends Error {
   constructor(
@@ -63,8 +73,26 @@ export class LiveProviderError extends Error {
 
 interface ChatCompletionPayload {
   readonly model?: string;
-  readonly choices?: readonly { readonly message?: { readonly content?: string } }[];
-  readonly usage?: { readonly prompt_tokens?: number; readonly completion_tokens?: number };
+  readonly choices?: readonly {
+    readonly message?: {
+      readonly content?: string;
+      /**
+       * v4 architecture: the reasoning trace that produced the content. It is metadata, never
+       * the JSON source — `content` stays the only thing parsed. A message with reasoning but
+       * empty content means the shared max_tokens budget was consumed by reasoning (retryable).
+       */
+      readonly reasoning_content?: string;
+    };
+  }[];
+  readonly usage?: {
+    readonly prompt_tokens?: number;
+    readonly completion_tokens?: number;
+    /** DeepSeek reports prompt-cache hits here (and in prompt_tokens_details.cached_tokens). */
+    readonly prompt_cache_hit_tokens?: number;
+    readonly prompt_tokens_details?: { readonly cached_tokens?: number };
+    /** v4 architecture: reasoning tokens, billed as output tokens. */
+    readonly completion_tokens_details?: { readonly reasoning_tokens?: number };
+  };
 }
 
 const DEFAULT_TIMEOUT_MS = 300_000;
@@ -76,9 +104,12 @@ export const createLiveLanguageModel = (
   const model = options.model ?? DEFAULT_LIVE_MODEL;
   const fetchImpl = options.fetchImpl ?? fetch;
   const priceIn =
-    options.priceInputMillicentsPerMToken ?? DEEPSEEK_CHAT_PRICE_INPUT_MILLICENTS_PER_MT;
+    options.priceInputMillicentsPerMToken ?? DEEPSEEK_V4_FLASH_PRICE_INPUT_MILLICENTS_PER_MT;
   const priceOut =
-    options.priceOutputMillicentsPerMToken ?? DEEPSEEK_CHAT_PRICE_OUTPUT_MILLICENTS_PER_MT;
+    options.priceOutputMillicentsPerMToken ?? DEEPSEEK_V4_FLASH_PRICE_OUTPUT_MILLICENTS_PER_MT;
+  const priceCacheHit =
+    options.priceCacheHitInputMillicentsPerMToken ??
+    DEEPSEEK_V4_FLASH_PRICE_CACHE_HIT_INPUT_MILLICENTS_PER_MT;
   const modelFor = (purpose: string): string => options.routing?.[purpose as CallPurpose] ?? model;
 
   return {
@@ -130,9 +161,19 @@ export const createLiveLanguageModel = (
           });
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
+          // AbortSignal.timeout rejects with a TimeoutError; a v4 model can legitimately spend
+          // most of the timeout reasoning before any content is produced, so the message names
+          // that failure mode instead of looking like a hung request.
+          const timedOut = error instanceof Error && error.name === 'TimeoutError';
           // A network failure or our own abort timeout: both are transient, both retryable.
           throw new LiveProviderError(
-            `Live provider request failed for ${request.contractName}@${request.contractVersion}: ${message}`,
+            `Live provider request failed for ${request.contractName}@${request.contractVersion}: ${message}` +
+              (timedOut
+                ? ' — timed out after ' +
+                  (request.timeoutMs ?? DEFAULT_TIMEOUT_MS) +
+                  'ms. v4 models reason before producing content, so long reasoning can ' +
+                  'outlast the timeout; a retry may succeed, or raise the timeout.'
+                : ''),
             undefined,
             true,
           );
@@ -172,13 +213,21 @@ export const createLiveLanguageModel = (
           );
         }
 
-        const content = payload.choices?.[0]?.message?.content;
+        const message = payload.choices?.[0]?.message;
+        const content = message?.content;
         if (typeof content !== 'string' || content.length === 0) {
           // Retryable: a 200 with no usable content is a provider anomaly (content filter,
           // degenerate completion), not a permanent contract failure — the backoff loop
-          // absorbs it like the other unusable-200 shapes.
+          // absorbs it like the other unusable-200 shapes. On v4, reasoning and content share
+          // the max_tokens budget, so a long reasoning trace can leave content empty — name
+          // that failure mode when the reasoning trace is present.
+          const reasoningNote =
+            typeof message?.reasoning_content === 'string' && message.reasoning_content.length > 0
+              ? ' — the v4 model produced only reasoning_content: its reasoning consumed the ' +
+                'shared max_tokens budget, leaving no content'
+              : '';
           throw new LiveProviderError(
-            `Live provider returned no message content for ${request.contractName}@${request.contractVersion}`,
+            `Live provider returned no message content for ${request.contractName}@${request.contractVersion}${reasoningNote}`,
             response.status,
             true,
           );
@@ -200,9 +249,10 @@ export const createLiveLanguageModel = (
           );
         }
 
-        const inputTokens = payload.usage?.prompt_tokens;
-        const outputTokens = payload.usage?.completion_tokens;
-        if (inputTokens === undefined || outputTokens === undefined) {
+        const usage = payload.usage;
+        const inputTokens = usage?.prompt_tokens;
+        const completionTokens = usage?.completion_tokens;
+        if (inputTokens === undefined || completionTokens === undefined) {
           // Retryable for the same reason: a 200 without usage cannot be accounted for, and
           // the provider can simply omit it on a bad attempt.
           throw new LiveProviderError(
@@ -213,9 +263,23 @@ export const createLiveLanguageModel = (
           );
         }
 
+        // v4 bills reasoning tokens as output tokens. The API reports them separately in
+        // completion_tokens_details.reasoning_tokens, so they are added to the billed output —
+        // otherwise a reasoning-heavy call is undercounted against the run budget.
+        const reasoningTokens = usage?.completion_tokens_details?.reasoning_tokens ?? 0;
+        const outputTokens = completionTokens + reasoningTokens;
+
+        // Tokens served from DeepSeek's prompt cache are billed at the cache-hit rate, not the
+        // full input rate (reported in prompt_cache_hit_tokens and
+        // prompt_tokens_details.cached_tokens).
+        const cacheHitTokens =
+          usage?.prompt_cache_hit_tokens ?? usage?.prompt_tokens_details?.cached_tokens ?? 0;
+        const billedInputTokens = Math.max(inputTokens - cacheHitTokens, 0);
+
         // Integer millicents, rounded up: spend is never undercounted against the budget.
         const costMillicents = Math.ceil(
-          (inputTokens * priceIn + outputTokens * priceOut) / 1_000_000,
+          (billedInputTokens * priceIn + cacheHitTokens * priceCacheHit + outputTokens * priceOut) /
+            1_000_000,
         );
 
         return {
@@ -248,6 +312,7 @@ export interface LiveLanguageModelEnv {
   readonly GAPOS_LLM_MODEL?: string;
   readonly GAPOS_LLM_PRICE_INPUT_MILLICENTS_PER_MT?: string;
   readonly GAPOS_LLM_PRICE_OUTPUT_MILLICENTS_PER_MT?: string;
+  readonly GAPOS_LLM_PRICE_CACHE_HIT_INPUT_MILLICENTS_PER_MT?: string;
   /** 'local' selects the local-model preset (E18): Ollama/llama.cpp, no key required. */
   readonly GAPOS_LLM_MODE?: string;
   /** Per-purpose routing (E17): "planning:model-a,teaching:model-b". */
@@ -300,6 +365,13 @@ export const createLiveLanguageModelFromEnv = (
       : {}),
     ...(env.GAPOS_LLM_PRICE_OUTPUT_MILLICENTS_PER_MT
       ? { priceOutputMillicentsPerMToken: Number(env.GAPOS_LLM_PRICE_OUTPUT_MILLICENTS_PER_MT) }
+      : {}),
+    ...(env.GAPOS_LLM_PRICE_CACHE_HIT_INPUT_MILLICENTS_PER_MT
+      ? {
+          priceCacheHitInputMillicentsPerMToken: Number(
+            env.GAPOS_LLM_PRICE_CACHE_HIT_INPUT_MILLICENTS_PER_MT,
+          ),
+        }
       : {}),
   });
 };

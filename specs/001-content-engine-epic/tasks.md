@@ -514,3 +514,17 @@ only the paid run and recorded evidence are missing.
       first-pass prompt must specify the rubric's contents rather than a bare non-empty string,
       per FR-012 / SC-008 (partial)
 
+- [x] T050 v4 architecture support: the live provider adapter
+      (`packages/provider-adapters/src/live/language-model.ts`) was built around the pre-v4
+      deepseek-chat architecture. DeepSeek now exposes deepseek-v4-flash/deepseek-v4-pro, whose
+      responses carry `reasoning_content` on the message plus
+      `usage.completion_tokens_details.reasoning_tokens`, and whose max_tokens is shared between
+      reasoning and content. Rework: `DEFAULT_LIVE_MODEL` → `deepseek-v4-flash` (deepseek-chat
+      stays reachable via `GAPOS_LLM_MODEL`); the pricing table becomes v4-flash rates ($0.14/M
+      input, $0.28/M output, $0.0028/M cache-hit input) with reasoning tokens billed as output
+      (added to billed output tokens so they count against the run budget); parsing accepts
+      messages with `reasoning_content` while `content` stays the JSON source, and
+      empty-content-after-reasoning stays retryable with a message naming the shared-budget
+      failure; PLAN/LESSON max output tokens rise 8192 → 16384 so reasoning + content fit;
+      `DEFAULT_TIMEOUT_MS` stays 300s but the timeout error names reasoning latency (SC-007,
+      partial)

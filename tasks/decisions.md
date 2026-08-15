@@ -22,8 +22,9 @@ boundary over plain fetch (OpenAI-compatible, DeepSeek by default; no provider S
 the adapter remains the only thing that knows the provider). `createProviders({mode:'live'})`
 still throws: a provider set must be all-live or all-fake, so a partial set can never masquerade
 as a live run. Text-only evaluation (the GAP-014b scoring run) uses the exported backend
-directly. Live pricing defaults track deepseek-chat list prices and are overridable via env; cost
-is rounded up to integer millicents so spend is never undercounted against a budget.
+directly. Live pricing defaults track deepseek-v4-flash list prices ($0.14/M input, $0.28/M
+output, $0.0028/M cache-hit input; reasoning tokens billed as output) and are overridable via
+env; cost is rounded up to integer millicents so spend is never undercounted against a budget.
 
 ## 2026-08-02 — Repository interfaces take an owner on every call
 
