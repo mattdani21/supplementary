@@ -72,8 +72,11 @@ export const MAX_LESSON_CONTRACT_ATTEMPTS = 3;
  *
  * On the v4 architecture max_tokens is shared between the reasoning trace and the content, and
  * the effort the pipeline asks for decides how much of it reasoning consumes (T051):
- *   - the contract-first steps (normalise, plan, diagnose, verify, audit) run at
+ *   - the contract-first steps (normalise, diagnose, verify, audit) run at
  *     reasoning_effort 'low', so their reasoning is small and 16384 fits a long plan;
+ *   - the planner (plan_curriculum) is a reasoning task, not a direct extraction: at 'low' it
+ *     stopped reasoning about the learner's knowledge and fabricated prerequisites (0/9
+ *     hit-rate, T052), so it runs at 'medium' — still small enough for 16384 to fit the plan;
  *   - the lesson generator runs at 'high', whose reasoning alone can consume the whole budget
  *     (observed live: 'Live provider returned no message content'), so lessons get 32768 to
  *     fit the reasoning trace AND the lesson JSON.
@@ -802,9 +805,12 @@ const planCurriculum = async (params: {
       // Plans are the largest structured payload in the pipeline; DeepSeek's default output
       // cap (4096 tokens) truncates a long plan mid-JSON, which killed live compiles.
       maxOutputTokens: PLAN_MAX_OUTPUT_TOKENS,
-      // Contract-first step (T051): the plan must pass the validation gate on the first
-      // attempt — 'low' reasoning effort, so the shared max_tokens budget goes to the plan.
-      reasoningEffort: 'low',
+      // The planner is a reasoning task (T052): at 'low' the live hit-rate run measured 0/9 —
+      // it stopped reasoning about the learner's knowledge and fabricated external
+      // prerequisites ("assumes X, which the learner has not been shown to hold"), with zero
+      // recorded invariant rejections. 'medium' is the smallest effort that keeps the planner
+      // actually reasoning about the learner; 16384 still fits the plan JSON.
+      reasoningEffort: 'medium',
       runId,
       userId: owner,
       subject: gapId,
