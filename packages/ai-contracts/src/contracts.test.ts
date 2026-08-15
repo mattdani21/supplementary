@@ -183,7 +183,7 @@ describe('plan and lesson contracts', () => {
 
   it('requires a lesson to carry at least one question', () => {
     const parsed = LessonPackageContract.schema.safeParse({
-      schemaVersion: '1.0.0',
+      schemaVersion: '1.1.0',
       day: 1,
       title: 'Relations',
       objectiveIds: ['o1'],
@@ -193,6 +193,60 @@ describe('plan and lesson contracts', () => {
       questions: [],
       estimatedMinutes: 12,
       evidence,
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it('accepts a 1.1.0 lesson carrying a notebook (markdown + LaTeX + diagram blocks)', () => {
+    const parsed = LessonPackageContract.schema.safeParse({
+      schemaVersion: '1.1.0',
+      day: 1,
+      title: 'Relations',
+      objectiveIds: ['o1'],
+      script: 'Today we look at relations.',
+      transcript: 'Today we look at relations.',
+      summary: 'Relations introduced.',
+      questions: [question()],
+      estimatedMinutes: 12,
+      evidence,
+      notebook:
+        '## Relations\n\nA relation pairs elements of a set. Scale by ' +
+        '$\\sqrt{d_k}$ for the attention head.\n\n$$A \\subseteq B$$' +
+        '\n\n```diagram\nA -> B\n```',
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it('still validates a lesson without a notebook — backward compatible (transcript fallback)', () => {
+    const parsed = LessonPackageContract.schema.safeParse({
+      schemaVersion: '1.1.0',
+      day: 1,
+      title: 'Relations',
+      objectiveIds: ['o1'],
+      script: 'Today we look at relations.',
+      transcript: 'Today we look at relations.',
+      summary: 'Relations introduced.',
+      questions: [question()],
+      estimatedMinutes: 12,
+      evidence,
+    });
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && parsed.data.notebook).toBeUndefined();
+  });
+
+  it('rejects a notebook that is an empty string', () => {
+    const parsed = LessonPackageContract.schema.safeParse({
+      schemaVersion: '1.1.0',
+      day: 1,
+      title: 'Relations',
+      objectiveIds: ['o1'],
+      script: 'Today we look at relations.',
+      transcript: 'Today we look at relations.',
+      summary: 'Relations introduced.',
+      questions: [question()],
+      estimatedMinutes: 12,
+      evidence,
+      notebook: '   ',
     });
     expect(parsed.success).toBe(false);
   });
