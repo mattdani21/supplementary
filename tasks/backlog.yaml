@@ -128,10 +128,20 @@ epics:
     dependencies: [E22]
     evidence: All quality-spec sections are enforced by tests; no legacy tokens; feedback moments and designed empty states everywhere
   - id: E24
-    title: 'Content — user-specific curriculum quality (the moat)'
+    title: "Content — user-specific curriculum quality (the moat)"
     priority: P0
     dependencies: [E4, E13, E23]
     evidence: Higher valid-plan hit rate; lesson scripts score against the human-sounding rubric; every objective traces to source locators
+  - id: E25
+    title: "Notebook — textbook-style content, professional TTS, explain layer, export"
+    priority: P0
+    dependencies: [E24]
+    evidence: Lessons render as notebook (markdown + LaTeX + diagrams) with listen-only toggle; Kokoro TTS voices; select-to-explain adds to notebook; download/print works
+  - id: E26
+    title: "Study flow — next-item navigation + math foundations content"
+    priority: P0
+    dependencies: [E25]
+    evidence: Next-lesson button on study page; math gap includes foundational math sources
 
 tasks:
   - id: E20
@@ -942,9 +952,101 @@ tasks:
       - 'account creation (Phase 0 trust work, separate)'
     dependencies: [GAP-037]
     acceptance:
-      - 'fresh-user render test walks the 3 steps and lands on compile-in-progress'
-      - 'skip path renders Today without onboarding'
-      - 'pnpm verify passes'
+      - "fresh-user render test walks the 3 steps and lands on compile-in-progress"
+      - "skip path renders Today without onboarding"
+      - "pnpm verify passes"
+  - id: GAP-083
+    title: "Notebook content — markdown + LaTeX + diagrams rendering (E25)"
+    epic: E25
+    priority: P0
+    status: ready
+    goal: "The lesson transcript renders as textbook-style notebook content with markdown styling, LaTeX math (KaTeX), and diagrams; a toggle hides it for listen-only mode."
+    scope:
+      - "extend the lesson package contract with a `notebook` field (markdown string, may contain $...$ / $$...$$ LaTeX and diagram blocks), keeping `script` as the spoken audio text"
+      - "pipeline generateLesson emits `notebook` (v4-flash high effort) — the notebook is the same content as the script but in textbook form with headings, math, diagrams"
+      - "web renders the notebook: markdown via a server-safe renderer, LaTeX via KaTeX, diagrams via a token-driven SVG renderer (existing map pattern) or mermaid-compatible description"
+      - "a Listen/Read toggle on the study page: Listen shows audio + hides notebook; Read shows notebook + transcript"
+      - "contract version bump lesson_package 1.0.0 -> 1.1.0 with backward-compat (notebook optional, fallback to transcript)"
+    out_of_scope:
+      - "notebook annotation editing (GAP-042 handles explain-to-notebook)"
+    dependencies: [GAP-039, E24-US1]
+    acceptance:
+      - "contract test: lesson with notebook validates; lesson without notebook still validates (transcript fallback)"
+      - "render test: notebook with $\\sqrt{d_k}$ and a diagram block renders math + diagram, not raw text"
+      - "study page: Listen mode hides notebook, Read mode shows it, toggle persists per session"
+      - "pnpm verify passes"
+  - id: GAP-084
+    title: "Kokoro TTS engine — hosted DeepInfra (E25)"
+    epic: E25
+    priority: P0
+    status: ready
+    goal: "Replace the gTTS robot voice with Kokoro-82M via DeepInfra's OpenAI-compatible endpoint."
+    scope:
+      - "new KokoroSpeechEngine behind the existing SpeechSynthesisEngine interface (packages/provider-adapters/src/live/speech.ts): POST to https://api.deepinfra.com/v1/openai/audio/speech, model hexgrad/Kokoro-82M, voice af_heart (or configurable via GAPOS_TTS_VOICE), returns WAV bytes"
+      - "wire via GAPOS_TTS_PROVIDER=deepinfra-kokoro env (default stays gTTS until deployed); cost accounting at ~$0.80/M chars"
+      - "duration: Kokoro returns WAV — compute real duration from byte length / sample rate instead of the estimate heuristic"
+      - "handle 24kHz mono WAV: pipeline stores as-is (audio/mpeg? no — audio/wav; check contract mediaType handling)"
+      - "tests: engine posts correct body/headers, parses WAV, cost accounting, duration from WAV header"
+    out_of_scope:
+      - "local kokoro-js inference (future, same interface)"
+    dependencies: [GAP-038]
+    acceptance:
+      - "engine test with injected fetch: correct URL, auth header, model, voice; WAV parsed with real duration"
+      - "factory wires deepinfra-kokoro when GAPOS_TTS_PROVIDER set; gTTS still default"
+      - "pnpm verify passes"
+  - id: GAP-085
+    title: "Explain layer — select text, AI explains, add to notebook (E25)"
+    epic: E25
+    priority: P0
+    status: ready
+    goal: "Select any word/sentence in the notebook or transcript and get an AI explanation inline, with an 'add to notebook' action."
+    scope:
+      - "new API route POST /api/lessons/:lessonId/explain { selection, context } -> { explanation } using the existing live LLM (deepseek-v4-flash, low effort, budget-gated)"
+      - "selection UX on the study page: window.getSelection + popover with explanation (loading/error states), 'Add to notebook' persists it"
+      - "annotations stored per lesson (new table or JSON in lesson? decide: new annotations table owner-scoped, migration forward-only)"
+      - "notebook renders saved annotations as inset callout blocks"
+    out_of_scope:
+      - "full notebook editing (headings, reordering)"
+    dependencies: [GAP-083]
+    acceptance:
+      - "API test: explain route returns explanation for a selection, validates owner scope, budget-gated"
+      - "component test: selection popover renders, add-to-notebook persists, annotation renders in notebook"
+      - "migration forward-only; specs/ updated"
+      - "pnpm verify passes"
+  - id: GAP-086
+    title: "Export — download lesson content as markdown + print view (E25)"
+    epic: E25
+    priority: P1
+    status: ready
+    goal: "Users can download the lesson notebook (with LaTeX) and print it."
+    scope:
+      - "GET /api/lessons/:lessonId/export.md returns the notebook (or transcript fallback) as markdown with annotations appended"
+      - "download button on the study page (blob download)"
+      - "print stylesheet: notebook prints cleanly (hide audio controls, nav, popovers)"
+    out_of_scope:
+      - "PDF generation server-side (print-to-PDF via browser is enough)"
+    dependencies: [GAP-085]
+    acceptance:
+      - "API test: export.md returns markdown with content-type text/markdown"
+      - "study page download button triggers blob download"
+      - "pnpm verify passes"
+  - id: GAP-087
+    title: "Next-item flow — proceed to next lesson + math foundations (E26)"
+    epic: E26
+    priority: P0
+    status: ready
+    goal: "A clear next-item button on the study page; the math gap gains foundational math content."
+    scope:
+      - "study page: after completing a lesson (all questions answered / checkpoint passed), a 'Next' button advances to the next lesson in the curriculum (day+1 / next ordinal); falls back to Today when the curriculum is complete"
+      - "next-lesson endpoint or client-side navigation from today/lesson data (check existing API surface)"
+      - "math foundations: add a foundational math source (e.g. a set-theory/algebra primer markdown) to gap_math_to_ml via the sources API, recompile the gap so Day 1 starts from foundations (sets, notation, algebra basics) before linear algebra"
+    out_of_scope:
+      - "adaptive pacing based on mastery (future)"
+    dependencies: [GAP-086]
+    acceptance:
+      - "component test: next button appears after lesson completion, navigates to next lesson, hides on last day"
+      - "source added to math gap; recompile publishes a curriculum whose Day 1 covers foundations"
+      - "pnpm verify passes"
   - id: GAP-040
     title: 'E24 T001: Baseline the quality gate on a clean tree (Setup)'
     epic: E24
@@ -963,7 +1065,7 @@ tasks:
     epic: E24
     priority: P0
     status: done
-    dependencies: [GAP-040]
+    dependencies: [GAP-083]
     goal: 'VERIFICATION_CATEGORIES + FindingCategory gain script_structure; contracts.test.ts; pnpm specs:generate'
     acceptance:
       - task T002 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
@@ -976,7 +1078,7 @@ tasks:
     epic: E24
     priority: P0
     status: done
-    dependencies: [GAP-040]
+    dependencies: [GAP-083]
     goal: 'claim_audit contract in ai-contracts, registered in ALL_CONTRACTS/CONTRACT_NAMES; specs:generate'
     acceptance:
       - task T003 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
@@ -989,7 +1091,7 @@ tasks:
     epic: E24
     priority: P0
     status: done
-    dependencies: [GAP-040]
+    dependencies: [GAP-083]
     goal: 'GENERATION_STEPS += audit_claims; state-machine.test.ts'
     acceptance:
       - task T004 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
@@ -1002,7 +1104,7 @@ tasks:
     epic: E24
     priority: P0
     status: done
-    dependencies: [GAP-040]
+    dependencies: [GAP-083]
     goal: 'planCurriculum returns PlanCurriculumResult; plan-hit-rate.test.ts compiles eval_01 and reads the step'
     acceptance:
       - task T005 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
@@ -1015,7 +1117,7 @@ tasks:
     epic: E24
     priority: P0
     status: done
-    dependencies: [GAP-040]
+    dependencies: [GAP-083]
     goal: 'packages/evaluation/src/traceability.ts; traceability.test.ts'
     acceptance:
       - task T006 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
@@ -1093,7 +1195,7 @@ tasks:
     epic: E24
     priority: P0
     status: done
-    dependencies: [GAP-041]
+    dependencies: [GAP-084]
     goal: 'single source of truth for scorer + verifier'
     acceptance:
       - task T012 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
@@ -1275,7 +1377,7 @@ tasks:
     epic: E24
     priority: P0
     status: done
-    dependencies: [GAP-042]
+    dependencies: [GAP-085]
     goal: 'claimAuditClean/Unresolved/Labelled in faulty-fixtures.ts'
     acceptance:
       - task T026 acceptance criteria satisfied by an automated check (specs/001-content-engine-epic/tasks.md)
