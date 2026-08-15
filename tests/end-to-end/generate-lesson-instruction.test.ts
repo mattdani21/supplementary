@@ -1,14 +1,20 @@
 /**
  * The `generateLesson` instruction targets the human_sounding contract on the first pass
- * (E24 US1/US5, T044 — FR-007).
+ * (E24 US1/US5, T044 — FR-007) and the free-response rubric contract (E24 T049, the
+ * lesson-hit-rate follow-up).
  *
  * The verifier (`checkLessonStructure`) repairs or excludes a script that misses a structural
  * element, but repair is the backstop, not the design: a live-mode lesson costs a provider
  * round-trip, so generation should demand the four elements — concrete opening, one idea per
  * segment, a worked example worked inside the script, and a checkpoint via `pausePrompts` —
- * from the very first prompt. This test reads the instruction the pipeline actually sends for
- * the `lesson_package` contract (through the guarded adapter into a recording fake backend)
- * and asserts all four demands are present in the first-pass prompt.
+ * from the very first prompt. The same logic applies to free-response questions: the
+ * `lesson_package` contract rejects a free-response question whose `rubric` is missing, and
+ * the live hit-rate harness (scripts/measure-plan-hit-rate.ts) measured four of nine compiles
+ * failing on exactly that field, so the first-pass prompt must also demand a concrete rubric —
+ * grading criteria with explicit checkpoints, a model answer, and partial-credit rules —
+ * rather than a bare non-empty string. This test reads the instruction the pipeline actually
+ * sends for the `lesson_package` contract (through the guarded adapter into a recording fake
+ * backend) and asserts all the demands are present in the first-pass prompt.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -99,5 +105,34 @@ describe('the generateLesson instruction demands the four structural elements (E
     expect(instruction).toMatch(/checkpoint/i);
     expect(instruction).toContain('pausePrompts');
     expect(instruction).toMatch(/before the lesson continues/i);
+  });
+});
+
+describe('the generateLesson instruction demands a concrete rubric for every free-response question (E24 T049)', () => {
+  it('demands grading criteria with explicit checkpoints in the free-response rubric', async () => {
+    const { context, calls } = buildRecordingContext();
+    await compileEvalOne(context, 't049-rubric-grading-criteria');
+
+    const instruction = firstLessonInstruction(calls);
+    expect(instruction).toMatch(/free-response/i);
+    expect(instruction).toMatch(/rubric/i);
+    expect(instruction).toMatch(/grading criteria/i);
+    expect(instruction).toMatch(/explicit checkpoints?/i);
+  });
+
+  it('demands a model answer inside the free-response rubric', async () => {
+    const { context, calls } = buildRecordingContext();
+    await compileEvalOne(context, 't049-rubric-model-answer');
+
+    const instruction = firstLessonInstruction(calls);
+    expect(instruction).toMatch(/model answer/i);
+  });
+
+  it('demands partial-credit rules inside the free-response rubric', async () => {
+    const { context, calls } = buildRecordingContext();
+    await compileEvalOne(context, 't049-rubric-partial-credit');
+
+    const instruction = firstLessonInstruction(calls);
+    expect(instruction).toMatch(/partial[- ]credit/i);
   });
 });

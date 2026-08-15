@@ -979,9 +979,11 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
           'prompt must be unique within the lesson. Every claim drawn from the source ' +
           'evidence must cite a locator from the evidence. Only multiple-choice questions ' +
           'carry an options field, with at least three distinct options and the answer among ' +
-          'them; every other question type omits options. Free-response questions MUST carry ' +
-          'a rubric — a non-empty string — and every other question type omits the rubric ' +
-          'field entirely. Never emit null for any field: omit optional fields instead.',
+          'them; every other question type omits options. Free-response questions MUST ship ' +
+          'a concrete rubric on the first pass: grading criteria with at least 2-3 explicit ' +
+          'checkpoints, a model answer, and partial-credit rules, so grading is checkable — ' +
+          'never a bare non-empty string. Every other question type omits the rubric field ' +
+          'entirely. Never emit null for any field: omit optional fields instead.',
         0.2,
       ),
   );

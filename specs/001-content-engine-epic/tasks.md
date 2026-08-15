@@ -504,4 +504,13 @@ only the paid run and recorded evidence are missing.
       `full_course_publication_latency_ms` telemetry (`packages/observability/src/metrics.ts`,
       observed in `apps/worker/src/pipeline/compile.ts`), so the latency budget is a recorded,
       reproducible number per SC-007 (partial)
+- [x] T049 E24 hit-rate follow-up: extend the `generateLesson` instruction in
+      `apps/worker/src/pipeline/compile.ts` to demand a concrete rubric for every free-response
+      question — grading criteria with at least 2-3 explicit checkpoints, a model answer, and
+      partial-credit rules, so grading is checkable — on the first pass, mirroring the T044
+      structural-elements demands. The live hit-rate harness (`scripts/measure-plan-hit-rate.ts`)
+      measured 5/9 first-attempt valid with all four failures on the `lesson_package` contract's
+      `questions.N.rubric` field ('A free-response question must ship with a rubric'), so the
+      first-pass prompt must specify the rubric's contents rather than a bare non-empty string,
+      per FR-012 / SC-008 (partial)
 
