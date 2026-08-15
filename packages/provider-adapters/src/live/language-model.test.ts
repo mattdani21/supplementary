@@ -166,6 +166,24 @@ describe('live language model', () => {
     expect(body.messages[1]!.content).toContain('fenced source text');
   });
 
+  it('sends reasoning_effort in the request body when the caller sets it', async () => {
+    // T051: DeepSeek v4 models take a per-call reasoning_effort ('low' | 'medium' | 'high').
+    // The contract-first steps run at 'low' so their direct, compliant output is not eaten by
+    // a long reasoning trace; the lesson generator runs at 'high'.
+    const { backend, calls } = build(completion({ ok: true }));
+    await backend.complete(baseRequest({ reasoningEffort: 'low' }));
+    expect(calls).toHaveLength(1);
+    const body = JSON.parse(String(calls[0]!.init.body)) as { reasoning_effort?: string };
+    expect(body.reasoning_effort).toBe('low');
+  });
+
+  it('omits reasoning_effort from the request body when the caller does not set it', async () => {
+    const { backend, calls } = build(completion({ ok: true }));
+    await backend.complete(baseRequest());
+    const body = JSON.parse(String(calls[0]!.init.body)) as { reasoning_effort?: string };
+    expect(body.reasoning_effort).toBeUndefined();
+  });
+
   it('rounds a fractional cost up so spend is never undercounted', async () => {
     const { backend } = build(
       completion({}, { usage: { prompt_tokens: 1, completion_tokens: 1 } }),

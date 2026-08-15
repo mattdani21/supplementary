@@ -111,6 +111,22 @@ describe('contract validation at the adapter boundary', () => {
     expect(raw.evidenceBlock).not.toContain('observableSuccessCondition');
   });
 
+  it('forwards reasoningEffort to the raw request when set and omits it when not', async () => {
+    // T051: the per-step reasoning-effort knob rides the request from the pipeline through the
+    // guarded wrapper to the backend; when a step does not set it, the raw request must not
+    // carry it (so the live body stays clean for backends that reject unknown fields).
+    const { model, backend } = build();
+    await model.generate({
+      ...baseRequest,
+      contract: GapNormalisationContract,
+      reasoningEffort: 'low',
+    });
+    await model.generate({ ...baseRequest, contract: GapNormalisationContract });
+
+    expect(backend.calls[0]!.reasoningEffort).toBe('low');
+    expect(backend.calls[1]!.reasoningEffort).toBeUndefined();
+  });
+
   it('rejects a structurally invalid response instead of persisting it', async () => {
     const { model } = build({ script: { lesson_package: () => structurallyInvalidLesson() } });
     await expect(

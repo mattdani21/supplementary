@@ -1,6 +1,6 @@
 {
  "schemaVersion": 1,
- "updatedAt": "2026-08-15T17:55:00.000Z",
+ "updatedAt": "2026-08-15T19:55:00.000Z",
  "controller": "gapos-controller",
  "tasks": {
   "GAP-035": {
@@ -1667,6 +1667,49 @@
    ],
    "notes": "T050 (v4 architecture support): the live provider adapter (packages/provider-adapters/src/live/language-model.ts) was built around the pre-v4 deepseek-chat architecture and got the v4 differences wrong. Rework: (a) DEFAULT_LIVE_MODEL -> 'deepseek-v4-flash' (the v4 fast/cheap tier; deepseek-chat stays reachable via GAPOS_LLM_MODEL for backwards compat); (b) the pricing table becomes DEEPSEEK_V4_FLASH_* constants ($0.14/M input, $0.28/M output, $0.0028/M cache-hit input, 14_000/28_000/280 millicents per MT), with a new cache-hit price applied to usage.prompt_cache_hit_tokens / prompt_tokens_details.cached_tokens and an env override GAPOS_LLM_PRICE_CACHE_HIT_INPUT_MILLICENTS_PER_MT; (c) usage accounting reads usage.completion_tokens_details.reasoning_tokens and adds it to billed output tokens, so reasoning counts against the run budget (the wrapper's cost accounting and telemetry both see it); (d) parsing accepts messages carrying reasoning_content — content stays the only JSON source, and empty-content-after-reasoning stays a retryable LiveProviderError whose message now names the shared max_tokens failure ('the v4 model produced only reasoning_content: its reasoning consumed the shared max_tokens budget'); (e) PLAN_MAX_OUTPUT_TOKENS / LESSON_MAX_OUTPUT_TOKENS (apps/worker/src/pipeline/compile.ts) rise 8192 -> 16384 with a comment explaining that v4 max_tokens is shared between reasoning and content (observed live: 'Live provider returned no message content' on v4-pro); (f) DEFAULT_TIMEOUT_MS stays 300s but the abort-timeout error now names reasoning latency ('v4 models reason before producing content, so long reasoning can outlast the timeout'). Tests written first: 7 new live-adapter tests + a new compile.test.ts, plus the deepseek-chat-era assertions updated to v4-flash; one worker.test.ts assertion updated by design (observed plan/lesson budget 8192 -> 16384). No contract/schema change, no migration, no new telemetry metric (the existing model_call_total / cost accounting already carry the combined output tokens); tasks/decisions.md pricing note updated to v4-flash. specs/001-content-engine-epic/tasks.md gained the [x] T050 entry.",
    "completedAt": "2026-08-15T17:55:00.000Z"
+  },
+  "E24-T051": {
+   "status": "done",
+  "startedAt": "2026-08-15T19:51:00.000Z",
+  "evidence": [
+   {
+    "command": "git status + git log --oneline -5; read tasks/status.json E24-T050, packages/provider-adapters/src/{interfaces,language-model}.ts, packages/provider-adapters/src/live/language-model.ts, apps/worker/src/pipeline/compile.ts + tests, tests/end-to-end/recording-provider.ts",
+    "result": "pass",
+    "note": "Controller loop: tree on autopilot/m1-fresh-checkout with only a pre-existing unrelated mode change (apps/cli/src/main.ts 100644->100755, present before this task, left uncommitted). T051 is a direct-request rework like T050 (not a backlog mirror): per-step reasoning effort for DeepSeek v4. Verified context: v4 models support reasoning_effort 'low'|'medium'|'high'; 'high' can consume the entire shared max_tokens budget on reasoning alone, leaving empty content ('Live provider returned no message content' observed in hit-rate runs). Request shape: compile.ts calls providers.languageModel.generate (StructuredRequest) -> wrapper builds RawCompletionRequest (language-model.ts) -> live backend builds the OpenAI-compatible body (live/language-model.ts ~line 134)."
+   },
+   {
+    "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm verify (baseline)",
+    "result": "pass",
+    "note": "599 passed | 26 loud skips (625 total), 46 test files passed | 4 skipped (50) — matches the E24-T050 final gate. Hermetic note as always: the sandbox injects GAPOS_PROVIDER_MODE=live without a key, so verify runs with env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL."
+   },
+   {
+    "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm exec vitest run packages/provider-adapters/src/live/language-model.test.ts packages/provider-adapters/src/language-model.test.ts apps/worker/src/pipeline/compile.test.ts tests/end-to-end/per-step-reasoning-effort.test.ts (test-first, red run)",
+    "result": "fail",
+    "note": "Expected red before implementation for exactly the right reasons: 5 failed. (1) live body test: reasoning_effort not in the request body (undefined vs 'low'); (2) wrapper test: raw request did not carry reasoningEffort; (3) compile.test.ts: LESSON_MAX_OUTPUT_TOKENS still 16384 vs 32768; (4)+(5) the two new per-step wiring tests: the recorded raw requests carried no reasoningEffort and the lesson budget was 16384 not 32768."
+   },
+   {
+    "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm exec vitest run packages/provider-adapters/src/live/language-model.test.ts packages/provider-adapters/src/language-model.test.ts apps/worker/src/pipeline/compile.test.ts tests/end-to-end/per-step-reasoning-effort.test.ts tests/end-to-end/worker.test.ts (after implementation)",
+    "result": "pass",
+    "note": "55 tests green. Implementation: (a) ReasoningEffort type ('low'|'medium'|'high') + optional reasoningEffort on StructuredRequest (interfaces.ts) and RawCompletionRequest, forwarded by the guarded wrapper (language-model.ts); (b) the live backend passes it through as reasoning_effort in the body, omitted when unset so backends that reject unknown fields stay reachable (live/language-model.ts); (c) pipeline steps set it — normalise_gap, interpret_diagnostic (diagnose), plan_curriculum, verify_artefact and audit_claims run at 'low' (contract-first: direct, compliant output); generateLesson (first pass AND repair calls) runs at 'high'; (d) LESSON_MAX_OUTPUT_TOKENS 16384 -> 32768 so high-effort reasoning + lesson JSON both fit the shared v4 budget; PLAN_MAX_OUTPUT_TOKENS stays 16384 with 'low'. worker.test.ts assertion updated by design (observed lesson budget 16384 -> 32768)."
+   },
+   {
+    "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm exec vitest run packages/provider-adapters tests/end-to-end/compile-math-gap.test.ts tests/end-to-end/journey.test.ts tests/end-to-end/security.test.ts tests/end-to-end/generate-lesson-instruction.test.ts tests/end-to-end/capability-reuse.test.ts tests/end-to-end/step-output-summary.test.ts tests/evaluation/plan-hit-rate.test.ts tests/evaluation/differentiation.test.ts (regression surface)",
+    "result": "pass",
+    "note": "139 tests green across the adapter package and every pipeline consumer — no regressions from the per-step effort wiring or the budget raise."
+   },
+   {
+    "command": "pnpm exec prettier --check <changed files> && pnpm exec eslint <changed files> && pnpm exec tsc -p tsconfig.json",
+    "result": "pass",
+    "note": "Prettier, ESLint (strict TS, no-any, no-restricted-imports) and tsc clean on the changed files."
+   },
+   {
+    "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm verify (final gate)",
+    "result": "pass",
+    "note": "604 passed | 26 loud skips (630 total), 47 test files passed | 4 skipped (51). Baseline 599 -> +5 new tests (2 live body + 1 wrapper forwarding + 2 per-step wiring). Format, lint, typecheck and the full suite green."
+   }
+  ],
+  "notes": "T051 (per-step reasoning effort): the pipeline now tells DeepSeek v4 how hard to reason per step. ReasoningEffort ('low'|'medium'|'high') rides StructuredRequest -> RawCompletionRequest -> the live body as reasoning_effort (omitted when unset, so backends that reject unknown fields stay reachable). Contract-first steps — normalise_gap, interpret_diagnostic (diagnose), plan_curriculum, verify_artefact and audit_claims — run at 'low': their output must be direct and compliant, and a low effort cannot eat the shared max_tokens budget at the expense of the JSON. The content step (generateLesson, including repair calls) runs at 'high' with LESSON_MAX_OUTPUT_TOKENS raised 16384 -> 32768 so the reasoning trace AND the lesson JSON both fit (observed live before T051: 'Live provider returned no message content' when high-effort reasoning consumed the whole budget); PLAN_MAX_OUTPUT_TOKENS stays 16384 with 'low'. Tests written first: live body includes reasoning_effort when set / omits it when not; wrapper forwards it (or omits it); the per-step wiring is asserted through the real pipeline into a recording fake backend (low on all five contract steps, high on every lesson call, budgets 16384/32768); budget constants match. No contract/schema change (the request type is internal to provider-adapters; no published contract or HTTP API changed), so specs/ is untouched; no migration; no new telemetry (the existing model_call_total / cost accounting already carry the call); reasoning content is never logged — the adapter only uses reasoning_content presence to name the empty-content failure mode, matching the docs' never-expose-reasoning rule.",
+  "completedAt": "2026-08-15T19:55:00.000Z"
   }
  },
  "GAP-014b": {

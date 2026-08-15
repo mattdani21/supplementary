@@ -292,9 +292,11 @@ describe('the durable worker loop (GAP-015)', () => {
     expect(done?.attempts).toBe(0);
     expect(lessonCalls).toBeGreaterThanOrEqual(2);
     // The big payloads carry an explicit output budget (provider defaults truncate long JSON).
-    // On v4, max_tokens is shared between reasoning and content, so the budget is 16384.
-    expect(observedTokens[0]).toBe(16384); // plan
-    expect(observedTokens.slice(1).every((t) => t === 16384)).toBe(true); // lessons
+    // On v4, max_tokens is shared between reasoning and content (T051): the plan runs at low
+    // reasoning effort so 16384 fits it, while lessons run at 'high' and get 32768 so the
+    // reasoning trace AND the lesson JSON both fit.
+    expect(observedTokens[0]).toBe(16384); // plan (low effort)
+    expect(observedTokens.slice(1).every((t) => t === 32768)).toBe(true); // lessons (high effort)
 
     const curriculum = await context.uow.curricula.getCurrentForGap(LEARNER, gap.id);
     expect(curriculum).toBeDefined();

@@ -70,13 +70,16 @@ export const MAX_LESSON_CONTRACT_ATTEMPTS = 3;
  * provider defaults (~4096 tokens) truncate a long JSON mid-string, and truncation parses as
  * an unparseable-JSON failure that no repair loop can see.
  *
- * On the v4 architecture max_tokens is shared between the reasoning trace and the content, so
- * 8192 could be consumed by reasoning alone, leaving the JSON with no room at all (observed
- * live: 'Live provider returned no message content' on v4-pro). 16384 gives reasoning + content
- * room to fit on v4 while still capping the largest payloads.
+ * On the v4 architecture max_tokens is shared between the reasoning trace and the content, and
+ * the effort the pipeline asks for decides how much of it reasoning consumes (T051):
+ *   - the contract-first steps (normalise, plan, diagnose, verify, audit) run at
+ *     reasoning_effort 'low', so their reasoning is small and 16384 fits a long plan;
+ *   - the lesson generator runs at 'high', whose reasoning alone can consume the whole budget
+ *     (observed live: 'Live provider returned no message content'), so lessons get 32768 to
+ *     fit the reasoning trace AND the lesson JSON.
  */
 export const PLAN_MAX_OUTPUT_TOKENS = 16384;
-export const LESSON_MAX_OUTPUT_TOKENS = 16384;
+export const LESSON_MAX_OUTPUT_TOKENS = 32768;
 
 export interface CompileDeps {
   readonly uow: UnitOfWork;
@@ -333,6 +336,9 @@ export const compileGap = async (
             // Structured extraction must be deterministic: the run retries idempotently, and a
             // degenerate-but-valid normalisation would poison every downstream stage.
             temperature: 0,
+            // Contract-first step (T051): direct, compliant output — 'low' reasoning effort
+            // so the reasoning trace cannot consume the shared max_tokens budget.
+            reasoningEffort: 'low',
             runId: run.id,
             userId: owner,
             instruction:
@@ -453,6 +459,9 @@ export const compileGap = async (
             contract: DiagnosticInterpretationContract,
             purpose: 'classification',
             temperature: 0,
+            // Contract-first step (T051): the inferred baseline is direct output — 'low'
+            // reasoning effort keeps the reasoning trace out of the shared max_tokens budget.
+            reasoningEffort: 'low',
             runId: run.id,
             userId: owner,
             instruction:
@@ -793,6 +802,9 @@ const planCurriculum = async (params: {
       // Plans are the largest structured payload in the pipeline; DeepSeek's default output
       // cap (4096 tokens) truncates a long plan mid-JSON, which killed live compiles.
       maxOutputTokens: PLAN_MAX_OUTPUT_TOKENS,
+      // Contract-first step (T051): the plan must pass the validation gate on the first
+      // attempt — 'low' reasoning effort, so the shared max_tokens budget goes to the plan.
+      reasoningEffort: 'low',
       runId,
       userId: owner,
       subject: gapId,
@@ -927,6 +939,10 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
           purpose: 'teaching',
           temperature: attempt === 1 ? temperature : 0,
           maxOutputTokens: LESSON_MAX_OUTPUT_TOKENS,
+          // The content step (T051): the lesson script benefits from deeper reasoning, so it
+          // runs at 'high' with the larger output budget — 32768 fits the reasoning trace AND
+          // the lesson JSON on the shared v4 max_tokens budget.
+          reasoningEffort: 'high',
           runId,
           userId: owner,
           subject: `day-${dayPlan.day}`,
@@ -1029,6 +1045,9 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
             contract: VerificationReportContract,
             purpose: 'verification',
             temperature: 0,
+            // Contract-first step (T051): independent solutions are direct output — 'low'
+            // reasoning effort so the shared max_tokens budget goes to the report.
+            reasoningEffort: 'low',
             runId,
             userId: owner,
             subject: `day-${dayPlan.day}`,
@@ -1325,6 +1344,9 @@ const auditLessonClaims = async (params: {
           contract: ClaimAuditContract,
           purpose: 'verification',
           temperature: 0,
+          // Contract-first step (T051): the audit's resolutions are direct output — 'low'
+          // reasoning effort keeps the reasoning trace out of the shared max_tokens budget.
+          reasoningEffort: 'low',
           runId,
           userId: owner,
           subject: `day-${day}`,

@@ -141,6 +141,14 @@ export const createLiveLanguageModel = (
         stream: false,
         ...(request.temperature === undefined ? {} : { temperature: request.temperature }),
         ...(request.maxOutputTokens === undefined ? {} : { max_tokens: request.maxOutputTokens }),
+        // T051: DeepSeek v4 models take a per-call reasoning effort. 'low' keeps a
+        // contract-first step's reasoning from consuming the shared max_tokens budget at the
+        // expense of the JSON; 'high' spends more of it on the reasoning trace (the lesson
+        // generator pairs it with a larger max_tokens so reasoning + content both fit).
+        // Omitted when unset so backends that reject unknown fields stay reachable.
+        ...(request.reasoningEffort === undefined
+          ? {}
+          : { reasoning_effort: request.reasoningEffort }),
       };
 
       // One HTTP round trip plus parsing. Retrying inside the adapter absorbs transient

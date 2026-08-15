@@ -19,6 +19,7 @@ import {
   ProviderBudgetError,
   ProviderContractError,
   type LanguageModel,
+  type ReasoningEffort,
   type StructuredRequest,
   type StructuredResponse,
 } from './interfaces.js';
@@ -39,6 +40,13 @@ export interface RawCompletionRequest {
   readonly temperature?: number;
   readonly maxOutputTokens?: number;
   readonly timeoutMs?: number;
+  /**
+   * Per-call reasoning effort (T051): 'low' for contract-first steps whose output must be
+   * direct and compliant, 'high' for the lesson generator (with a larger maxOutputTokens so
+   * reasoning + content both fit the shared v4 budget). Optional: a backend that does not
+   * support it, or a caller that does not care, omits it.
+   */
+  readonly reasoningEffort?: ReasoningEffort;
 }
 
 export interface RawCompletion {
@@ -114,6 +122,9 @@ export const createLanguageModel = (
           ? {}
           : { maxOutputTokens: request.maxOutputTokens }),
         ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
+        ...(request.reasoningEffort === undefined
+          ? {}
+          : { reasoningEffort: request.reasoningEffort }),
       };
 
       const decision = deps.costAccountant.authorise({

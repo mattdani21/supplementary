@@ -12,6 +12,16 @@
 import type { Contract, EvidenceItem } from '@gapos/ai-contracts';
 import type { CallPurpose, Millicents } from '@gapos/observability';
 
+/**
+ * Per-call reasoning effort for a model that supports it (T051). DeepSeek v4 models take
+ * `reasoning_effort` ('low' | 'medium' | 'high'): a higher effort spends more of the SHARED
+ * max_tokens budget on the reasoning trace before any content is produced. Contract-first
+ * steps whose output must be direct and compliant run at 'low'; the lesson generator, which
+ * benefits from deeper reasoning, runs at 'high' with a larger budget so reasoning + content
+ * both fit. Backends that do not support it ignore the field.
+ */
+export type ReasoningEffort = 'low' | 'medium' | 'high';
+
 export interface StructuredRequest<T> {
   readonly contract: Contract<T>;
   /**
@@ -25,6 +35,7 @@ export interface StructuredRequest<T> {
   readonly temperature?: number;
   readonly maxOutputTokens?: number;
   readonly timeoutMs?: number;
+  readonly reasoningEffort?: ReasoningEffort;
   /** Correlates the call with a run for cost accounting and the generation log. */
   readonly runId: string;
   readonly userId: string;
