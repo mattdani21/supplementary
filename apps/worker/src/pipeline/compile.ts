@@ -834,11 +834,17 @@ const planCurriculum = async (params: {
         '(4) PREREQUISITE GRAPH: the prerequisiteObjectiveIds must form an acyclic graph, and ' +
         'every prerequisiteObjectiveId must name an objective the plan teaches. Failure modes: ' +
         'prerequisite_cycle (the cycle is named) and prerequisite_unmet (dangling dependency).\n' +
-        '(5) EXTERNAL PREREQUISITES: copy externalPrerequisites VERBATIM from the list of what ' +
-        'the learner is assumed to already hold — never invent, reword or reorder one. If a ' +
-        'prerequisite is not on that list, either teach it as an objective or remove the ' +
-        'dependency. Failure mode: prerequisite_unmet ("assumes X, which the learner has not ' +
-        'been shown to hold").\n' +
+        "(5) EXTERNAL PREREQUISITES: the learner's own stated current state — the capabilities " +
+        'in the normalisation "current state" line — is a self-reported baseline and counts as ' +
+        'HELD: the curriculum builds on it, so never list those capabilities as unmet ' +
+        'prerequisites. You may reword them inside the plan (for example as an early ' +
+        "objective's capability statement or an internal prerequisiteObjectiveId), but they " +
+        'must never appear in externalPrerequisites. For genuinely unmet knowledge, copy ' +
+        'externalPrerequisites VERBATIM from the list of what the learner is assumed to ' +
+        'already hold — never invent, reword or reorder one. If a prerequisite is not on that ' +
+        "list and is not part of the learner's stated current state, either teach it as an " +
+        'objective or remove the dependency. Failure mode: prerequisite_unmet ("assumes X, ' +
+        'which the learner has not been shown to hold").\n' +
         '(6) EVIDENCE GROUNDING: every source-grounded objective must cite locators from the ' +
         'evidence block; only an objective explicitly labelled general_knowledge may omit them. ' +
         'Failure mode: an objective "claims source grounding but cites no locator".\n' +
