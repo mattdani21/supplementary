@@ -25,7 +25,7 @@ import {
   totalDurationSeconds,
 } from '../lib/audio';
 import { gradeCheckpoint, pendingCheckpoint } from '../lib/checkpoint';
-import { AudioPlayer, AudioPlayerView } from './audio-player';
+import { AudioPlayer, AudioPlayerView, ownerFromCookie } from './audio-player';
 import { Checkpoint } from './checkpoint';
 
 /** Small fixture: three audio segments of 30/30/40 seconds (100s total). */
@@ -308,5 +308,27 @@ describe('the checkpoint surface (E24 US1, T010)', () => {
     expect(html).toContain('set-theory-primer.md');
     expect(html).toContain('p. 9');
     expect(html).toMatch(/<a [^>]*href="[^"]*\?tab=sources/);
+  });
+});
+
+describe('ownerFromCookie (audio auth fallback)', () => {
+  it('defaults to local-learner for a fresh browser with no cookie', () => {
+    expect(ownerFromCookie('')).toBe('local-learner');
+    expect(ownerFromCookie('other=1; theme=dark')).toBe('local-learner');
+  });
+
+  it('reads an explicit owner cookie', () => {
+    expect(ownerFromCookie('gapos_owner=someone; theme=dark')).toBe('someone');
+  });
+
+  it('decodes URL-encoded owner ids', () => {
+    expect(ownerFromCookie('gapos_owner=my%40learner')).toBe('my@learner');
+  });
+
+  it('mirrors the server-side default exactly', () => {
+    // The server (lib/viewer.ts viewerOwner) falls back to 'local-learner' when the
+    // cookie is missing. The client must match, or a fresh browser 401s on audio.
+    expect(ownerFromCookie('')).toBe('local-learner');
+    expect(ownerFromCookie('gapos_owner=local-learner')).toBe('local-learner');
   });
 });

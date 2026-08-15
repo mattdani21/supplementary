@@ -222,19 +222,26 @@ interface AudioPlayerProps {
   readonly checkpointLocators?: readonly FeedbackLocator[];
 }
 
-/** Reads the learner cookie client-side (the audio endpoint scopes by X-Owner-Id). */
-const readOwnerId = (): string | undefined => {
-  const raw = document.cookie
+/**
+ * Resolve the learner owner id from a raw cookie string. Mirrors the server-side
+ * default (`viewerOwner` in lib/viewer.ts): a fresh browser without the cookie
+ * authenticates as the default learner instead of 401ing on every audio fetch.
+ */
+export const ownerFromCookie = (rawCookie: string): string => {
+  const raw = rawCookie
     .split('; ')
     .find((part) => part.startsWith('gapos_owner='))
     ?.split('=')[1];
-  if (!raw) return undefined;
+  if (!raw) return 'local-learner';
   try {
     return decodeURIComponent(raw);
   } catch {
     return raw;
   }
 };
+
+/** Reads the learner cookie client-side (the audio endpoint scopes by X-Owner-Id). */
+const readOwnerId = (): string => ownerFromCookie(document.cookie);
 
 /**
  * The media controller: resolves every segment's signed URL, drives a single <audio> element
