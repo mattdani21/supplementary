@@ -137,7 +137,11 @@ importers:
         specifier: ^8.11.10
         version: 8.20.3
 
-  packages/domain: {}
+  packages/domain:
+    dependencies:
+      '@gapos/ai-contracts':
+        specifier: workspace:*
+        version: link:../ai-contracts
 
   packages/evaluation:
     dependencies:
