@@ -478,7 +478,7 @@ constitution violations (constitution is an unfilled template). T046/T047 requir
 provider key (AGENTS.md §5 human approval gate) — the harnesses and tests are already in place,
 only the paid run and recorded evidence are missing.
 
-- [ ] T044 Update the `generateLesson` instruction in `apps/worker/src/pipeline/compile.ts`
+- [x] T044 Update the `generateLesson` instruction in `apps/worker/src/pipeline/compile.ts`
       (lines 892–906) to demand the four structural elements — concrete opening, one idea per
       segment, a worked example worked inside the script, and a checkpoint via `pausePrompts` —
       so live-mode generation targets the `human_sounding` contract on the first pass rather than
@@ -488,7 +488,7 @@ only the paid run and recorded evidence are missing.
       `planCurriculum` instruction until the first-attempt valid-plan rate reaches ≥ 80%, keeping
       `tests/evaluation/plan-gate-guard.test.ts` green; record the command + result in
       `tasks/status.json` per SC-001 / FR-013 / FR-022 (partial; human approval gate)
-- [ ] T046 Drive the review-due list from the learner's mastery evidence: compute `reviewDue`
+- [x] T046 Drive the review-due list from the learner's mastery evidence: compute `reviewDue`
       from evidence records (e.g. `uow.mastery.listEvidenceForCurriculum`) in the compile
       threading (`apps/worker/src/pipeline/compile.ts` currently hardcodes `reviewDue: []` at line
       368) so `derivePlanInputs` schedules review inside the new curriculum, per FR-020 /

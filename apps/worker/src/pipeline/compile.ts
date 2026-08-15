@@ -35,6 +35,7 @@ import { textOf } from '@gapos/database';
 import {
   DomainError,
   GENERATION_STATUSES,
+  MASTERY_THRESHOLD,
   blocksPublication,
   checkAudioIntegrity,
   chunkDocument,
@@ -147,6 +148,55 @@ const hash = (value: unknown): string =>
 
 const shortChecksum = (text: string): string =>
   createHash('sha256').update(text).digest('hex').slice(0, 32);
+
+/**
+ * The slice of an evidence record the review-due rule reads. Kept minimal so the rule never
+ * depends on the persistence record's full shape.
+ */
+export interface ReviewDueEvidence {
+  readonly objectiveId: string;
+  readonly recordedAt: Date;
+  readonly score: number;
+}
+
+/**
+ * FR-020: which previously demonstrated capabilities are due for review inside the new
+ * curriculum, derived from the learner's evidence records (never a hardcoded empty list).
+ *
+ * A capability is due when its objective's MOST RECENT evidence record scores below the mastery
+ * threshold — the learner recently answered weakly on it, so the new curriculum must schedule a
+ * review even when the capability still counts as held from fill time. Objectives with no
+ * evidence are never called in for review, and a capability is reported once across all prior
+ * curricula. The result follows the prior curricula's plan-objective order, so identical inputs
+ * always produce the identical brief (idempotency).
+ */
+export const reviewDueFromPriorCurricula = (params: {
+  readonly curricula: readonly {
+    readonly objectives: readonly { readonly id: string; readonly capabilityStatement: string }[];
+    readonly evidence: readonly ReviewDueEvidence[];
+  }[];
+}): readonly string[] => {
+  const due: string[] = [];
+  const seen = new Set<string>();
+  for (const curriculum of params.curricula) {
+    const latestByObjective = new Map<string, ReviewDueEvidence>();
+    for (const record of curriculum.evidence) {
+      const current = latestByObjective.get(record.objectiveId);
+      if (!current || record.recordedAt.getTime() >= current.recordedAt.getTime()) {
+        latestByObjective.set(record.objectiveId, record);
+      }
+    }
+    for (const objective of curriculum.objectives) {
+      const record = latestByObjective.get(objective.id);
+      if (!record || record.score >= MASTERY_THRESHOLD || seen.has(objective.capabilityStatement)) {
+        continue;
+      }
+      seen.add(objective.capabilityStatement);
+      due.push(objective.capabilityStatement);
+    }
+  }
+  return due;
+};
 
 export const compileGap = async (
   request: CompileRequest,
@@ -354,18 +404,34 @@ export const compileGap = async (
       goals: user?.goals ?? [],
       preferredLessonLength: user?.preferredLessonLength ?? 'standard',
     };
-    let priorEvidenceRecords = 0;
+    // FR-020: the review-due list is driven by the learner's evidence records, never a
+    // hardcoded empty array. For each prior curriculum, map the evidence back to the capability
+    // its objective teaches; an objective whose most recent evidence scores below the mastery
+    // threshold is due for review inside the new curriculum (a recent weak signal means review,
+    // not a silent assumption — review is additive, never a reteach).
+    const priorCurricula: {
+      readonly objectives: readonly { readonly id: string; readonly capabilityStatement: string }[];
+      readonly evidence: readonly ReviewDueEvidence[];
+    }[] = [];
     for (const filled of filledGaps) {
       const priorCurriculum = await uow.curricula.getCurrentForGap(owner, filled.id);
       if (!priorCurriculum) continue;
-      priorEvidenceRecords += (
-        await uow.mastery.listEvidenceForCurriculum(owner, priorCurriculum.id)
-      ).length;
+      priorCurricula.push({
+        objectives: priorCurriculum.plan.objectives.map((o) => ({
+          id: o.id,
+          capabilityStatement: o.capabilityStatement,
+        })),
+        evidence: await uow.mastery.listEvidenceForCurriculum(owner, priorCurriculum.id),
+      });
     }
+    const priorEvidenceRecords = priorCurricula.reduce(
+      (sum, curriculum) => sum + curriculum.evidence.length,
+      0,
+    );
     const mastery: MasteryInput = {
       satisfied: priorReuse.satisfied,
       decayed: priorReuse.decayed,
-      reviewDue: [],
+      reviewDue: reviewDueFromPriorCurricula({ curricula: priorCurricula }),
       evidenceSummary:
         priorEvidenceRecords > 0
           ? `${priorEvidenceRecords} recorded evidence item(s) across prior filled gaps.`
@@ -896,7 +962,19 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
           `${blueprintForDay}. Ship at least those item counts across the lesson's questions ` +
           '(application items may be marked transfer). The script must be written to be spoken ' +
           'aloud — roughly 750 words for five minutes, plain sentences, no bullet lists, no ' +
-          "references to figures. Set estimatedMinutes to the script's actual listening time " +
+          'references to figures. The script is the teaching itself and must pass the four ' +
+          'structural checks the verifier enforces, so hit all four on the first pass: ' +
+          '(1) CONCRETE OPENING: open with a situation, question or problem the learner ' +
+          'recognizes; never open with a statement about the lesson ("in this lesson…", "today ' +
+          'we will…", "we will cover…"). (2) ONE IDEA PER SEGMENT: every segment (a paragraph, ' +
+          'or a sentence when the script is one paragraph) teaches exactly one idea, in complete ' +
+          'sentences, with no bullet or list markers. (3) WORKED EXAMPLE: work at least one ' +
+          'example step by step INSIDE the script ("first…, then…", labelled steps) and declare ' +
+          'it in examples so its text appears in the script — never merely reference a worked ' +
+          'example. (4) CHECKPOINT: ask at least one checkpoint question aloud in the script AND ' +
+          'declare it in pausePrompts with the exact prompt text, so the audio pauses and the ' +
+          'learner must respond before the lesson continues. Set estimatedMinutes to the ' +
+          "script's actual listening time " +
           "(about 5 minutes for 750 words), never the day's total budget. Every question " +
           'prompt must be unique within the lesson. Every claim drawn from the source ' +
           'evidence must cite a locator from the evidence. Only multiple-choice questions ' +
