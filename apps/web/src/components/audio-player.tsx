@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AudioFallback } from './audio-fallback';
 import { Checkpoint } from './checkpoint';
 import { gradeCheckpoint, pendingCheckpoint, type CheckpointPrompt } from '../lib/checkpoint';
+import { ownerFromCookie } from '../lib/owner';
 import type { FeedbackLocator } from './practice-feedback';
 import {
   DEFAULT_PLAYBACK_SPEED,
@@ -221,24 +222,6 @@ interface AudioPlayerProps {
   /** Source locators behind the checkpoint answers, shown in the correction surface. */
   readonly checkpointLocators?: readonly FeedbackLocator[];
 }
-
-/**
- * Resolve the learner owner id from a raw cookie string. Mirrors the server-side
- * default (`viewerOwner` in lib/viewer.ts): a fresh browser without the cookie
- * authenticates as the default learner instead of 401ing on every audio fetch.
- */
-export const ownerFromCookie = (rawCookie: string): string => {
-  const raw = rawCookie
-    .split('; ')
-    .find((part) => part.startsWith('gapos_owner='))
-    ?.split('=')[1];
-  if (!raw) return 'local-learner';
-  try {
-    return decodeURIComponent(raw);
-  } catch {
-    return raw;
-  }
-};
 
 /** Reads the learner cookie client-side (the audio endpoint scopes by X-Owner-Id). */
 const readOwnerId = (): string => ownerFromCookie(document.cookie);

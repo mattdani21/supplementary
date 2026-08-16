@@ -1,6 +1,6 @@
 {
  "schemaVersion": 1,
- "updatedAt": "2026-08-15T20:50:00.000Z",
+ "updatedAt": "2026-08-16T13:58:00.000Z",
  "controller": "gapos-controller",
  "tasks": {
   "GAP-083": {
@@ -18,6 +18,33 @@
      "note": "609 passed | 26 loud skips (635 total), 48 files passed | 4 skipped. Format + lint + typecheck + full suite green. Same hermetic note as every E22-E24 task: the sandbox injects GAPOS_PROVIDER_MODE=live without a key, so verify runs with env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL."
     }
    ]
+  },
+  "GAP-088": {
+   "status": "done",
+   "startedAt": "2026-08-16T13:55:00.000Z",
+   "evidence": [
+    {
+     "command": "git status + git log --oneline -5; read tasks/backlog.yaml GAP-088, apps/web/src/app/gaps/page.tsx, apps/web/src/app/review/page.tsx, apps/web/src/app/gaps/[gapId]/page.tsx, apps/web/src/components/{transition-buttons,owner-switcher,api,audio-player}.tsx, apps/web/src/lib/viewer.ts, screens.test.tsx, empty-states.test.tsx, audio-player.test.tsx",
+     "result": "pass",
+     "note": "Controller loop: tree on autopilot/m1-fresh-checkout, clean (GAP-087 done in bd45b44, so the dependency is satisfied). GAP-088 is the E27 hostile-user hardening: (1) OwnerSwitcher (Learner textbox + Switch) renders unconditionally on /gaps; (2) the Review queue link on /gaps points learners at the educator moderation route /review; (3) client transition actions (Check mastery / Archive / Retry compile) go through apiFetch, which only sent x-owner-id when the cookie existed - a fresh browser sent no header and the server 401'd with the raw 'Set the X-Owner-Id header.' message, which TransitionButtons renders into the page. Fix plan: shared client-safe owner helper (ownerFromCookie, extracted from audio-player.tsx so api.ts can use it without importing the player component), apiFetch always sends x-owner-id with the local-learner fallback, and the /gaps page gates OwnerSwitcher + Review queue behind GAPOS_DEV_MODE=1 or ?dev=1 (pure injectable isDevMode helper)."
+    },
+    {
+     "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm verify (baseline)",
+     "result": "pass",
+     "note": "Format + lint + typecheck + full suite green before any change: 665 passed | 26 loud skips (691 total), 55 files passed | 4 skipped. Hermetic env note as every E22-E27 task: the sandbox injects GAPOS_PROVIDER_MODE=live without a key, so verify runs with env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL."
+    },
+    {
+     "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm exec vitest run apps/web/src/lib/dev-mode.test.ts apps/web/src/lib/owner.test.ts apps/web/src/components/api.test.ts apps/web/src/components/screens.test.tsx apps/web/src/components/audio-player.test.tsx apps/web/src/components/empty-states.test.tsx tests/end-to-end/explain-layer.test.ts (targeted, after implementation)",
+     "result": "pass",
+     "note": "Test-first: the GAP-088 tests were written before implementation and ran red for exactly the right reasons (api.test.ts: x-owner-id was null without a cookie; screens.test.tsx: '>Learner<' and 'Review queue' present under the default env; dev-mode/owner suites red on missing modules). After implementation all targeted suites pass: 71 tests across 7 files. The ownerFromCookie describe moved verbatim from audio-player.test.tsx to lib/owner.test.ts alongside the helper - audio-player, explain-layer and the shared apiFetch all resolve the owner from lib/owner.ts now."
+    },
+    {
+     "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm verify (final gate)",
+     "result": "pass",
+     "note": "Format + lint + typecheck + full suite green: 676 passed | 26 loud skips (702 total), 58 files passed | 4 skipped - up 11 tests from the 665 baseline. One typecheck fix along the way: vi.fn() without declared parameters typed mock.calls as [] tuples in api.test.ts, so the fetch mocks now declare (input, init) parameters. tasks/status.json sits in .prettierignore with a 1-space indent convention; the GAP-088 entry was inserted as raw text so the diff stays minimal (17 insertions, 1 deletion)."
+    }
+   ],
+   "completedAt": "2026-08-16T13:58:00.000Z"
   },
   "GAP-035": {
    "status": "done",

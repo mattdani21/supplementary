@@ -4,6 +4,7 @@ import { EmptyState } from '../../components/empty-state';
 import { GapForm } from '../../components/gap-form';
 import { OwnerSwitcher } from '../../components/owner-switcher';
 import { VoiceCapture } from '../../components/voice-capture';
+import { isDevMode } from '../../lib/dev-mode';
 import { pillClass } from '../../lib/status-pill';
 import { listGaps } from '../../server/api';
 import { getServerContext } from '../../server/bootstrap';
@@ -11,20 +12,30 @@ import { viewerOwner } from '../../lib/viewer';
 
 export const dynamic = 'force-dynamic';
 
-export default async function GapsPage() {
+export default async function GapsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+} = {}) {
   const owner = await viewerOwner();
   const context = await getServerContext();
   const { gaps } = (await listGaps(context, owner)) as { gaps: Gap[] };
+  const { dev } = (await searchParams) ?? {};
+  const devMode = isDevMode(process.env.GAPOS_DEV_MODE, dev);
 
   return (
     <main>
       <header className="page-head">
         <div className="row page-head__row">
           <h1>Gaps</h1>
-          <span className="actions">
-            <Link href="/review">Review queue</Link>
-            <OwnerSwitcher />
-          </span>
+          {/* Developer surfaces (owner switcher, educator review queue) are hidden from
+              learners by default; they render only under GAPOS_DEV_MODE=1 or ?dev=1 (E27). */}
+          {devMode && (
+            <span className="actions">
+              <Link href="/review">Review queue</Link>
+              <OwnerSwitcher />
+            </span>
+          )}
         </div>
         <p className="page-head__meta">Your learning tracks, one gap at a time.</p>
       </header>

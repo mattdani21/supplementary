@@ -64,6 +64,11 @@ import {
   transitionGap,
 } from '../server/api';
 
+// Developer surfaces are gated behind GAPOS_DEV_MODE=1 or ?dev=1 (GAP-088, E27). Every
+// render in this file asserts the learner-facing default, so pin the env flag off
+// regardless of the host environment.
+vi.stubEnv('GAPOS_DEV_MODE', undefined);
+
 const OWNER = 'local-learner';
 const GAP_TITLE = 'Relations and proof techniques';
 
@@ -151,7 +156,8 @@ describe('the gaps list with the shell (GAP-035)', () => {
 
     expect(html).toContain('New gap');
     expect(html).toContain('Speak a gap');
-    expect(html).toContain('Review queue');
+    // The review queue is an educator-moderation surface, not learner nav (GAP-088).
+    expect(html).not.toContain('Review queue');
   });
 });
 
@@ -478,5 +484,49 @@ describe('the course progress surface (E26)', () => {
     );
     expect(html).toContain('Your course is being written.');
     expect(html).toContain('0/0 days');
+  });
+});
+
+describe('developer surfaces are gated off the learner gaps page (GAP-088, E27)', () => {
+  const renderGaps = async (
+    searchParams: Record<string, string | string[] | undefined> = {},
+  ): Promise<string> =>
+    renderWithShell(await GapsPage({ searchParams: Promise.resolve(searchParams) }));
+
+  it('renders no owner switcher and no review-queue link under the default env', async () => {
+    const html = await renderGaps();
+
+    // The dev surfaces must not exist in the learner-facing markup at all — not hidden
+    // via CSS, not present-but-disabled.
+    expect(html).not.toContain('>Learner<');
+    expect(html).not.toContain('>Switch<');
+    expect(html).not.toContain('name="owner"');
+    expect(html).not.toContain('Review queue');
+    expect(html).not.toContain('href="/review"');
+  });
+
+  it('renders the owner switcher and the review-queue link under ?dev=1', async () => {
+    const html = await renderGaps({ dev: '1' });
+
+    expect(html).toContain('>Learner<');
+    expect(html).toContain('>Switch<');
+    expect(html).toContain('name="owner"');
+    expect(html).toContain('Review queue');
+    expect(html).toContain('href="/review"');
+  });
+
+  it('renders the transition actions on an active gap overview without the raw header error', async () => {
+    const html = await renderWithShell(
+      await GapDetailPage({
+        params: Promise.resolve({ gapId: compiledGapId }),
+        searchParams: Promise.resolve({}),
+      }),
+    );
+
+    expect(html).toContain('Check mastery');
+    expect(html).toContain('Archive');
+    // The raw owner-required message must never reach the learner surface.
+    expect(html).not.toContain('Set the X-Owner-Id header.');
+    expect(html).not.toContain('owner_required');
   });
 });

@@ -5,9 +5,7 @@
 
 import { cookies } from 'next/headers';
 import type { OwnerId } from '@gapos/database';
-
-export const OWNER_COOKIE = 'gapos_owner';
-export const DEFAULT_OWNER: OwnerId = 'local-learner' as OwnerId;
+import { DEFAULT_OWNER, OWNER_COOKIE } from './owner';
 
 export const viewerOwner = async (): Promise<OwnerId> => {
   const jar = await cookies();

@@ -10,7 +10,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ownerFromCookie } from './audio-player';
+import { ownerFromCookie } from '../lib/owner';
 
 interface ExplainResponse {
   explanation: { selection: string; explanation: string; note?: string };
