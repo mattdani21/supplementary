@@ -54,6 +54,7 @@ import GapsPage from '../app/gaps/page';
 import GapDetailPage from '../app/gaps/[gapId]/page';
 import StudyPage from '../app/gaps/[gapId]/study/page';
 import { SourceLinks } from './source-links';
+import { CourseProgress } from './course-progress';
 import { getServerContext } from '../server/bootstrap';
 import {
   compile,
@@ -215,8 +216,8 @@ describe('the gap detail workspace with the shell (GAP-035)', () => {
     expect(html).toContain(REFERENCE_GAP_STATEMENT);
     expect(html).toMatch(/class="pill/);
     expect(html).toContain('Today');
-    expect(html).toContain('Compile progress');
-    expect(html).toContain('class="log-line"');
+    expect(html).toContain('class="course-progress"');
+    expect(html).toContain('days');
     expect(html).toContain('complete'); // the run status pill
   });
 
@@ -235,8 +236,8 @@ describe('the gap detail workspace with the shell (GAP-035)', () => {
   });
 });
 
-describe('the generation progress surface (GAP-037)', () => {
-  it('renders a phase label, per-step status chips and a collapsible debug toggle', async () => {
+describe('the course progress surface replaces the raw compile log (E26)', () => {
+  it('shows progress ticks and a calm status for a completed course, never the raw step list', async () => {
     const html = await renderWithShell(
       await GapDetailPage({
         params: Promise.resolve({ gapId: compiledGapId }),
@@ -244,39 +245,27 @@ describe('the generation progress surface (GAP-037)', () => {
       }),
     );
 
-    // The designed surface: a phase label for the run, not the raw step list.
-    expect(html).toMatch(/class="progress-phase"/);
-    expect(html).toContain('Complete'); // phase label for a finished run
+    // The learner-facing surface: progress ticks, a count, and a calm status line.
+    expect(html).toContain('class="course-progress"');
+    expect(html).toMatch(/course-progress__tick--done/);
+    expect(html).toMatch(/\d+\/\d+ days/);
+    expect(html).toContain('Course complete.');
 
-    // Per-step status chips carry the four pipeline states.
-    expect(html).toContain('class="progress-steps"');
-    expect(html).toContain('progress-chip--succeeded');
-    expect(html).toContain('>succeeded<');
-
-    // The raw generation log lives behind a debug toggle, closed by default.
-    expect(html).toMatch(/<details class="progress-debug"[^>]*>/); // no `open` attribute
-    expect(html).toContain('<summary>Debug log</summary>');
-    const detailsStart = html.indexOf('class="progress-debug"');
-    const rawLogIndex = html.indexOf('class="log"');
-    expect(rawLogIndex).toBeGreaterThan(detailsStart); // raw log is inside the toggle
+    // The raw generation log is gone from the overview of a completed course.
+    expect(html).not.toContain('class="progress-phase"');
+    expect(html).not.toContain('class="log-line"');
+    expect(html).not.toContain('Compile progress');
   });
 
-  it('keeps the raw log lines inside the debug view only', async () => {
+  it('links to the next lesson from the progress card', async () => {
     const html = await renderWithShell(
       await GapDetailPage({
         params: Promise.resolve({ gapId: compiledGapId }),
         searchParams: Promise.resolve({}),
       }),
     );
-    // Every raw log line lives within the debug <details> element.
-    const detailsStart = html.indexOf('<details class="progress-debug"');
-    const detailsEnd = html.indexOf('</details>', detailsStart);
-    expect(detailsStart).toBeGreaterThan(-1);
-    expect(detailsEnd).toBeGreaterThan(detailsStart);
-    const inside = html.slice(detailsStart, detailsEnd);
-    const outside = html.slice(0, detailsStart) + html.slice(detailsEnd);
-    expect(inside).toContain('class="log-line"');
-    expect(outside).not.toContain('class="log-line"');
+    expect(html).toMatch(/href="\/gaps\/[^"]+\/study"/);
+    expect(html).toContain('Continue —');
   });
 });
 
@@ -423,5 +412,39 @@ describe('design tokens replace the slate palette (GAP-035)', () => {
     // Confidence capture (GAP-037) is a segmented control of buttons, so the shared
     // button:focus-visible rule covers it — no separate selector needed.
     expect(css).toMatch(/button:focus-visible/);
+  });
+});
+
+describe('the course progress surface (E26)', () => {
+  const lessons = [
+    { id: 'l1', day: 1, title: 'Sets', publicationStatus: 'published' },
+    { id: 'l2', day: 2, title: 'Functions', publicationStatus: 'published' },
+    { id: 'l3', day: 3, title: 'Vectors', publicationStatus: 'excluded' },
+    { id: 'l4', day: 4, title: 'Matrices', publicationStatus: 'published' },
+  ];
+
+  it('renders a progress rule with a tick per day, filled for published days', () => {
+    const html = renderToStaticMarkup(<CourseProgress gapId="gap_cp" lessons={lessons} />);
+    expect(html).toContain('Progress');
+    expect(html).toContain('3/4 days');
+    expect(html).toMatch(/tick--done/);
+    expect(html).toContain('role="progressbar"');
+    expect(html).toContain('aria-valuenow="75"');
+  });
+
+  it('links to the study page with the next lesson', () => {
+    const html = renderToStaticMarkup(<CourseProgress gapId="gap_cp" lessons={lessons} />);
+    // Days 1–2 are done (consecutive from day 1), day 3 excluded, day 4 published →
+    // the streak breaks at 2, so Continue points at Day 4.
+    expect(html).toContain('Continue — Day 4: Matrices');
+    expect(html).toContain('href="/gaps/gap_cp/study"');
+  });
+
+  it('shows a calm status line while compiling', () => {
+    const html = renderToStaticMarkup(
+      <CourseProgress gapId="gap_cp" lessons={[]} compileStatus="auditing" />,
+    );
+    expect(html).toContain('Your course is being written.');
+    expect(html).toContain('0/0 days');
   });
 });

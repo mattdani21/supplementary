@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { Gap } from '@gapos/database';
 import { EmptyState } from '../../../components/empty-state';
+import { CourseProgress } from '../../../components/course-progress';
 import { GenerationProgress } from '../../../components/generation-progress';
 import { SourceForm } from '../../../components/source-form';
 import { TransitionButtons } from '../../../components/transition-buttons';
@@ -88,14 +89,15 @@ export default async function GapDetailPage({
   };
 
   // Overview carries the generation log; the Curriculum tab loads the compiled plan. Each is
-  // fetched only when its tab is open, so a draft gap never crashes the workspace.
+  // fetched only when its tab is open, so a draft gap never crashes the workspace. The overview
+  // also loads the published lessons for the course-progress surface (E26).
   const { log } =
     tab === 'overview'
       ? await generationLog(context, owner, gapId)
       : { log: { run: undefined, steps: [], findings: [] } };
 
   const curriculumData =
-    tab === 'curriculum'
+    tab === 'overview' || tab === 'curriculum'
       ? await getCurriculum(context, owner, gapId).catch((error: unknown) =>
           error instanceof ApiError && error.status === 404 ? null : Promise.reject(error),
         )
@@ -150,12 +152,36 @@ export default async function GapDetailPage({
             <Link href={`/gaps/${gapId}/map`}>Knowledge map</Link>
           </p>
 
-          <GenerationProgress
-            run={log.run}
-            steps={log.steps}
-            findingsCount={log.findings.length}
-            sourcesHref={`/gaps/${gapId}?tab=sources`}
+          <CourseProgress
+            gapId={gapId}
+            lessons={(curriculum?.lessons ?? []).map((lesson) => ({
+              id: lesson.id,
+              day: lesson.day,
+              title: lesson.title,
+              publicationStatus: lesson.publicationStatus,
+            }))}
+            compileStatus={log.run?.status}
           />
+
+          {(log.run?.status === 'queued' ||
+            log.run?.status === 'ingesting' ||
+            log.run?.status === 'planning' ||
+            log.run?.status === 'generating_lessons' ||
+            log.run?.status === 'generating_assessment' ||
+            log.run?.status === 'auditing' ||
+            log.run?.status === 'repairing' ||
+            log.run?.status === 'synthesising_audio' ||
+            log.run?.status === 'publishing') && (
+            <details className="course-progress__debug">
+              <summary>Compilation details</summary>
+              <GenerationProgress
+                run={log.run}
+                steps={log.steps}
+                findingsCount={log.findings.length}
+                sourcesHref={`/gaps/${gapId}?tab=sources`}
+              />
+            </details>
+          )}
         </>
       )}
 
