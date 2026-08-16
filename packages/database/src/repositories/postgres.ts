@@ -1001,6 +1001,14 @@ export const createPostgresUnitOfWork = (pool: Pool): UnitOfWork => {
       return one(rows, toRun);
     },
 
+    async getLatestRunForGap(owner, gapId) {
+      const { rows } = await db.query(
+        'SELECT * FROM generation_runs WHERE owner_id = $1 AND gap_id = $2 ORDER BY started_at DESC LIMIT 1',
+        [owner, gapId],
+      );
+      return one(rows, toRun);
+    },
+
     async setRunStatus(owner, id, status, error) {
       const terminal = ['complete', 'partial', 'failed', 'cancelled'].includes(status);
       const { rows } = await db.query(

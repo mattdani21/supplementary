@@ -519,12 +519,16 @@ export const generationLog = async (
   gapId: string,
 ): Promise<{ log: GenerationLog }> => {
   const curriculum = await context.uow.curricula.getCurrentForGap(owner, gapId);
-  if (!curriculum?.runId) return { log: { steps: [], findings: [] } };
+  // A failed compile may never have produced a curriculum (E27/GAP-089): fall back to the
+  // gap's most recent run so the failure is still surfaced instead of a blank progress card.
+  const runId =
+    curriculum?.runId ?? (await context.uow.generation.getLatestRunForGap(owner, gapId))?.id;
+  if (!runId) return { log: { steps: [], findings: [] } };
 
   const [run, steps, findings] = await Promise.all([
-    context.uow.generation.getRun(owner, curriculum.runId),
-    context.uow.generation.listSteps(owner, curriculum.runId),
-    context.uow.generation.listFindings(owner, curriculum.runId),
+    context.uow.generation.getRun(owner, runId),
+    context.uow.generation.listSteps(owner, runId),
+    context.uow.generation.listFindings(owner, runId),
   ]);
 
   return {

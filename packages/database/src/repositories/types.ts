@@ -362,6 +362,9 @@ export interface GenerationRepository {
     run: Omit<GenerationRun, 'ownerId'>,
   ): Promise<{ run: GenerationRun; created: boolean }>;
   getRun(owner: OwnerId, id: string): Promise<GenerationRun | undefined>;
+  /** The most recent run for a gap (by started_at), regardless of curriculum linkage — lets
+   *  the UI surface a failed compile even when no curriculum was ever published. */
+  getLatestRunForGap(owner: OwnerId, gapId: string): Promise<GenerationRun | undefined>;
   setRunStatus(
     owner: OwnerId,
     id: string,

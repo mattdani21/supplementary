@@ -430,6 +430,11 @@ export const createMemoryUnitOfWork = (store: MemoryStore = createMemoryStore())
     async getRun(owner, id) {
       return store.runs.get(owner, id);
     },
+    async getLatestRunForGap(owner, gapId) {
+      return store.runs
+        .where(owner, (r) => r.gapId === gapId)
+        .sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime())[0];
+    },
     async setRunStatus(owner, id, status: GenerationStatus, error) {
       const run = store.runs.require('GenerationRun', owner, id);
       const terminal = ['complete', 'partial', 'failed', 'cancelled'].includes(status);
