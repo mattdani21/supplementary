@@ -127,6 +127,11 @@ epics:
     priority: P0
     dependencies: [E22]
     evidence: All quality-spec sections are enforced by tests; no legacy tokens; feedback moments and designed empty states everywhere
+  - id: E27
+    title: 'Adversarial UX hardening — findings from a hostile-user test of the live app'
+    priority: P0
+    dependencies: [E26]
+    evidence: 'dogfood adversarial-ux-test session 2026-08-16: screenshots + report in dogfood-output/'
   - id: E24
     title: 'Content — user-specific curriculum quality (the moat)'
     priority: P0
@@ -1047,6 +1052,99 @@ tasks:
       - 'component test: next button appears after lesson completion, navigates to next lesson, hides on last day'
       - 'source added to math gap; recompile publishes a curriculum whose Day 1 covers foundations'
       - 'pnpm verify passes'
+  - id: GAP-088
+    title: 'Hide developer surfaces from the learner (E27 adversarial UX: owner-switcher, review queue, raw header error)'
+    epic: E27
+    priority: P0
+    status: ready
+    dependencies: [GAP-087]
+    goal: 'A hostile-user test found three developer surfaces leaking into the learner path: (1) a "Learner" textbox + Switch button on /gaps (owner switcher), (2) the Review queue at /gaps/review exposing raw audit findings with Approve/Reject buttons (an educator-moderation tool, not a learner surface), (3) clicking "Check mastery" renders the raw error "Set the X-Owner-Id header." into the page.'
+    scope:
+      - 'remove or gate the owner-switcher on /gaps behind a dev flag (GAPOS_DEV_MODE or similar); default learners never see it'
+      - 'review queue: move behind the same dev gate or an explicit educator route not linked from the learner nav; learner-facing Gaps page must not link to it'
+      - '"Check mastery" (and Archive, Retry compile) client actions must send the owner header like the audio player does (ownerFromCookie) or surface a calm error instead of the raw header message'
+    out_of_scope:
+      - 'full educator/learner role system (future)'
+    acceptance:
+      - 'render test: /gaps shows no Learner/Switch control under default env'
+      - 'render test: Gaps page has no link to the review queue'
+      - 'test: mastery transition without an owner cookie yields a calm error, not the raw header text'
+      - 'pnpm verify passes'
+
+  - id: GAP-089
+    title: 'Failed gap needs a why and a next step (E27: TOPIK gap shows only "Retry compile" + 0/0 days)'
+    epic: E27
+    priority: P0
+    status: ready
+    dependencies: [GAP-088]
+    goal: 'A failed compile leaves the learner with a Retry button and zero explanation. The course-progress card should say what failed in plain words and what to do (e.g. "The course could not be finished — Days 3 and 6 were set aside after repeated quality checks. Retry to regenerate them.").'
+    scope:
+      - 'course-progress card: when compileStatus is failed, render the failed status line + a short human explanation sourced from the run error/findings summary'
+      - 'retry affordance remains, labelled with what a retry does'
+    acceptance:
+      - 'render test: failed compile status shows an explanatory line, not only 0/0 days'
+      - 'pnpm verify passes'
+
+  - id: GAP-090
+    title: 'Completed course must not say "Continue — Day 1" (E27 streak fallback bug)'
+    epic: E27
+    priority: P0
+    status: ready
+    dependencies: [GAP-087]
+    goal: 'A 100% complete course (frontier gap: 7/7 published) renders "Continue — Day 1: Attention and Multi-Head Attention". The progress card must recognise completion and offer Review/Restart instead of pointing back at Day 1.'
+    scope:
+      - 'course-progress: when the published-day streak covers every planned day (or completed == days), render "Review the course" (link to study) or "Course complete" with no Continue arrow'
+    acceptance:
+      - 'render test: 7/7 published lessons -> no "Continue — Day" text; shows completion state'
+      - 'pnpm verify passes'
+
+  - id: GAP-091
+    title: 'Speak-a-gap record button is a silent dead control on prod (E27: STT unconfigured)'
+    epic: E27
+    priority: P1
+    status: ready
+    dependencies: []
+    goal: 'The "🎤 Record" button on /gaps does nothing on production (STT backend is optional and unconfigured; the stub throws only on transcribe, and the click path swallows it). A learner taps, nothing happens.'
+    scope:
+      - 'record button: when the STT provider is unavailable, clicking shows a calm notice ("Voice input is not available yet — type your gap instead") instead of silent no-op; when available, it must surface transcription errors visibly'
+    out_of_scope:
+      - 'wiring a paid STT provider (future, human-gated)'
+    acceptance:
+      - 'component test: record click with unavailable STT shows the notice'
+      - 'pnpm verify passes'
+
+  - id: GAP-092
+    title: 'Curriculum module grouping: secondary objectives vanish and multi-objective lessons land oddly (E27)'
+    epic: E27
+    priority: P1
+    status: ready
+    dependencies: [GAP-087]
+    goal: 'Module rendering groups lessons under their FIRST objective only. On the math gap: the SVD/eigendecomposition objective (O2) has no module at all (no lesson lists it first), and Day 3 "Sets, Relations, Sums, Logs" sits under O1 (tensor shapes) while its content belongs to O3/O4. The map reads wrong.'
+    scope:
+      - 'module list: render every plan objective as a module, with lessons nested under each objective they teach when that is semantically right, OR show a "No lessons yet" state for objectives without lessons instead of hiding the module'
+      - 'decide + document the grouping rule (first-objective vs all-objectives with duplication vs primary-by-title); a lesson teaching O1..O4 should appear under the module its title matches'
+    out_of_scope:
+      - 're-planning the curriculum generator (the plan itself is fine; the UI grouping is the bug)'
+    acceptance:
+      - 'render test: every plan objective yields a module (with lessons or an empty state)'
+      - 'render test: Day 3 title "Foundations for ML: Sets, Relations..." nests under the matching module'
+      - 'pnpm verify passes'
+
+  - id: GAP-093
+    title: 'Two "Learn" destinations and a truncated workspace nav (E27)'
+    epic: E27
+    priority: P1
+    status: ready
+    dependencies: []
+    goal: 'The bottom tab bar "Learn" and the workspace tab "Learn" go to different places (bottom nav opens a gap overview; workspace Learn opens the study page), and the workspace segmented control truncates "Curriculum" to "Curric…" on a phone frame.'
+    scope:
+      - 'rename or retarget: bottom-nav Learn should go to the study/learn surface for the active gap (or Today), not a random gap overview'
+      - 'workspace nav: allow two-line labels or smaller pills so all six fit without ellipsis on 430px'
+    acceptance:
+      - 'render test: bottom Learn link href matches the study route for the active gap'
+      - 'visual check: no truncated labels in the workspace nav at 430px'
+      - 'pnpm verify passes'
+
   - id: GAP-040
     title: 'E24 T001: Baseline the quality gate on a clean tree (Setup)'
     epic: E24
