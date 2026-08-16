@@ -4,7 +4,8 @@ import { AttemptForm, type AttemptQuestion } from '../../../../components/attemp
 import { AudioPlayer } from '../../../../components/audio-player';
 import { EmptyState } from '../../../../components/empty-state';
 import { ExportControls } from '../../../../components/export-controls';
-import { GapNotFound, isGapNotFoundError } from '../../../../components/gap-not-found';
+import { GapNotFound } from '../../../../components/gap-not-found';
+import { isGapNotFoundError } from '../../../../lib/gap-visibility';
 import { NotebookSection } from '../../../../components/notebook-section';
 import { SourceLinks } from '../../../../components/source-links';
 import { WorkspaceTabs } from '../../../../components/workspace-tabs';

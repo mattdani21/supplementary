@@ -39,17 +39,3 @@ export function GapNotFound() {
     />
   );
 }
-
-/**
- * True when an error means the gap is simply not visible to this owner (GAP-095).
- * Covers both error shapes in the codebase: the API layer's `ApiError` (status 404)
- * and the service layer's plain `Error` messages for a missing gap or curriculum.
- */
-export const isGapNotFoundError = (error: unknown): boolean => {
-  if (!(error instanceof Error)) return false;
-  if ('status' in error && (error as { status: number }).status === 404) return true;
-  return (
-    error.message.includes('was not found for this owner') ||
-    error.message.includes('No curriculum for gap')
-  );
-};

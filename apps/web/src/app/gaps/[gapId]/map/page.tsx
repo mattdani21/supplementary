@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { EmptyState } from '../../../../components/empty-state';
-import { GapNotFound, isGapNotFoundError } from '../../../../components/gap-not-found';
+import { GapNotFound } from '../../../../components/gap-not-found';
+import { isGapNotFoundError } from '../../../../lib/gap-visibility';
 import { knowledgeMap, type KnowledgeEdgeView, type KnowledgeNode } from '../../../../server/api';
 import { getServerContext } from '../../../../server/bootstrap';
 import { viewerOwner } from '../../../../lib/viewer';

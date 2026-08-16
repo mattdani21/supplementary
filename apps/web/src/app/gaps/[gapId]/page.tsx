@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { Gap } from '@gapos/database';
-import { GapNotFound, isGapNotFoundError } from '../../../components/gap-not-found';
+import { GapNotFound } from '../../../components/gap-not-found';
+import { isGapNotFoundError } from '../../../lib/gap-visibility';
 import { EmptyState } from '../../../components/empty-state';
 import { CourseProgress } from '../../../components/course-progress';
 import { GenerationProgress, isActiveRunStatus } from '../../../components/generation-progress';

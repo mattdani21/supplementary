@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { GapNotFound, isGapNotFoundError } from '../../../../components/gap-not-found';
+import { GapNotFound } from '../../../../components/gap-not-found';
+import { isGapNotFoundError } from '../../../../lib/gap-visibility';
 import { WorkspaceTabs } from '../../../../components/workspace-tabs';
 import { masterySchedule, masteryView } from '../../../../server/api';
 import { getServerContext } from '../../../../server/bootstrap';
