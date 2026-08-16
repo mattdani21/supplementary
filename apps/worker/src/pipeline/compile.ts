@@ -1031,7 +1031,11 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
           '"embeddings -> attention scores". Do not invent a diagram syntax the renderer does ' +
           'not know: only hyphen or arrow between two labels on each line. The notebook must ' +
           'cover the same concepts, worked example and checkpoint as ' +
-          'the script, so Read mode teaches the complete lesson without the audio.',
+          'the script, so Read mode teaches the complete lesson without the audio. ' +
+          'CRITICAL: the notebook is the LESSON CONTENT itself — headings, explanations, math ' +
+          'and the diagram — never instructions to the learner (no "use a scratchpad", no ' +
+          '"write down", no "put this in your notes", no meta-commentary about studying). ' +
+          'It must read like a textbook page, not like a study plan.',
         0.2,
       ),
   );

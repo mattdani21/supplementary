@@ -184,4 +184,15 @@ describe('the notebook instruction demands a diagram block (E26)', () => {
     expect(instruction).toMatch(/REQUIRED, not optional/i);
     expect(instruction).toMatch(/triple-backtick/);
   });
+
+  it('forbids meta-instructions to the learner in the notebook', async () => {
+    const { context, calls } = buildRecordingContext();
+    await compileEvalOne(context, 'e26-notebook-is-content');
+
+    const instruction = firstLessonInstruction(calls);
+    expect(instruction).toMatch(/LESSON CONTENT itself/i);
+    expect(instruction).toMatch(/never instructions to the learner/i);
+    expect(instruction).toMatch(/scratchpad/i);
+    expect(instruction).toMatch(/textbook page/i);
+  });
 });
