@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { EmptyState } from '../../../../components/empty-state';
+import { GapNotFound, isGapNotFoundError } from '../../../../components/gap-not-found';
 import { knowledgeMap, type KnowledgeEdgeView, type KnowledgeNode } from '../../../../server/api';
 import { getServerContext } from '../../../../server/bootstrap';
 import { viewerOwner } from '../../../../lib/viewer';
@@ -53,7 +54,26 @@ export default async function KnowledgeMapPage({ params }: { params: Promise<{ g
   const { gapId } = await params;
   const owner = await viewerOwner();
   const context = await getServerContext();
-  const { nodes, edges } = await knowledgeMap(context, owner, gapId);
+
+  // A stale learner cookie (or a deleted gap) must never crash the map with a raw server
+  // error — the designed not-found surface offers a one-tap reset (GAP-095).
+  let nodes: KnowledgeNode[];
+  let edges: KnowledgeEdgeView[];
+  try {
+    ({ nodes, edges } = await knowledgeMap(context, owner, gapId));
+  } catch (error) {
+    if (isGapNotFoundError(error)) {
+      return (
+        <main>
+          <Link href={`/gaps/${gapId}`} className="back-link">
+            ← Workspace
+          </Link>
+          <GapNotFound />
+        </main>
+      );
+    }
+    throw error;
+  }
 
   const positions = layout(nodes, edges, gapId);
   const gapNode = nodes.find((node) => node.id === gapId);

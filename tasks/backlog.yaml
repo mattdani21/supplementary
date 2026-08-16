@@ -1122,6 +1122,25 @@ tasks:
     risk: low
     human_gate: false
 
+  - id: GAP-095
+    title: 'Stale/empty owner cookie crashes every gap page with a raw server error (E27)'
+    epic: E27
+    priority: P0
+    status: done
+    dependencies: []
+    goal: 'A browser carrying a gapos_owner cookie that is empty or names another owner gets a raw Next.js server-error page on /gaps/:id, /study, /map and /mastery (ApiError 404 gap_not_found / no_curriculum is uncaught). The owner switcher can write such a cookie; the single-learner deploy must never dead-end.'
+    scope:
+      - 'viewerOwner: an empty cookie falls back to DEFAULT_OWNER (same as no cookie)'
+      - 'gap pages (overview, study, map, mastery): catch gap-not-found errors and render a designed surface — "This gap isn\'t available for this learner." + one-tap Reset learner (clears the cookie) + Go to gaps'
+    acceptance:
+      - 'render test: cookie naming another owner shows the reset surface, never the raw error text'
+      - 'render test: empty owner cookie renders the workspace normally (default learner)'
+      - 'pnpm verify passes'
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+
   - id: GAP-091
     title: 'Speak-a-gap record button is a silent dead control on prod (E27: STT unconfigured)'
     epic: E27

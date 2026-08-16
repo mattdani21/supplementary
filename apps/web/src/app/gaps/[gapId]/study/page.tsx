@@ -4,6 +4,7 @@ import { AttemptForm, type AttemptQuestion } from '../../../../components/attemp
 import { AudioPlayer } from '../../../../components/audio-player';
 import { EmptyState } from '../../../../components/empty-state';
 import { ExportControls } from '../../../../components/export-controls';
+import { GapNotFound, isGapNotFoundError } from '../../../../components/gap-not-found';
 import { NotebookSection } from '../../../../components/notebook-section';
 import { SourceLinks } from '../../../../components/source-links';
 import { WorkspaceTabs } from '../../../../components/workspace-tabs';
@@ -77,9 +78,27 @@ export default async function StudyPage({
     : { lesson: undefined };
   const explicitLessonId = resolvedSearch.lesson;
 
-  const { today } = (await todayView(context, owner, gapId)) as {
-    today: { lesson?: { lessonId: string } };
-  };
+  // A stale learner cookie (or a deleted gap) must never crash the lesson with a raw
+  // server error — the designed not-found surface offers a one-tap reset (GAP-095).
+  let today: { lesson?: { lessonId: string } };
+  try {
+    ({ today } = (await todayView(context, owner, gapId)) as {
+      today: { lesson?: { lessonId: string } };
+    });
+  } catch (error) {
+    if (isGapNotFoundError(error)) {
+      return (
+        <main>
+          <Link href={`/gaps/${gapId}`} className="back-link">
+            ← Workspace
+          </Link>
+          <WorkspaceTabs gapId={gapId} active="learn" />
+          <GapNotFound />
+        </main>
+      );
+    }
+    throw error;
+  }
   const lessonIdForPage = explicitLessonId ?? today.lesson?.lessonId;
   if (!lessonIdForPage) {
     return (

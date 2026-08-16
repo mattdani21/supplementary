@@ -9,5 +9,9 @@ import { DEFAULT_OWNER, OWNER_COOKIE } from './owner';
 
 export const viewerOwner = async (): Promise<OwnerId> => {
   const jar = await cookies();
-  return (jar.get(OWNER_COOKIE)?.value as OwnerId | undefined) ?? DEFAULT_OWNER;
+  // An empty cookie (the owner switcher can write one) is the same as no cookie: a
+  // fresh browser authenticates as the default learner. A stale value for an owner
+  // that does not exist must not crash every gap page (GAP-095).
+  const raw = jar.get(OWNER_COOKIE)?.value;
+  return raw && raw.trim() ? (raw as OwnerId) : DEFAULT_OWNER;
 };

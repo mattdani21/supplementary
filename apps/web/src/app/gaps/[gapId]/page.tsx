@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { Gap } from '@gapos/database';
+import { GapNotFound, isGapNotFoundError } from '../../../components/gap-not-found';
 import { EmptyState } from '../../../components/empty-state';
 import { CourseProgress } from '../../../components/course-progress';
 import { GenerationProgress, isActiveRunStatus } from '../../../components/generation-progress';
@@ -76,7 +77,25 @@ export default async function GapDetailPage({
   const owner = await viewerOwner();
   const context = await getServerContext();
 
-  const { gap } = (await getGap(context, owner, gapId)) as { gap: Gap };
+  // A stale learner cookie (or a deleted gap) must never crash the workspace with a raw
+  // server error — the designed not-found surface offers a one-tap reset (GAP-095).
+  let gap: Gap;
+  try {
+    ({ gap } = (await getGap(context, owner, gapId)) as { gap: Gap });
+  } catch (error) {
+    if (isGapNotFoundError(error)) {
+      return (
+        <main>
+          <Link href="/gaps" className="back-link">
+            ← Gaps
+          </Link>
+          <WorkspaceTabs gapId={gapId} active="overview" />
+          <GapNotFound />
+        </main>
+      );
+    }
+    throw error;
+  }
   const { sources } = (await listSources(context, owner, gapId)) as {
     sources: {
       id: string;

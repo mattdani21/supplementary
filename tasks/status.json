@@ -1,6 +1,6 @@
 {
  "schemaVersion": 1,
- "updatedAt": "2026-08-16T18:25:00.000Z",
+ "updatedAt": "2026-08-16T18:45:00.000Z",
  "controller": "gapos-controller",
  "tasks": {
   "GAP-083": {
@@ -1965,6 +1965,28 @@
     }
    ],
    "notes": "GAP-094 DONE: the study surface no longer has a Listen/Read toggle - the notebook is always on screen, audio floats in a dock (play/pause, prev/next segment, speed cycle, seek, Transcript sheet, Questions sheet, checkpoint sheet), practice items are lifted into the Questions sheet, diagrams render in rows of 4 at a readable size, and the home page stops showing the raw compile card once the run settles. Deploy: railway up (web) then live-verify."
+  },
+  "GAP-095": {
+   "status": "done",
+   "startedAt": "2026-08-16T18:20:00.000Z",
+   "evidence": [
+    {
+     "command": "curl the live app (/, /gaps, /gaps/gap_d38c48ef/study, /api/health) with X-Owner-Id: local-learner and with Cookie: gapos_owner= / gapos_owner=something-else; railway logs --service gapos --json",
+     "result": "pass",
+     "note": "User RED: raw Next.js server-error page (digest 1313645441) on gapos-production. Logs showed ApiError gap_not_found (digest 2361627944) from [gapId]/page.js and no_curriculum (digest 1313645441) from study/page.js, all for gap_d38c48ef at 18:31-18:32Z. Reproduced: Cookie: gapos_owner= (empty) and gapos_owner=something-else both 500 on /gaps/gap_d38c48ef; no cookie → 200. DB: all 3 gaps owned by local-learner only. Root cause: a stale or empty gapos_owner cookie (owner switcher can write one) made every gap-scoped page throw an uncaught 404 → Next error page."
+    },
+    {
+     "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm exec vitest run apps/web/src/components/screens.test.tsx (test-first, after implementation)",
+     "result": "pass",
+     "note": "Added GAP-095 describe: (1) cookie naming another owner renders the reset surface (\"This gap isn't available for this learner.\" + Reset learner + Go to gaps) and never the raw error text; (2) an EMPTY owner cookie falls back to the default learner and the workspace renders normally. Fixed two test-harness issues along the way (afterEach import; HTML-escaped apostrophe in the assertion). 33 tests pass in the file."
+    },
+    {
+     "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm verify",
+     "result": "pass",
+     "note": "691 passed | 26 skipped (717 total), 60 files passed | 4 skipped. Format + lint + typecheck + full suite green. Hermetic env note as every E22-E27 task: the sandbox injects GAPOS_PROVIDER_MODE=live without a key, so verify runs with env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL."
+    }
+   ],
+   "notes": "GAP-095 DONE: viewerOwner now treats an empty cookie as the default learner, and all four gap pages (overview, study, map, mastery) catch gap-not-found errors and render a designed reset surface (one-tap cookie clear + return to /gaps) instead of crashing with a raw server error page."
   }
  },
  "GAP-014b": {

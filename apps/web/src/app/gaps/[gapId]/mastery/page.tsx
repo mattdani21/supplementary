@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { GapNotFound, isGapNotFoundError } from '../../../../components/gap-not-found';
 import { WorkspaceTabs } from '../../../../components/workspace-tabs';
 import { masterySchedule, masteryView } from '../../../../server/api';
 import { getServerContext } from '../../../../server/bootstrap';
@@ -39,10 +40,26 @@ export default async function MasteryPage({ params }: { params: Promise<{ gapId:
   const owner = await viewerOwner();
   const context = await getServerContext();
 
-  const { mastery } = (await masteryView(context, owner, gapId)) as { mastery: MasterySummary };
-  const { reviews } = (await masterySchedule(context, owner, gapId)) as {
-    reviews: ScheduleItem[];
-  };
+  // A stale learner cookie (or a deleted gap) must never crash mastery with a raw server
+  // error — the designed not-found surface offers a one-tap reset (GAP-095).
+  let mastery: MasterySummary;
+  let reviews: ScheduleItem[];
+  try {
+    ({ mastery } = (await masteryView(context, owner, gapId)) as { mastery: MasterySummary });
+    ({ reviews } = (await masterySchedule(context, owner, gapId)) as { reviews: ScheduleItem[] });
+  } catch (error) {
+    if (isGapNotFoundError(error)) {
+      return (
+        <main>
+          <Link href={`/gaps/${gapId}`} className="back-link">
+            ← Workspace
+          </Link>
+          <GapNotFound />
+        </main>
+      );
+    }
+    throw error;
+  }
 
   const required = mastery.requiredObjectiveIds.length;
   const mastered = mastery.masteredObjectiveIds.length;

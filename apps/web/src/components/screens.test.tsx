@@ -20,14 +20,15 @@
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { ReactNode } from 'react';
+import { cookies } from 'next/headers';
 import type * as ServerContextModule from '../server/context';
 import { REFERENCE_GAP_STATEMENT, SET_THEORY_SOURCE } from '@gapos/test-fixtures';
 
 vi.mock('next/headers', () => ({
-  cookies: async () => ({ get: () => undefined }),
+  cookies: vi.fn(async () => ({ get: () => undefined })),
 }));
 vi.mock('next/navigation', () => ({
   usePathname: () => '/gaps',
@@ -608,5 +609,54 @@ describe('developer surfaces are gated off the learner gaps page (GAP-088, E27)'
     // The raw owner-required message must never reach the learner surface.
     expect(html).not.toContain('Set the X-Owner-Id header.');
     expect(html).not.toContain('owner_required');
+  });
+});
+
+describe('a gap the learner cannot see renders the reset surface, never a crash (GAP-095)', () => {
+  const setCookie = (value: string | undefined) => {
+    const cookiesMock = vi.mocked(cookies);
+    cookiesMock.mockResolvedValue({
+      get: () => (value === undefined ? undefined : { name: 'gapos_owner', value }),
+      // The mock only needs `get`; the full jar type is next/headers internals.
+    } as never);
+  };
+
+  afterEach(() => {
+    // Back to the shared default: no cookie → default learner.
+    setCookie(undefined);
+  });
+
+  it('renders the reset surface on the workspace when the cookie names another owner', async () => {
+    setCookie('someone-else');
+
+    const html = await renderWithShell(
+      await GapDetailPage({
+        params: Promise.resolve({ gapId: compiledGapId }),
+        searchParams: Promise.resolve({}),
+      }),
+    );
+
+    // The designed surface, not a raw server error page. (The apostrophe is
+    // HTML-escaped in server markup: isn&#x27;t.)
+    expect(html).toContain('This gap isn&#x27;t available for this learner.');
+    expect(html).toContain('Reset learner');
+    expect(html).toContain('Go to gaps');
+    // The crash surfaces are gone: no gap content, no raw error text.
+    expect(html).not.toContain('gap_not_found');
+    expect(html).not.toContain('was not found for this owner');
+  });
+
+  it('treats an empty owner cookie as the default learner — the workspace still renders', async () => {
+    setCookie('');
+
+    const html = await renderWithShell(
+      await GapDetailPage({
+        params: Promise.resolve({ gapId: compiledGapId }),
+        searchParams: Promise.resolve({}),
+      }),
+    );
+
+    expect(html).not.toContain('This gap isn&#x27;t available for this learner.');
+    expect(html).toContain('Course complete.');
   });
 });
