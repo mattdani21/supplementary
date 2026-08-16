@@ -1724,3 +1724,42 @@ summary:focus-visible {
   font-size: 0.875rem;
   line-height: 1.55;
 }
+
+/* ------------------------------------------- export controls (E25/GAP-086) */
+
+.export-controls {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+/* print: only the lesson content survives */
+
+@media print {
+  .tab-bar,
+  .back-link,
+  .export-controls,
+  .study-mode,
+  .player-surface .notebook__listen,
+  .practice-section,
+  .segmented,
+  .page-head__meta {
+    display: none !important;
+  }
+  body {
+    background: #fff !important;
+    color: #111 !important;
+  }
+  .app-frame {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+  .notebook__read,
+  .notebook__paragraph,
+  .notebook__heading {
+    color: #111 !important;
+  }
+  .notebook__diagram svg {
+    stroke: #111 !important;
+  }
+}

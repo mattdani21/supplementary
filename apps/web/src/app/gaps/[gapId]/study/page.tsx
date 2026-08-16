@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { AttemptForm, type AttemptQuestion } from '../../../../components/attempt-form';
 import { AudioPlayer } from '../../../../components/audio-player';
 import { EmptyState } from '../../../../components/empty-state';
+import { ExportControls } from '../../../../components/export-controls';
 import { NotebookSection } from '../../../../components/notebook-section';
 import { SourceLinks } from '../../../../components/source-links';
 import { WorkspaceTabs } from '../../../../components/workspace-tabs';
@@ -160,6 +161,7 @@ export default async function StudyPage({ params }: { params: Promise<{ gapId: s
             {audioDurationLabel ? ` · ${audioDurationLabel} audio` : ''}
           </p>
         )}
+        <ExportControls gapId={gapId} lessonId={lesson.id} />
       </header>
 
       <section className="card player-surface" aria-labelledby="listen-heading">

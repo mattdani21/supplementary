@@ -410,6 +410,46 @@ export const listAnnotations = async (
   return { annotations };
 };
 
+/* -------------------------------------------------------------- export (E25/GAP-086) */
+
+/**
+ * Export a lesson as markdown (E25 / GAP-086): the notebook (or transcript fallback)
+ * plus the learner's pinned annotations, ready for download or print.
+ */
+export const exportLessonMarkdown = async (
+  context: ServerContext,
+  owner: OwnerId,
+  gapId: string,
+  lessonId: string,
+): Promise<{ markdown: string; filename: string }> => {
+  const { lesson } = (await getLesson(context, owner, gapId, lessonId)) as {
+    lesson: { title: string; package: { notebook?: string; transcript: string } };
+  };
+  const { annotations } = await listAnnotations(context, owner, lessonId);
+
+  const body = lesson.package.notebook ?? lesson.package.transcript;
+  const lines: string[] = [
+    `# ${lesson.title}`,
+    '',
+    body,
+    '',
+    ...(annotations.length > 0
+      ? [
+          '---',
+          '',
+          '## Your notes',
+          '',
+          ...annotations.flatMap((a) => [`> **“${a.selection}”**`, '', a.explanation, '']),
+        ]
+      : []),
+  ];
+  const slug = lesson.title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+  return { markdown: lines.join('\n'), filename: `${slug || 'lesson'}.md` };
+};
+
 export const masteryView = async (
   context: ServerContext,
   owner: OwnerId,
