@@ -32,7 +32,6 @@ interface NotebookSectionProps {
   readonly explain?: {
     readonly gapId: string;
     readonly lessonId: string;
-    readonly onPinned: (selection: string, explanation: string) => void;
   };
 }
 
@@ -102,12 +101,7 @@ export function NotebookSection({
       {mode === 'listen' ? (
         <div className="notebook__listen">{listenSurface}</div>
       ) : explain ? (
-        <ExplainLayer
-          gapId={explain.gapId}
-          lessonId={explain.lessonId}
-          context={transcript || ''}
-          onPinned={explain.onPinned}
-        >
+        <ExplainLayer gapId={explain.gapId} lessonId={explain.lessonId} context={transcript || ''}>
           {readSurface}
         </ExplainLayer>
       ) : (

@@ -114,11 +114,10 @@ interface ExplainLayerProps {
   readonly gapId: string;
   readonly lessonId: string;
   readonly context: string;
-  readonly onPinned: (selection: string, explanation: string) => void;
   readonly children: React.ReactNode;
 }
 
-export function ExplainLayer({ gapId, lessonId, context, onPinned, children }: ExplainLayerProps) {
+export function ExplainLayer({ gapId, lessonId, context, children }: ExplainLayerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [selection, setSelection] = useState<string | null>(null);
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
@@ -163,8 +162,9 @@ export function ExplainLayer({ gapId, lessonId, context, onPinned, children }: E
               setPos(null);
               window.getSelection()?.removeAllRanges();
             }}
-            onPinned={(sel, exp) => {
-              onPinned(sel, exp);
+            onPinned={() => {
+              // The annotation is persisted server-side; closing the popover is all
+              // the client needs to do — the page shows it on next load.
               setSelection(null);
               setPos(null);
             }}

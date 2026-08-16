@@ -192,9 +192,6 @@ export default async function StudyPage({
           explain={{
             gapId,
             lessonId: lesson.id,
-            onPinned: () => {
-              // The annotation is persisted server-side; the page reflects it on next load.
-            },
           }}
           listenSurface={
             <>
