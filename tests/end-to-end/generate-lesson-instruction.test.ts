@@ -173,3 +173,15 @@ describe('the REPAIR instruction re-demands rubrics for every free-response ques
     expect(repairInstruction).toMatch(/a question without a rubric is rejected/i);
   });
 });
+
+describe('the notebook instruction demands a diagram block (E26)', () => {
+  it('requires a fenced diagram block in every notebook', async () => {
+    const { context, calls } = buildRecordingContext();
+    await compileEvalOne(context, 'e26-diagram-demand');
+
+    const instruction = firstLessonInstruction(calls);
+    expect(instruction).toMatch(/diagram/);
+    expect(instruction).toMatch(/REQUIRED, not optional/i);
+    expect(instruction).toMatch(/triple-backtick/);
+  });
+});

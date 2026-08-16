@@ -6,6 +6,7 @@ export * from './mastery/mastery.js';
 export * from './mastery/review-schedule.js';
 export * from './curriculum/plan-validation.js';
 export * from './curriculum/personalisation.js';
+export * from './speech/normalise-for-speech.js';
 export * from './curriculum/script-structure.js';
 export * from './sources/chunking.js';
 export * from './verification/verifier.js';

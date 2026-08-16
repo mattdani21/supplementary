@@ -22,7 +22,7 @@ interface ExplainPopoverProps {
   readonly selection: string;
   readonly context: string;
   readonly onClose: () => void;
-  readonly onPinned: (selection: string, explanation: string) => void;
+  readonly onPinned: () => void;
 }
 
 export function ExplainPopover({
@@ -68,19 +68,19 @@ export function ExplainPopover({
   const pin = useCallback(async () => {
     setPinned(true);
     try {
-      await fetch('/api/gaps/explain', {
+      await fetch('/api/gaps/annotations', {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
           'x-owner-id': ownerFromCookie(document.cookie),
         },
-        body: JSON.stringify({ gapId, lessonId, selection, explanation }),
+        body: JSON.stringify({ lessonId, selection, explanation }),
       });
-      onPinned(selection, explanation);
+      onPinned();
     } catch {
       setPinned(false);
     }
-  }, [gapId, lessonId, selection, explanation, onPinned]);
+  }, [lessonId, selection, explanation, onPinned]);
 
   return (
     <div className="explain-popover" role="dialog" aria-label="Explain selection">
@@ -122,9 +122,10 @@ export function ExplainLayer({ gapId, lessonId, context, children }: ExplainLaye
   const [selection, setSelection] = useState<string | null>(null);
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
 
-  const handleMouseUp = useCallback(() => {
-    // Let the browser settle the selection before reading it.
-    setTimeout(() => {
+  const handleSelectionChange = useCallback(() => {
+    // Works for mouse AND touch: fires whenever the selection changes, including when
+    // the mobile selection handles are released. Debounced so the selection has settled.
+    window.setTimeout(() => {
       const sel = window.getSelection();
       const text = sel?.toString().trim();
       if (!text || text.length < 2 || text.length > 2000) {
@@ -136,19 +137,20 @@ export function ExplainLayer({ gapId, lessonId, context, children }: ExplainLaye
       const node = sel?.anchorNode;
       const inside = containerRef.current?.contains(node instanceof Node ? node : null);
       if (!inside) return;
-      const rect = sel?.getRangeAt(0).getBoundingClientRect();
+      const range = sel?.getRangeAt(0);
+      const rect = range?.getBoundingClientRect();
       setSelection(text);
       setPos(rect ? { x: rect.left + rect.width / 2, y: rect.top - 8 } : null);
-    }, 10);
+    }, 50);
   }, []);
 
+  useEffect(() => {
+    document.addEventListener('selectionchange', handleSelectionChange);
+    return () => document.removeEventListener('selectionchange', handleSelectionChange);
+  }, [handleSelectionChange]);
+
   return (
-    <div
-      ref={containerRef}
-      className="explain-layer"
-      onMouseUp={handleMouseUp}
-      onKeyUp={handleMouseUp}
-    >
+    <div ref={containerRef} className="explain-layer">
       {children}
       {selection && pos && (
         <div className="explain-popover__anchor" style={{ left: pos.x, top: pos.y }}>

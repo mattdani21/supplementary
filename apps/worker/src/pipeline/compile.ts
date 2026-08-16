@@ -32,6 +32,7 @@ import {
 import { detectInjectionAttempts } from '@gapos/ai-contracts';
 import type { ObjectStore, OwnerId, UnitOfWork } from '@gapos/database';
 import { textOf } from '@gapos/database';
+import { normaliseForSpeech } from '@gapos/domain';
 import {
   DomainError,
   GENERATION_STATUSES,
@@ -1021,9 +1022,15 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
           'to be READ rather than spoken — headings per section, prose in complete paragraphs, ' +
           'every mathematical expression in LaTeX (inline math between single dollar signs, ' +
           'display math between double dollar signs, e.g. the attention scaling factor as ' +
-          'sqrt(d_k) in LaTeX), and at most one fenced diagram block (triple-backtick with the ' +
-          'word "diagram") describing a simple visual that carries information the prose does ' +
-          'not. The notebook must cover the same concepts, worked example and checkpoint as ' +
+          'sqrt(d_k) in LaTeX), and a fenced diagram block (triple-backtick with the word ' +
+          '"diagram" on the fence line) describing a simple visual that carries information ' +
+          'the prose does not. A diagram is REQUIRED, not optional: every lesson that involves ' +
+          'a flow, a data shape, an architecture, or a step-by-step computation MUST include ' +
+          'one. The diagram block uses simple two-node edge lines, one edge per line, with a ' +
+          'hyphen or arrow between node labels, for example: "input tokens -> embeddings", ' +
+          '"embeddings -> attention scores". Do not invent a diagram syntax the renderer does ' +
+          'not know: only hyphen or arrow between two labels on each line. The notebook must ' +
+          'cover the same concepts, worked example and checkpoint as ' +
           'the script, so Read mode teaches the complete lesson without the audio.',
         0.2,
       ),
@@ -1223,7 +1230,9 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
             deps.concurrency ?? 3,
             async (segment) => {
               const audio = await providers.textToSpeech.synthesise({
-                text: segment.text,
+                // Speech normalisation (E26): the script is written for the eye (a^2,
+                // 1/2, ≤, Σ); TTS reads symbols literally unless rewritten to words.
+                text: normaliseForSpeech(segment.text),
                 segmentId: segment.id,
                 voice: 'default',
                 locale: 'en',
