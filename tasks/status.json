@@ -1,6 +1,6 @@
 {
  "schemaVersion": 1,
- "updatedAt": "2026-08-16T14:05:00.000Z",
+ "updatedAt": "2026-08-16T14:07:00.000Z",
  "controller": "gapos-controller",
  "tasks": {
   "GAP-083": {
@@ -77,6 +77,38 @@
     }
    ],
    "completedAt": "2026-08-16T14:05:00.000Z"
+  },
+  "GAP-090": {
+   "status": "done",
+   "startedAt": "2026-08-16T14:06:00.000Z",
+   "evidence": [
+    {
+     "command": "git status + git log --oneline -5; read tasks/backlog.yaml GAP-090, apps/web/src/components/course-progress.tsx, apps/web/src/components/screens.test.tsx (course-progress section), apps/web/src/app/globals.css (.course-progress rules)",
+     "result": "pass",
+     "note": "Controller loop: tree clean on autopilot/m1-fresh-checkout; GAP-088 done, so the dependency chain (GAP-087 done in bd45b44 per the GAP-088 record) is satisfied. GAP-090: a fully published course (7/7) renders 'Continue - Day 1: ...' because the streak loop reaches days, published.find(lesson => lesson.day > streak) is undefined, and the ?? published[0] fallback points back at the first already-complete day. Scope: when the published-day streak covers every planned day (streak === days, equivalently completed === days), render a completion state - 'Review the course' linking to /gaps/{gapId}/study (or 'Course complete' with no Continue arrow) - and never 'Continue - Day N'. Partial courses (3/4 -> 'Continue - Day 4') keep the existing logic unchanged. Design: derive done = days > 0 && streak === days; status line falls back to 'Course complete.' when done; the next-lesson Link renders only when not done, and a done course renders a 'Review the course' link to the study page in its place (same .course-progress__next affordance, no new CSS). No API/schema change (all data already on the lesson list), no specs/ or migration impact; no new operational behaviour to meter."
+    },
+    {
+     "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm verify (baseline)",
+     "result": "pass",
+     "note": "Format + lint + typecheck + full suite green before any change: 679 passed | 26 loud skips (705 total), 58 files passed | 4 skipped (same baseline as the GAP-089 final gate). Hermetic env note as every E22-E27 task: the sandbox injects GAPOS_PROVIDER_MODE=live without a key, so verify runs with env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL."
+    },
+    {
+     "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm exec vitest run apps/web/src/components/screens.test.tsx -t 'GAP-090' (test-first, before implementation)",
+     "result": "pass",
+     "note": "Test-first: the new render test ('renders a completion state for a fully published course - never \"Continue - Day N\" (GAP-090)') ran red for exactly the right reason - the received markup for 7/7 published lessons contained '<a class=\"course-progress__next\" href=\"/gaps/gap_cp/study\">Continue — Day 1: Lesson 1</a>': the streak reached days, published.find(lesson => lesson.day > streak) was undefined, and the ?? published[0] fallback pointed back at the already-complete Day 1, reproducing the reported bug verbatim."
+    },
+    {
+     "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm exec vitest run apps/web/src/components/screens.test.tsx (targeted, after implementation)",
+     "result": "pass",
+     "note": "Green after implementation: 31 tests passed. One pre-existing test in the same file pinned the buggy behaviour: 'links to the next lesson from the progress card' rendered the fully-published fixture gap (reference plan, 3/3) and asserted 'Continue —' - exactly what GAP-090 forbids. Its assertion was corrected to the new acceptance criterion ('Review the course' present, 'Continue —' absent) - an update, not a weakening: it still verifies the study-page link, and the partial-course path stays pinned by the untouched E26 tests (3/4 days -> 'Continue — Day 4: Matrices' still green). New test pins: 7/7 days, aria-valuenow=100, 'Course complete.', 'Review the course', study href, and neither 'Continue — Day' nor 'Start — Day' anywhere."
+    },
+    {
+     "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm verify (final gate, exit code captured)",
+     "result": "pass",
+     "note": "EXIT=0: format (prettier --check) + lint + typecheck + full suite green: 680 passed | 26 loud skips (706 total), 58 files passed | 4 skipped - up 1 test from the 679 baseline (the new GAP-090 render test; the corrected fixture-course test is a 1:1 rename). Implementation is 8 lines in course-progress.tsx: done = days > 0 && streak === days; when done the status line falls back to 'Course complete.' and the next-lesson Link is replaced by 'Review the course' (same .course-progress__next affordance, same study href); the Start/Continue branch is otherwise byte-identical, so partial courses are unchanged. No new CSS (reuses .course-progress__next, a focusable link with accessible text - no a11y regression), no API/schema change (all data already on the lesson list), no specs/ or migration impact, no new operational behaviour to meter."
+    }
+   ],
+   "completedAt": "2026-08-16T14:07:00.000Z"
   },
   "GAP-035": {
    "status": "done",

@@ -263,7 +263,7 @@ describe('the course progress surface replaces the raw compile log (E26)', () =>
     expect(html).not.toContain('Compile progress');
   });
 
-  it('links to the next lesson from the progress card', async () => {
+  it('links to the study page from the progress card — review, never Continue, when complete (GAP-090)', async () => {
     const html = await renderWithShell(
       await GapDetailPage({
         params: Promise.resolve({ gapId: compiledGapId }),
@@ -271,7 +271,10 @@ describe('the course progress surface replaces the raw compile log (E26)', () =>
       }),
     );
     expect(html).toMatch(/href="\/gaps\/[^"]+\/study"/);
-    expect(html).toContain('Continue —');
+    // The fixture course is fully published, so the card offers review — it must
+    // never say "Continue — Day N" pointing back at an already-complete day.
+    expect(html).toContain('Review the course');
+    expect(html).not.toContain('Continue —');
   });
 });
 
@@ -476,6 +479,26 @@ describe('the course progress surface (E26)', () => {
     // the streak breaks at 2, so Continue points at Day 4.
     expect(html).toContain('Continue — Day 4: Matrices');
     expect(html).toContain('href="/gaps/gap_cp/study"');
+  });
+
+  it('renders a completion state for a fully published course — never "Continue — Day N" (GAP-090)', () => {
+    // The real bug: with every planned day published, the streak reaches `days`,
+    // `published.find((lesson) => lesson.day > streak)` is undefined, and the
+    // `?? published[0]` fallback pointed back at the already-complete Day 1.
+    const complete = [1, 2, 3, 4, 5, 6, 7].map((day) => ({
+      id: `c${day}`,
+      day,
+      title: `Lesson ${day}`,
+      publicationStatus: 'published',
+    }));
+    const html = renderToStaticMarkup(<CourseProgress gapId="gap_cp" lessons={complete} />);
+    expect(html).toContain('7/7 days');
+    expect(html).toContain('aria-valuenow="100"');
+    expect(html).toContain('Course complete.');
+    expect(html).toContain('Review the course');
+    expect(html).toContain('href="/gaps/gap_cp/study"');
+    expect(html).not.toContain('Continue — Day');
+    expect(html).not.toContain('Start — Day');
   });
 
   it('shows a calm status line while compiling', () => {

@@ -97,6 +97,10 @@ export function CourseProgress({
   const doneDays = new Set(published.map((l) => l.day));
   let streak = 0;
   while (doneDays.has(streak + 1)) streak += 1;
+  // A complete course: the streak covers every planned day (equivalently completed ===
+  // days). Continue must never point back at an already-complete day — the card renders
+  // a review affordance instead (GAP-090).
+  const done = days > 0 && streak === days;
   const next = published.find((lesson) => lesson.day > streak) ?? published[0];
 
   return (
@@ -133,9 +137,11 @@ export function CourseProgress({
       <p className="course-progress__status">
         {compileStatus
           ? (STATUS_LINE[compileStatus] ?? '')
-          : pct === 0
-            ? 'Nothing published yet.'
-            : ''}
+          : done
+            ? 'Course complete.'
+            : pct === 0
+              ? 'Nothing published yet.'
+              : ''}
       </p>
 
       {compileStatus === 'failed' && (
@@ -144,13 +150,21 @@ export function CourseProgress({
         </p>
       )}
 
-      {published.length > 0 && next && (
+      {done ? (
         <Link href={`/gaps/${gapId}/study`} className="course-progress__next">
-          {streak === 0 && days > 0
-            ? `Start — Day ${next.day}: ${next.title}`
-            : `Continue — Day ${next.day}: ${next.title}`}
+          Review the course
           <span aria-hidden="true">→</span>
         </Link>
+      ) : (
+        published.length > 0 &&
+        next && (
+          <Link href={`/gaps/${gapId}/study`} className="course-progress__next">
+            {streak === 0 && days > 0
+              ? `Start — Day ${next.day}: ${next.title}`
+              : `Continue — Day ${next.day}: ${next.title}`}
+            <span aria-hidden="true">→</span>
+          </Link>
+        )
       )}
     </section>
   );
