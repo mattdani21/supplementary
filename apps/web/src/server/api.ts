@@ -450,6 +450,30 @@ export const exportLessonMarkdown = async (
   return { markdown: lines.join('\n'), filename: `${slug || 'lesson'}.md` };
 };
 
+/* -------------------------------------------------------- next lesson (E26/GAP-087) */
+
+/**
+ * The next published lesson after the current one (E26 / GAP-087), so the study page
+ * can offer a Next button. Returns undefined when the current lesson is the last one.
+ */
+export const nextLesson = async (
+  context: ServerContext,
+  owner: OwnerId,
+  gapId: string,
+  currentLessonId: string,
+): Promise<{ next: { day: number; lessonId: string; title: string } | undefined }> => {
+  const curriculum = await context.uow.curricula.getCurrentForGap(owner, gapId);
+  if (!curriculum) return { next: undefined };
+  const lessons = (await context.uow.curricula.listLessons(owner, curriculum.id))
+    .filter((l) => l.publicationStatus === 'published')
+    .sort((a, b) => a.day - b.day || a.ordinal - b.ordinal);
+  const index = lessons.findIndex((l) => l.id === currentLessonId);
+  const following = index >= 0 ? lessons[index + 1] : undefined;
+  return following
+    ? { next: { day: following.day, lessonId: following.id, title: following.title } }
+    : { next: undefined };
+};
+
 export const masteryView = async (
   context: ServerContext,
   owner: OwnerId,

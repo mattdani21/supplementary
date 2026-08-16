@@ -7,7 +7,13 @@ import { ExportControls } from '../../../../components/export-controls';
 import { NotebookSection } from '../../../../components/notebook-section';
 import { SourceLinks } from '../../../../components/source-links';
 import { WorkspaceTabs } from '../../../../components/workspace-tabs';
-import { getLesson, listAnnotations, listSources, todayView } from '../../../../server/api';
+import {
+  getLesson,
+  listAnnotations,
+  listSources,
+  nextLesson,
+  todayView,
+} from '../../../../server/api';
 import { getServerContext } from '../../../../server/bootstrap';
 import { formatDuration } from '../../../../lib/audio';
 import { notebookToHtml } from '../../../../lib/notebook';
@@ -56,15 +62,26 @@ interface LessonView {
   };
 }
 
-export default async function StudyPage({ params }: { params: Promise<{ gapId: string }> }) {
+export default async function StudyPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ gapId: string }>;
+  searchParams?: Promise<{ lesson?: string }>;
+}) {
   const { gapId } = await params;
   const owner = await viewerOwner();
   const context = await getServerContext();
+  const resolvedSearch = searchParams
+    ? await searchParams.catch(() => ({ lesson: undefined }))
+    : { lesson: undefined };
+  const explicitLessonId = resolvedSearch.lesson;
 
   const { today } = (await todayView(context, owner, gapId)) as {
     today: { lesson?: { lessonId: string } };
   };
-  if (!today.lesson) {
+  const lessonIdForPage = explicitLessonId ?? today.lesson?.lessonId;
+  if (!lessonIdForPage) {
     return (
       <main>
         <Link href={`/gaps/${gapId}`} className="back-link">
@@ -88,7 +105,7 @@ export default async function StudyPage({ params }: { params: Promise<{ gapId: s
     );
   }
 
-  const { lesson } = (await getLesson(context, owner, gapId, today.lesson.lessonId)) as {
+  const { lesson } = (await getLesson(context, owner, gapId, lessonIdForPage)) as {
     lesson: LessonView;
   };
   const { annotations } = (await listAnnotations(context, owner, lesson.id)) as {
@@ -98,6 +115,9 @@ export default async function StudyPage({ params }: { params: Promise<{ gapId: s
       selection: string;
       explanation: string;
     }[];
+  };
+  const { next } = (await nextLesson(context, owner, gapId, lesson.id)) as {
+    next: { day: number; lessonId: string; title: string } | undefined;
   };
 
   const { sources } = (await listSources(context, owner, gapId)) as {
@@ -255,6 +275,18 @@ export default async function StudyPage({ params }: { params: Promise<{ gapId: s
           ))
         )}
       </section>
+
+      {next && (
+        <nav className="next-lesson" aria-label="Continue">
+          <p className="next-lesson__meta">Up next · Day {next.day}</p>
+          <Link
+            href={`/gaps/${gapId}/study?lesson=${encodeURIComponent(next.lessonId)}`}
+            className="btn"
+          >
+            Next: {next.title} →
+          </Link>
+        </nav>
+      )}
     </main>
   );
 }

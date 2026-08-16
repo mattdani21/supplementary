@@ -1763,3 +1763,26 @@ summary:focus-visible {
     stroke: #111 !important;
   }
 }
+
+/* ------------------------------------------- next lesson (E26/GAP-087) */
+
+.next-lesson {
+  margin-top: 2rem;
+  padding: 1.25rem;
+  border: 1px solid var(--hairline, rgba(255, 255, 255, 0.08));
+  border-radius: 14px;
+  background: var(--surface, #121214);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.next-lesson__meta {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary, rgba(255, 255, 255, 0.55));
+  margin: 0;
+}
