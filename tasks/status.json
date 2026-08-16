@@ -1,6 +1,6 @@
 {
  "schemaVersion": 1,
- "updatedAt": "2026-08-16T18:10:00.000Z",
+ "updatedAt": "2026-08-16T18:25:00.000Z",
  "controller": "gapos-controller",
  "tasks": {
   "GAP-083": {
@@ -1957,6 +1957,11 @@
      "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm verify",
      "result": "pass",
      "note": "689 passed | 26 skipped (715 total), 60 files passed | 4 skipped. Format + lint + typecheck + full suite green after prettier --write on the three touched files. Hermetic env note as every E22-E27 task: the sandbox injects GAPOS_PROVIDER_MODE=live without a key, so verify runs with env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL."
+    },
+    {
+     "command": "browser console measurement of live diagram: svgRenderWidth=660, viewBox=0 0 725 250, font-size=15 → ~13.7px effective text; figure scrolls horizontally on narrow screens",
+     "result": "pass",
+     "note": "Follow-up after visual check: the first live check rendered diagram labels at ~9.5px effective (520px floor). Bumped the SVG floor to 660px + font 15 + colGap 160 in e6646c6 (verified: 689 passed | 26 skipped), redeployed to the gapos service, and confirmed live — the labels now render at ~13.7px effective, legible on a phone with horizontal pan."
     }
    ],
    "notes": "GAP-094 DONE: the study surface no longer has a Listen/Read toggle - the notebook is always on screen, audio floats in a dock (play/pause, prev/next segment, speed cycle, seek, Transcript sheet, Questions sheet, checkpoint sheet), practice items are lifted into the Questions sheet, diagrams render in rows of 4 at a readable size, and the home page stops showing the raw compile card once the run settles. Deploy: railway up (web) then live-verify."
