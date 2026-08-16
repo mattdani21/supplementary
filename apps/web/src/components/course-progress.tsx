@@ -15,10 +15,28 @@ export interface CourseProgressLesson {
   readonly publicationStatus: string;
 }
 
+export interface CourseProgressFinding {
+  readonly category: string;
+  readonly severity: string;
+  readonly finding: string;
+}
+
+/**
+ * What a failed run recorded about why it stopped (GAP-089): the run error and the audit
+ * findings summary. Both are debugging-grade detail; the card derives plain words from them
+ * and never renders them raw.
+ */
+export interface CourseFailure {
+  readonly error?: string;
+  readonly findings: readonly CourseProgressFinding[];
+}
+
 interface CourseProgressProps {
   readonly gapId: string;
   readonly lessons: readonly CourseProgressLesson[];
   readonly compileStatus?: string;
+  /** Failure details for the failed state (GAP-089): the run error and audit findings. */
+  readonly compileFailure?: CourseFailure;
 }
 
 const STATUS_LINE: Record<string, string> = {
@@ -33,11 +51,40 @@ const STATUS_LINE: Record<string, string> = {
   publishing: 'Your course is being written.',
   complete: 'Course complete.',
   partial: 'Course complete — a few days were set aside.',
-  failed: 'Compilation stopped — check the Curriculum tab.',
+  failed: 'The course could not be finished.',
   cancelled: 'Cancelled.',
 };
 
-export function CourseProgress({ gapId, lessons, compileStatus }: CourseProgressProps) {
+/**
+ * Run errors the pipeline writes as learner-addressable sentinels. Anything else is a
+ * debugging string (provider exceptions, validation output) and stays out of the card.
+ */
+const KNOWN_FAILURE_REASONS: Record<string, string> = {
+  clarification_required:
+    'It needs a clarification from you — update your gap statement, then retry.',
+};
+
+/**
+ * A short plain-words why + next step for a failed compile (GAP-089, E27): derived from the
+ * run error (only known learner-addressable reasons) and the audit findings summary, with a
+ * calm fallback. The raw error string never reaches the learner here — the developer-facing
+ * detail lives in the generation log.
+ */
+export const failedExplanation = (failure: CourseFailure | undefined): string => {
+  const reason = failure?.error ? KNOWN_FAILURE_REASONS[failure.error] : undefined;
+  if (reason) return reason;
+  if ((failure?.findings.length ?? 0) > 0) {
+    return 'Some days were set aside after repeated quality checks. Retry to regenerate them.';
+  }
+  return 'Something went wrong while writing it. Retry to regenerate it.';
+};
+
+export function CourseProgress({
+  gapId,
+  lessons,
+  compileStatus,
+  compileFailure,
+}: CourseProgressProps) {
   const published = lessons
     .filter((lesson) => lesson.publicationStatus === 'published')
     .sort((a, b) => a.day - b.day);
@@ -90,6 +137,12 @@ export function CourseProgress({ gapId, lessons, compileStatus }: CourseProgress
             ? 'Nothing published yet.'
             : ''}
       </p>
+
+      {compileStatus === 'failed' && (
+        <p className="course-progress__explanation" role="status">
+          {failedExplanation(compileFailure)}
+        </p>
+      )}
 
       {published.length > 0 && next && (
         <Link href={`/gaps/${gapId}/study`} className="course-progress__next">

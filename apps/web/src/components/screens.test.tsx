@@ -487,6 +487,55 @@ describe('the course progress surface (E26)', () => {
   });
 });
 
+describe('the failed compile state explains why and what to do (GAP-089, E27)', () => {
+  it('renders an explanatory line for a failed compile — never the raw error string', () => {
+    const html = renderToStaticMarkup(
+      <CourseProgress
+        gapId="gap_cp"
+        lessons={[]}
+        compileStatus="failed"
+        compileFailure={{
+          error: 'Simulated provider failure for gap_normalisation (0 remaining)',
+          findings: [
+            { category: 'grounding', severity: 'high', finding: 'Objective O2 lacks locators' },
+          ],
+        }}
+      />,
+    );
+
+    // The count alone is useless; the card must say why it failed and what to do.
+    expect(html).toContain('0/0 days');
+    expect(html).toContain('The course could not be finished.');
+    expect(html).toContain('course-progress__explanation');
+    expect(html).toContain('Retry');
+    // The raw run error is a debugging string, never the learner-facing explanation.
+    expect(html).not.toContain('Simulated provider failure');
+    expect(html).not.toContain('gap_normalisation');
+  });
+
+  it('uses the pipeline’s own reason when the run error is learner-addressable', () => {
+    const html = renderToStaticMarkup(
+      <CourseProgress
+        gapId="gap_cp"
+        lessons={[]}
+        compileStatus="failed"
+        compileFailure={{ error: 'clarification_required', findings: [] }}
+      />,
+    );
+    expect(html).toContain('clarification');
+    expect(html).not.toContain('clarification_required'); // the code, never verbatim
+  });
+
+  it('still explains a failed compile with no error or findings on record', () => {
+    const html = renderToStaticMarkup(
+      <CourseProgress gapId="gap_cp" lessons={[]} compileStatus="failed" />,
+    );
+    expect(html).toContain('The course could not be finished.');
+    expect(html).toContain('Retry');
+    expect(html).toMatch(/course-progress__explanation[^>]*>.*Retry/);
+  });
+});
+
 describe('developer surfaces are gated off the learner gaps page (GAP-088, E27)', () => {
   const renderGaps = async (
     searchParams: Record<string, string | string[] | undefined> = {},

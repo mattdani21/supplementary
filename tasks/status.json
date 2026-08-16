@@ -1,6 +1,6 @@
 {
  "schemaVersion": 1,
- "updatedAt": "2026-08-16T13:58:00.000Z",
+ "updatedAt": "2026-08-16T14:05:00.000Z",
  "controller": "gapos-controller",
  "tasks": {
   "GAP-083": {
@@ -45,6 +45,38 @@
     }
    ],
    "completedAt": "2026-08-16T13:58:00.000Z"
+  },
+  "GAP-089": {
+   "status": "done",
+   "startedAt": "2026-08-16T14:01:49.000Z",
+   "evidence": [
+    {
+     "command": "git status + git log --oneline -5; read tasks/backlog.yaml GAP-089, apps/web/src/components/course-progress.tsx, apps/web/src/app/gaps/[gapId]/page.tsx, apps/web/src/server/api.ts, apps/web/src/components/screens.test.tsx (course-progress section), apps/worker/src/pipeline/{compile,lifecycle}.ts, packages/provider-adapters/src/fake/language-model.ts",
+     "result": "pass",
+     "note": "Controller loop: tree clean on autopilot/m1-fresh-checkout; GAP-088 done, so the dependency is satisfied. GAP-089: the failed compile state on the course-progress card must say WHY it failed and WHAT TO DO, in plain words, never the raw error string. Available data: generationLog exposes run.error (e.g. 'clarification_required' sentinel, provider exception messages, plan-gate DomainError like 'The planner could not produce a valid plan...') and run.findings (audit findings with category/severity/finding). Design: CourseProgress gains an optional compileFailure prop (run error + findings) wired from the gap overview only when log.run.status === 'failed'; a pure failedExplanation() helper maps known learner-addressable run errors (clarification_required) to plain copy, summarises the findings summary ('Some days were set aside after repeated quality checks. Retry to regenerate them.'), and falls back to 'Something went wrong while writing it. Retry to regenerate it.'; STATUS_LINE.failed reworded from 'Compilation stopped — check the Curriculum tab.' (wrong guidance: the tab shows 'No curriculum yet.' on failure) to 'The course could not be finished.'; explanation renders as .course-progress__explanation with role=status (live region) so screen readers announce the failure. The Retry compile button in TransitionButtons (TRANSITIONS.failed) is untouched and stays on the overview; the copy points at it. No API/schema change (generationLog already exposes error + findings), so no specs/ or migration impact; no new operational behaviour to meter (worker already meters compile failures and audit findings)."
+    },
+    {
+     "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm exec vitest run apps/web/src/components/screens.test.tsx -t 'GAP-089' (test-first, before implementation)",
+     "result": "pass",
+     "note": "Test-first: 3 new render tests in screens.test.tsx ('the failed compile state explains why and what to do (GAP-089, E27)') ran red for exactly the right reasons - (1) failed + findings: no 'The course could not be finished.', no 'Retry', no .course-progress__explanation (component had no explanation at all); (2) clarification_required: 'clarification' missing (the sentinel code was never surfaced); (3) failed with no details: still no explanation. Red failures were assertion failures on missing copy, not crashes."
+    },
+    {
+     "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm exec vitest run apps/web/src/components/screens.test.tsx (targeted, after implementation)",
+     "result": "pass",
+     "note": "Green after implementation: 30 tests passed (27 existing E26/E27 screens tests incl. complete/partial/compiling course-progress tests + 3 new GAP-089 tests). The new tests pin: explanatory line renders (not blank), 'Retry' present, raw error string ('Simulated provider failure for gap_normalisation (0 remaining)') and its fragments never rendered, the clarification sentinel code never rendered verbatim, and a fallback explanation for a failure with no error/findings on record. One typecheck fix along the way: with noUncheckedIndexedAccess, KNOWN_FAILURE_REASONS[failure.error] is string | undefined, so the helper binds the reason to a const before the truthiness return."
+    },
+    {
+     "command": "pnpm typecheck (authoritative root tsc -p tsconfig.json; .next/types is gitignored generated output and excluded from the gate)",
+     "result": "pass",
+     "note": "Repo-wide typecheck green. An ad-hoc tsc -p apps/web/tsconfig.json also surfaces a stale .next/types/app/gaps/page.ts PageProps error, but that file is generated build output, gitignored, and not part of pnpm verify."
+    },
+    {
+     "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm verify (final gate)",
+     "result": "pass",
+     "note": "Format + lint + typecheck + full suite green: 679 passed | 26 loud skips (705 total), 58 files passed | 4 skipped - up 3 tests from the 676 GAP-088 baseline (the 3 new GAP-089 tests). One format:check failure on the first gate run (prettier wanted the CourseProgress signature split across lines) fixed with prettier --write on course-progress.tsx only; re-run green. Hermetic env note as every E22-E27 task: the sandbox injects GAPOS_PROVIDER_MODE=live without a key, so verify runs with env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL."
+    }
+   ],
+   "completedAt": "2026-08-16T14:05:00.000Z"
   },
   "GAP-035": {
    "status": "done",

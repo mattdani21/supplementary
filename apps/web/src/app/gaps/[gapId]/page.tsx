@@ -162,6 +162,11 @@ export default async function GapDetailPage({
               publicationStatus: lesson.publicationStatus,
             }))}
             compileStatus={log.run?.status}
+            compileFailure={
+              log.run?.status === 'failed'
+                ? { error: log.run.error, findings: log.findings }
+                : undefined
+            }
           />
 
           {(log.run?.status === 'queued' ||
