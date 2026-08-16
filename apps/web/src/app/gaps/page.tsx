@@ -15,8 +15,11 @@ export const dynamic = 'force-dynamic';
 export default async function GapsPage({
   searchParams,
 }: {
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
-} = {}) {
+  // Next.js always passes searchParams for dynamic pages, and its PageProps type
+  // requires it non-optional (a `= {}` default makes the whole props type `| undefined`,
+  // which fails next build). Render tests pass searchParams explicitly.
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const owner = await viewerOwner();
   const context = await getServerContext();
   const { gaps } = (await listGaps(context, owner)) as { gaps: Gap[] };

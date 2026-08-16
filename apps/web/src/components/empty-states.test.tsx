@@ -50,7 +50,7 @@ const renderWithShell = async (page: ReactNode): Promise<string> =>
 
 describe('the gaps list empty state — runs first, before any gap exists (GAP-037)', () => {
   it('explains what belongs here and gives a concrete next action', async () => {
-    const html = await renderWithShell(await GapsPage());
+    const html = await renderWithShell(await GapsPage({ searchParams: Promise.resolve({}) }));
     expect(html).toContain('No gaps yet.');
     expect(html).toContain('Name the thing you want to be able to do');
     expect(html).toMatch(/href="#new-gap"/);

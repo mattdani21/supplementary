@@ -89,7 +89,7 @@ const anchors = (html: string): { href: string; active: boolean }[] =>
 describe('the styled empty state (GAP-035)', () => {
   it('renders the empty-state block with a primary CTA before any gap exists', async () => {
     // Declared first so it runs before the seeded describes populate the shared context.
-    const html = await renderWithShell(await GapsPage());
+    const html = await renderWithShell(await GapsPage({ searchParams: Promise.resolve({}) }));
 
     expect(html).toContain('class="empty-state"');
     expect(html).toMatch(/class="btn btn--primary"/);
@@ -128,7 +128,7 @@ describe('the gaps list with the shell (GAP-035)', () => {
   });
 
   it('renders the shell around the gaps list: app-frame, tab bar, one aria-current', async () => {
-    const html = await renderWithShell(await GapsPage());
+    const html = await renderWithShell(await GapsPage({ searchParams: Promise.resolve({}) }));
 
     expect(html).toContain('class="app-frame"');
     expect(html).toContain('<nav class="tab-bar"');
@@ -143,7 +143,7 @@ describe('the gaps list with the shell (GAP-035)', () => {
   });
 
   it('lists the seeded gap as a card row with status pill and minutes per day', async () => {
-    const html = await renderWithShell(await GapsPage());
+    const html = await renderWithShell(await GapsPage({ searchParams: Promise.resolve({}) }));
 
     expect(html).toContain(GAP_TITLE);
     expect(html).toMatch(/class="track-row/);
@@ -152,7 +152,7 @@ describe('the gaps list with the shell (GAP-035)', () => {
   });
 
   it('keeps the inline creation surfaces styled on the page', async () => {
-    const html = await renderWithShell(await GapsPage());
+    const html = await renderWithShell(await GapsPage({ searchParams: Promise.resolve({}) }));
 
     expect(html).toContain('New gap');
     expect(html).toContain('Speak a gap');
