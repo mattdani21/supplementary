@@ -320,6 +320,38 @@ describe('duration estimates on Day cards and the lesson header (GAP-038)', () =
   });
 });
 
+describe('the curriculum tab nests day lessons under objective modules (E26)', () => {
+  it('renders each module with its capability statement and the day lessons beneath it', async () => {
+    const html = await renderWithShell(
+      await GapDetailPage({
+        params: Promise.resolve({ gapId: compiledGapId }),
+        searchParams: Promise.resolve({ tab: 'curriculum' }),
+      }),
+    );
+    // Modules exist, with kicker + capability title.
+    expect(html).toMatch(/Module · obj_/);
+    expect(html).toContain('class="module__title"');
+    // Day cards still render inside the module sections.
+    expect(html).toMatch(/Day \d — /);
+    // The flat "Lessons" heading is gone — lessons are grouped under modules now.
+    expect(html).not.toContain('>Lessons<');
+    expect(html).not.toContain('>Objectives<');
+  });
+
+  it('renders a module for every objective that has lessons, in plan order', async () => {
+    const html = await renderWithShell(
+      await GapDetailPage({
+        params: Promise.resolve({ gapId: compiledGapId }),
+        searchParams: Promise.resolve({ tab: 'curriculum' }),
+      }),
+    );
+    const modules = html.match(/Module · (obj_[a-z_]+)/g) ?? [];
+    expect(modules.length).toBeGreaterThanOrEqual(3);
+    // First-listed objective is the earliest one in the plan.
+    expect(modules[0]).toMatch(/obj_subset_proof/);
+  });
+});
+
 /**
  * T022 (US2, E24): traceability is user-visible. Every published lesson and every practice
  * question shows the locator(s) behind it, and the source is one step away — a real link to

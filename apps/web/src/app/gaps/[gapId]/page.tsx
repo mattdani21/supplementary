@@ -45,6 +45,7 @@ interface CurriculumLessonView {
   title: string;
   estimatedMinutes: number;
   publicationStatus: string;
+  objectiveIds: string[];
   questions: { id: string }[];
   artefacts: { id: string; kind?: string; durationSeconds?: number }[];
 }
@@ -262,58 +263,70 @@ export default async function GapDetailPage({
             />
           ) : (
             <>
-              <h2>Objectives</h2>
-              <ul className="objective-list">
-                {curriculum.curriculum.plan.objectives.map((objective) => (
-                  <li key={objective.id} className="card objective-row">
-                    <div className="objective-row__head">
-                      <span className="objective-row__label">{objective.capabilityStatement}</span>
+              {/* Objectives are the modules: each carries its capability statement and the
+                  day lessons that teach it nest underneath (E26). A lesson teaching several
+                  objectives lives under its first-listed one, so nothing is duplicated. */}
+              {curriculum.curriculum.plan.objectives.map((objective) => {
+                const moduleLessons = curriculum.lessons.filter(
+                  (lesson) => lesson.objectiveIds[0] === objective.id,
+                );
+                if (moduleLessons.length === 0) return null;
+                return (
+                  <section
+                    key={objective.id}
+                    className="module"
+                    aria-label={objective.capabilityStatement}
+                  >
+                    <header className="module__head">
+                      <div>
+                        <span className="module__kicker">Module · {objective.id}</span>
+                        <h2 className="module__title">{objective.capabilityStatement}</h2>
+                      </div>
                       {objective.required && <span className="pill pill--accent">required</span>}
-                    </div>
+                    </header>
                     {objective.prerequisiteObjectiveIds.length > 0 && (
                       <p className="objective-row__missing">
                         Needs: {objective.prerequisiteObjectiveIds.join(', ')}
                       </p>
                     )}
-                  </li>
-                ))}
-              </ul>
-
-              <h2>Lessons</h2>
-              <ul className="track-list">
-                {curriculum.lessons.map((lesson) => {
-                  // Day card duration estimate (E23 quality spec §8): the lesson's audio length,
-                  // shown before play, alongside the estimated study minutes.
-                  const audioSeconds = lesson.artefacts
-                    .filter((artefact) => artefact.kind === 'audio')
-                    .reduce((sum, artefact) => sum + (artefact.durationSeconds ?? 0), 0);
-                  const audioDuration = formatDuration(audioSeconds);
-                  return (
-                    <li key={lesson.id}>
-                      <Link href={`/gaps/${gapId}/study`} className="track-row">
-                        <span className="track-row__main">
-                          <span className="track-row__title">
-                            Day {lesson.day} — {lesson.title}
-                          </span>
-                          <span className="track-row__capability">
-                            {lesson.questions.length} questions · ~{lesson.estimatedMinutes} min
-                            {audioDuration ? ` · ${audioDuration} audio` : ''}
-                          </span>
-                        </span>
-                        <span className="track-row__meta">
-                          <span
-                            className={
-                              lesson.publicationStatus === 'published' ? 'pill pill--ok' : 'pill'
-                            }
-                          >
-                            {lesson.publicationStatus}
-                          </span>
-                        </span>
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
+                    <ul className="track-list">
+                      {moduleLessons.map((lesson) => {
+                        const audioSeconds = lesson.artefacts
+                          .filter((artefact) => artefact.kind === 'audio')
+                          .reduce((sum, artefact) => sum + (artefact.durationSeconds ?? 0), 0);
+                        const audioDuration = formatDuration(audioSeconds);
+                        return (
+                          <li key={lesson.id}>
+                            <Link href={`/gaps/${gapId}/study`} className="track-row">
+                              <span className="track-row__main">
+                                <span className="track-row__title">
+                                  Day {lesson.day} — {lesson.title}
+                                </span>
+                                <span className="track-row__capability">
+                                  {lesson.questions.length} questions · ~{lesson.estimatedMinutes}{' '}
+                                  min
+                                  {audioDuration ? ` · ${audioDuration} audio` : ''}
+                                </span>
+                              </span>
+                              <span className="track-row__meta">
+                                <span
+                                  className={
+                                    lesson.publicationStatus === 'published'
+                                      ? 'pill pill--ok'
+                                      : 'pill'
+                                  }
+                                >
+                                  {lesson.publicationStatus}
+                                </span>
+                              </span>
+                            </Link>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </section>
+                );
+              })}
             </>
           )}
         </>
