@@ -83,7 +83,7 @@ export const renderDiagramSvg = (spec: string): string => {
   const nodesPerRow = 4;
   const boxWidth = 150;
   const boxHeight = 46;
-  const colGap = 170;
+  const colGap = 160;
   const rowGap = 110;
   const margin = 60;
   const cols = Math.min(nodes.length, nodesPerRow);
@@ -113,7 +113,7 @@ export const renderDiagramSvg = (spec: string): string => {
         `<rect x="${p.x - boxWidth / 2}" y="${p.y - boxHeight / 2}" width="${boxWidth}" ` +
         `height="${boxHeight}" rx="10" fill="#121214" stroke="rgba(255,255,255,0.12)"/>` +
         `<text x="${p.x}" y="${p.y + 5}" text-anchor="middle" fill="rgba(255,255,255,0.85)" ` +
-        `font-size="14" font-family="system-ui">${escaped}</text>`
+        `font-size="15" font-family="system-ui">${escaped}</text>`
       );
     })
     .join('');

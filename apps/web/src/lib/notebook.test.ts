@@ -133,6 +133,6 @@ describe('renderDiagramSvg', () => {
     expect(height).toBeGreaterThan(150); // two rows of nodes
     expect(width).toBeLessThan(800); // four columns, not eight
     // Bigger readable type in the scaled viewBox.
-    expect(svg).toContain('font-size="14"');
+    expect(svg).toContain('font-size="15"');
   });
 });

@@ -1716,7 +1716,7 @@ summary:focus-visible {
   display: block;
   width: 100%;
   height: auto;
-  min-width: 520px;
+  min-width: 660px;
 }
 
 .notebook__list {
