@@ -649,7 +649,7 @@ export const referenceLesson = (day: number): LessonPackage => {
   const questions = questionsForDay(day);
 
   return {
-    schemaVersion: '1.0.0',
+    schemaVersion: '1.1.0',
     day,
     title: content.title,
     objectiveIds: [...new Set(questions.map((q) => q.objectiveId))],

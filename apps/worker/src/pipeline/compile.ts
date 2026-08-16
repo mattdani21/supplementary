@@ -1016,7 +1016,15 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
           'a concrete rubric on the first pass: grading criteria with at least 2-3 explicit ' +
           'checkpoints, a model answer, and partial-credit rules, so grading is checkable — ' +
           'never a bare non-empty string. Every other question type omits the rubric field ' +
-          'entirely. Never emit null for any field: omit optional fields instead.',
+          'entirely. Never emit null for any field: omit optional fields instead. ' +
+          'Ship the notebook field (E25): the SAME lesson as textbook-style markdown, written ' +
+          'to be READ rather than spoken — headings per section, prose in complete paragraphs, ' +
+          'every mathematical expression in LaTeX (inline math between single dollar signs, ' +
+          'display math between double dollar signs, e.g. the attention scaling factor as ' +
+          'sqrt(d_k) in LaTeX), and at most one fenced diagram block (triple-backtick with the ' +
+          'word "diagram") describing a simple visual that carries information the prose does ' +
+          'not. The notebook must cover the same concepts, worked example and checkpoint as ' +
+          'the script, so Read mode teaches the complete lesson without the audio.',
         0.2,
       ),
   );

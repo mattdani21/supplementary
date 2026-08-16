@@ -3,11 +3,13 @@ import { randomUUID } from 'node:crypto';
 import { AttemptForm, type AttemptQuestion } from '../../../../components/attempt-form';
 import { AudioPlayer } from '../../../../components/audio-player';
 import { EmptyState } from '../../../../components/empty-state';
+import { NotebookSection } from '../../../../components/notebook-section';
 import { SourceLinks } from '../../../../components/source-links';
 import { WorkspaceTabs } from '../../../../components/workspace-tabs';
 import { getLesson, listSources, todayView } from '../../../../server/api';
 import { getServerContext } from '../../../../server/bootstrap';
 import { formatDuration } from '../../../../lib/audio';
+import { notebookToHtml } from '../../../../lib/notebook';
 import { viewerOwner } from '../../../../lib/viewer';
 
 export const dynamic = 'force-dynamic';
@@ -44,6 +46,7 @@ interface LessonView {
   artefacts: ArtefactView[];
   package: {
     transcript: string;
+    notebook?: string;
     pausePrompts?: { atSecond: number; prompt: string; expectedAnswer: string }[];
     evidence?: {
       basis: string;
@@ -152,42 +155,52 @@ export default async function StudyPage({ params }: { params: Promise<{ gapId: s
       </header>
 
       <section className="card player-surface" aria-labelledby="listen-heading">
-        <h2 id="listen-heading">Listen</h2>
-        {audio.length > 0 ? (
-          <AudioPlayer
-            gapId={gapId}
-            segments={audio.map((artefact) => ({
-              artefactId: artefact.id,
-              durationSeconds: artefact.durationSeconds,
-            }))}
-            transcript={transcriptText}
-            pausePrompts={pausePrompts}
-            checkpointLocators={checkpointLocators}
-          />
-        ) : (
-          <>
-            <p className="muted">No audio for this lesson.</p>
-            {transcriptText ? (
-              <p className="transcript">{transcriptText}</p>
-            ) : (
-              <p className="muted">Transcript unavailable for this lesson.</p>
-            )}
-          </>
-        )}
-        {pausePrompts.length > 0 && (
-          <p className="muted checkpoint-note">
-            <strong>Checkpoint:</strong> the lesson pauses at the question —{' '}
-            {pausePrompts[0]!.prompt}
-          </p>
-        )}
-        {/* Traceability is user-visible (E24 US2, C-07): the locators behind this lesson, one
-            step from the source. A general-knowledge lesson carries the explicit label. */}
-        <SourceLinks
-          gapId={gapId}
-          basis={
-            lesson.package.evidence?.basis === 'general_knowledge' ? 'general_knowledge' : 'source'
+        <h2 id="listen-heading">Study</h2>
+        <NotebookSection
+          notebookHtml={lesson.package.notebook ? notebookToHtml(lesson.package.notebook) : ''}
+          transcript={transcriptText}
+          listenSurface={
+            <>
+              {audio.length > 0 ? (
+                <AudioPlayer
+                  gapId={gapId}
+                  segments={audio.map((artefact) => ({
+                    artefactId: artefact.id,
+                    durationSeconds: artefact.durationSeconds,
+                  }))}
+                  transcript={transcriptText}
+                  pausePrompts={pausePrompts}
+                  checkpointLocators={checkpointLocators}
+                />
+              ) : (
+                <>
+                  <p className="muted">No audio for this lesson.</p>
+                  {transcriptText ? (
+                    <p className="transcript">{transcriptText}</p>
+                  ) : (
+                    <p className="muted">Transcript unavailable for this lesson.</p>
+                  )}
+                </>
+              )}
+              {pausePrompts.length > 0 && (
+                <p className="muted checkpoint-note">
+                  <strong>Checkpoint:</strong> the lesson pauses at the question —{' '}
+                  {pausePrompts[0]!.prompt}
+                </p>
+              )}
+              {/* Traceability is user-visible (E24 US2, C-07): the locators behind this lesson,
+                  one step from the source. A general-knowledge lesson carries the label. */}
+              <SourceLinks
+                gapId={gapId}
+                basis={
+                  lesson.package.evidence?.basis === 'general_knowledge'
+                    ? 'general_knowledge'
+                    : 'source'
+                }
+                locators={checkpointLocators}
+              />
+            </>
           }
-          locators={checkpointLocators}
         />
       </section>
 

@@ -1539,3 +1539,100 @@ summary:focus-visible {
     scroll-behavior: auto !important;
   }
 }
+
+/* ------------------------------------------- notebook (E25/GAP-083) */
+
+.study-mode {
+  display: inline-flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border: 1px solid var(--hairline, rgba(255, 255, 255, 0.08));
+  border-radius: 999px;
+  background: var(--surface-2, #1a1a1e);
+  margin-bottom: 1rem;
+}
+
+.study-mode__btn {
+  appearance: none;
+  border: none;
+  background: none;
+  color: var(--text-tertiary, rgba(255, 255, 255, 0.55));
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0.35rem 0.9rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    color 120ms ease-out,
+    background 120ms ease-out;
+}
+
+.study-mode__btn:hover {
+  color: var(--text-primary, #fff);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.study-mode__btn:focus-visible {
+  outline: 2px solid var(--accent, #4f8cff);
+  outline-offset: 2px;
+}
+
+.study-mode__btn.is-active {
+  background: var(--accent, #4f8cff);
+  color: #fff;
+}
+
+.notebook__read {
+  max-width: 68ch;
+  line-height: 1.65;
+  color: var(--text-primary, #fff);
+}
+
+.notebook__heading {
+  color: var(--text-primary, #fff);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 1.5rem 0 0.5rem;
+}
+
+.notebook__h1 {
+  font-size: 1.35rem;
+}
+.notebook__h2 {
+  font-size: 1.15rem;
+}
+.notebook__h3 {
+  font-size: 1rem;
+}
+
+.notebook__paragraph {
+  margin: 0.75rem 0;
+}
+
+.notebook__math {
+  overflow-x: auto;
+  padding: 0.5rem 0;
+  margin: 0.75rem 0;
+}
+
+.notebook__diagram {
+  margin: 1rem 0;
+  padding: 0.75rem;
+  border: 1px solid var(--hairline, rgba(255, 255, 255, 0.08));
+  border-radius: 12px;
+  background: var(--surface, #121214);
+  overflow-x: auto;
+}
+
+.notebook__list {
+  margin: 0.75rem 0;
+  padding-left: 1.25rem;
+}
+
+.notebook__list li {
+  margin: 0.3rem 0;
+}
+
+.notebook .transcript {
+  white-space: pre-wrap;
+}

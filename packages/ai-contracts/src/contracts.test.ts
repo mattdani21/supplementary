@@ -53,7 +53,7 @@ describe('contract versioning', () => {
 
   it('rejects unknown fields rather than silently dropping them', () => {
     const parsed = GapNormalisationContract.schema.safeParse({
-      schemaVersion: '1.0.0',
+      schemaVersion: '1.1.0',
       topic: 'set theory',
       currentState: 'knows notation',
       targetCapability: 'can prove double inclusion',
@@ -148,7 +148,7 @@ describe('plan and lesson contracts', () => {
       activities: [{ kind: 'audio_lesson', description: 'listen', estimatedMinutes: 10 }],
     }));
     const parsed = CurriculumPlanContract.schema.safeParse({
-      schemaVersion: '1.0.0',
+      schemaVersion: '1.1.0',
       gapId: 'g1',
       dailyMinutes: 35,
       objectives: [{ id: 'o1', capabilityStatement: 'do the thing', required: true, evidence }],
@@ -162,7 +162,7 @@ describe('plan and lesson contracts', () => {
 
   it('rejects a daily budget below the fifteen-minute product floor', () => {
     const parsed = CurriculumPlanContract.schema.safeParse({
-      schemaVersion: '1.0.0',
+      schemaVersion: '1.1.0',
       gapId: 'g1',
       dailyMinutes: 5,
       objectives: [{ id: 'o1', capabilityStatement: 'x', required: true, evidence }],

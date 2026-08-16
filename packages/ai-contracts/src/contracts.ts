@@ -227,7 +227,7 @@ export type CurriculumPlan = z.infer<typeof CurriculumPlanContract.schema>;
 
 /* ---------------------------------------------------------- stage E: lesson package */
 
-export const LessonPackageContract = defineContract('lesson_package', '1.0.0', {
+export const LessonPackageContract = defineContract('lesson_package', '1.1.0', {
   day: z.number().int().min(1).max(7),
   title: z.string().min(1),
   objectiveIds: z.array(z.string().min(1)).min(1),
@@ -236,6 +236,12 @@ export const LessonPackageContract = defineContract('lesson_package', '1.0.0', {
   transcript: z.string().min(1),
   summary: z.string().min(1),
   examples: z.array(z.string().min(1)).default([]),
+  /**
+   * Textbook-style rendering of the same lesson (E25/GAP-083): markdown with headings,
+   * LaTeX math ($...$ inline, $$...$$ display), and fenced ```diagram blocks.
+   * Optional for backward compatibility — consumers fall back to `transcript`.
+   */
+  notebook: z.string().trim().min(1).optional(),
   /** Prompts embedded in the audio that force a response before continuing. */
   pausePrompts: z
     .array(

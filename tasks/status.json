@@ -1,8 +1,24 @@
 {
  "schemaVersion": 1,
- "updatedAt": "2026-08-15T19:16:00.000Z",
+ "updatedAt": "2026-08-15T20:50:00.000Z",
  "controller": "gapos-controller",
  "tasks": {
+  "GAP-083": {
+   "status": "in_progress",
+   "startedAt": "2026-08-15T20:50:00.000Z",
+   "evidence": [
+    {
+     "command": "git status + git log --oneline -5; read specs/quality.md, tasks/backlog.yaml GAP-083, AGENTS.md",
+     "result": "pass",
+     "note": "Controller loop: branch autopilot/m1-fresh-checkout (one pre-existing unstaged file-mode change in apps/cli/src/main.ts, untouched); GAP-083 ready with dependencies GAP-039 (done) and E24-US1-validation (done). Contract = E25 notebook: (1) lesson_package contract gains an optional `notebook` markdown string, version 1.0.0 -> 1.1.0, backward-compatible (consumers fall back to transcript); (2) generateLesson prompt demands notebook (same content as script, textbook form: headings, $-/$-LaTeX, fenced diagram blocks); (3) web renders markdown + LaTeX + token-driven diagram SVG with a Listen/Read toggle persisted per session; (4) tests: contract validates with and without notebook, render test asserts LaTeX (sqrt of d_k) renders as math and a diagram renders as SVG, toggle hides/shows and persists. Baseline verify was red on format:check only because the E25 planning commit (0a5c8bd) left tasks/backlog.yaml unformatted; fixed with prettier --write (format-only, same file this task lives in) and re-ran the gate."
+    },
+    {
+     "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm verify (baseline after backlog.yaml format fix)",
+     "result": "pass",
+     "note": "609 passed | 26 loud skips (635 total), 48 files passed | 4 skipped. Format + lint + typecheck + full suite green. Same hermetic note as every E22-E24 task: the sandbox injects GAPOS_PROVIDER_MODE=live without a key, so verify runs with env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL."
+    }
+   ]
+  },
   "GAP-035": {
    "status": "done",
    "startedAt": "2026-08-14T05:01:06.000Z",
