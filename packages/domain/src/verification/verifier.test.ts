@@ -397,3 +397,46 @@ describe('the repair loop', () => {
     expect(actions).toEqual(['repair', 'repair', 'exclude']);
   });
 });
+
+describe('the shared glossary rule (E26 fix)', () => {
+  const lesson = toVerifiable(1);
+
+  it('does NOT flag a term the lesson never discusses', () => {
+    // "Eigendecomposition" is in the reference plan's glossary, but a Day-1 sets lesson
+    // has nothing to do with it. Requiring it would exclude the whole course.
+    const findings = verifyLesson(
+      { ...lesson, script: 'Today we study sets, unions and intersections.' },
+      contextFor(lesson),
+    );
+    const glossaryFindings = findings.filter((f) => f.finding.includes('glossary term'));
+    expect(glossaryFindings).toEqual([]);
+  });
+
+  it('flags a term when the lesson discusses the concept without the agreed wording', () => {
+    // The spoken lesson talks about the concept (the term's first word appears in the
+    // script) but never uses the agreed term itself — that is drift worth repairing.
+    const findings = verifyLesson(
+      { ...lesson, script: 'We keep the scaling small so the numbers stay stable.' },
+      {
+        ...contextFor(lesson),
+        glossaryTerms: ['scaling factor', 'attention weights'],
+      },
+    );
+    const drift = findings.filter(
+      (f) => f.finding.includes('glossary term') && f.finding.includes('scaling factor'),
+    );
+    expect(drift.length).toBe(1);
+  });
+
+  it('uses the agreed term without a finding', () => {
+    const findings = verifyLesson(
+      { ...lesson, script: 'Today we study the scaling factor and attention weights.' },
+      {
+        ...contextFor(lesson),
+        glossaryTerms: ['scaling factor', 'attention weights'],
+      },
+    );
+    const glossaryFindings = findings.filter((f) => f.finding.includes('glossary term'));
+    expect(glossaryFindings).toEqual([]);
+  });
+});

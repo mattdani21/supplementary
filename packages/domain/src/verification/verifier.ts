@@ -350,16 +350,26 @@ const checkGlossary = (lesson: VerifiableLesson, context: VerificationContext): 
   const script = normalise(lesson.script);
   const findings: Finding[] = [];
 
-  // Drift is a glossary term that has *disappeared* — a lesson that should use the shared term
-  // and instead invented its own. Presence of extra vocabulary is normal; absence of the agreed
-  // term while teaching the same objective is the failure worth catching.
-  const expected = context.glossaryTerms.filter(
-    (term) => lesson.objectiveIds.some(() => true) && normalise(term).split(' ').length <= 3,
-  );
+  // Drift is a glossary term that has *disappeared* — the lesson discusses the concept
+  // but invented its own wording instead of the agreed term. A lesson that never
+  // discusses the concept at all is NOT a finding: the plan's shared glossary is a
+  // curriculum-wide terminology contract, not a checklist every day must recite.
+  // (Fixed E26: previously every lesson was required to contain every glossary term,
+  // which excluded whole courses — e.g. "Eigendecomposition" demanded inside a
+  // Day-1 sets lesson — even when the lesson had nothing to do with the concept.)
+  const expected = context.glossaryTerms.filter((term) => {
+    const normalisedTerm = normalise(term);
+    if (normalisedTerm.split(' ').length > 3) return false;
+    if (script.includes(normalisedTerm)) return false;
+    // The spoken lesson is about the concept (or close to it) but does not use the
+    // agreed term: a meaningful prefix of the term appears in the script. Question
+    // prompts are deliberately excluded — they are authored against the transcript
+    // and routinely name concepts the spoken script does not.
+    const prefix = normalisedTerm.split(' ')[0]!;
+    return prefix.length >= 4 && script.includes(prefix);
+  });
 
   for (const term of expected) {
-    const normalisedTerm = normalise(term);
-    if (script.includes(normalisedTerm)) continue;
     findings.push({
       category: 'spoken_clarity',
       severity: 'low',

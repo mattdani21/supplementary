@@ -96,7 +96,6 @@ export const normaliseForSpeech = (text: string): string => {
 
   // restore protected phrases (the marker regex is constructed from a constant, not
   // user input — the control character is deliberate and safe)
-  // eslint-disable-next-line no-control-regex
   const restore = new RegExp(`${MARKER}(\\d+)${MARKER}`, 'g');
   out = out.replace(restore, (_m, index: string) => {
     const value = protectedPhrases[Number(index)];
