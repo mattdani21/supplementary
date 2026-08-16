@@ -831,46 +831,154 @@ details > summary {
 }
 
 /* Study surface: audio player + transcript + practice items. */
-.player-surface {
+/* Study surface (GAP-091): the notebook card. */
+.study-surface {
   background: linear-gradient(180deg, var(--surface-2), var(--surface));
 }
 
-.player-surface audio {
+.study-surface audio {
   width: 100%;
 }
 
-/* Audio player chrome (GAP-038, E23 quality spec §8): a custom transport so the speed cycle,
-   seek and segment skip share the design system. The native <audio> element is hidden — the
-   chrome drives it. */
-.audio-player {
+/* Floating player dock (GAP-091): the lesson notebook is always on screen; the dock floats
+   above the tab bar with the transport and sheet triggers. Sheets slide up over the dock. */
+.study-dock {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--tab-bar-height) + env(safe-area-inset-bottom, 0px) + 0.5rem);
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  width: min(calc(100% - 1.5rem), calc(var(--frame-max) - 1.5rem));
+  padding: 0.625rem 0.75rem 0.75rem;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--surface-2) 92%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+}
+
+.study-dock__row {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.study-dock__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.375rem;
+}
+
+.dock-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.5rem 0.75rem;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--spring);
+}
+
+.dock-btn:hover {
+  background: var(--surface-2);
+}
+
+.dock-btn:active {
+  transform: scale(0.97);
+}
+
+.dock-btn[aria-expanded='true'] {
+  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Backdrop behind an open sheet: dims the lesson, keeps the dock itself tappable. */
+.dock-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 65;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+/* Bottom sheet: transcript, questions, or a due checkpoint. Slides up over the dock. */
+.dock-sheet {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--tab-bar-height) + env(safe-area-inset-bottom, 0px) + 0.5rem);
+  transform: translateX(-50%) translateY(0);
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: min(calc(100% - 1.5rem), calc(var(--frame-max) - 1.5rem));
+  max-height: min(70dvh, 34rem);
+  padding: 1rem;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  overflow-y: auto;
+}
+
+.dock-sheet[hidden] {
+  display: none;
+}
+
+.dock-sheet__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.dock-sheet__title {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+
+.dock-sheet__close {
+  padding: 0.375rem 0.625rem;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.dock-sheet__body {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
 }
 
-.audio-player__element {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
+.dock-sheet__body .attempt-form + .attempt-form {
+  padding-top: 1rem;
+  border-top: 1px solid var(--hairline);
 }
 
-.player-chrome {
-  display: flex;
-  flex-direction: column;
-  gap: 0.625rem;
-  padding: 0.875rem 1rem;
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-}
-
-.player-chrome__row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+/* A due checkpoint sheet is not dismissible: answering is required to continue. */
+.dock-sheet--checkpoint {
+  border-color: rgba(79, 140, 255, 0.4);
 }
 
 .player-btn {
@@ -943,14 +1051,26 @@ details > summary {
   accent-color: var(--accent);
 }
 
+/* Fallback stacking (no audio / failed): the note and transcript read as one column. */
+.audio-player {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.audio-player__element {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
 .transcript__id {
   font-size: 0.75rem;
   color: var(--text-tertiary);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-}
-
-.practice-section {
-  margin-top: 1.5rem;
 }
 
 .attempt-form .prompt {
@@ -1548,46 +1668,6 @@ summary:focus-visible {
 
 /* ------------------------------------------- notebook (E25/GAP-083) */
 
-.study-mode {
-  display: inline-flex;
-  gap: 0.25rem;
-  padding: 0.25rem;
-  border: 1px solid var(--hairline, rgba(255, 255, 255, 0.08));
-  border-radius: 999px;
-  background: var(--surface-2, #1a1a1e);
-  margin-bottom: 1rem;
-}
-
-.study-mode__btn {
-  appearance: none;
-  border: none;
-  background: none;
-  color: var(--text-tertiary, rgba(255, 255, 255, 0.55));
-  font-size: 0.8125rem;
-  font-weight: 600;
-  padding: 0.35rem 0.9rem;
-  border-radius: 999px;
-  cursor: pointer;
-  transition:
-    color 120ms ease-out,
-    background 120ms ease-out;
-}
-
-.study-mode__btn:hover {
-  color: var(--text-primary, #fff);
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.study-mode__btn:focus-visible {
-  outline: 2px solid var(--accent, #4f8cff);
-  outline-offset: 2px;
-}
-
-.study-mode__btn.is-active {
-  background: var(--accent, #4f8cff);
-  color: #fff;
-}
-
 .notebook__read {
   max-width: 68ch;
   line-height: 1.65;
@@ -1628,6 +1708,15 @@ summary:focus-visible {
   border-radius: 12px;
   background: var(--surface, #121214);
   overflow-x: auto;
+}
+
+/* Diagrams keep a readable floor width: on narrow phones the figure scrolls
+   horizontally instead of shrinking the whole viewBox to illegible text. */
+.notebook__diagram svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-width: 520px;
 }
 
 .notebook__list {
@@ -1745,8 +1834,9 @@ summary:focus-visible {
   .tab-bar,
   .back-link,
   .export-controls,
-  .study-mode,
-  .player-surface .notebook__listen,
+  .study-dock,
+  .dock-backdrop,
+  .dock-sheet,
   .practice-section,
   .segmented,
   .page-head__meta {

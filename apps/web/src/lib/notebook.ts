@@ -70,16 +70,31 @@ const parseDiagram = (
   return { nodes: [...nodes], edges };
 };
 
-/** Render a simple token diagram as inline SVG (dark-theme friendly). */
+/**
+ * Render a simple token diagram as inline SVG (dark-theme friendly).
+ *
+ * Layout: nodes flow left-to-right in rows of at most NODES_PER_ROW (a long one-row strip
+ * scales the whole viewBox down to unreadable on phones — the attention pipeline with 8
+ * nodes used to render at ~3px effective text). Bigger boxes and a wider font keep the
+ * diagram legible when the figure scales to the container.
+ */
 export const renderDiagramSvg = (spec: string): string => {
   const { nodes, edges } = parseDiagram(spec);
-  const width = Math.max(320, nodes.length * 140 + 40);
-  const height = Math.max(80, Math.ceil(edges.length / Math.max(1, nodes.length - 1)) * 90 + 40);
+  const nodesPerRow = 4;
+  const boxWidth = 150;
+  const boxHeight = 46;
+  const colGap = 170;
+  const rowGap = 110;
+  const margin = 60;
+  const cols = Math.min(nodes.length, nodesPerRow);
+  const rows = Math.max(1, Math.ceil(nodes.length / nodesPerRow));
+  const width = Math.max(340, cols * colGap + margin + 25);
+  const height = rows * rowGap + 30;
   const positions = new Map<string, { x: number; y: number }>();
   nodes.forEach((node, i) => {
-    const col = nodes.length === 1 ? 0 : i % Math.max(1, nodes.length - 1);
-    const row = Math.floor(i / Math.max(1, nodes.length - 1));
-    positions.set(node, { x: 60 + col * 130, y: 40 + row * 80 });
+    const col = i % nodesPerRow;
+    const row = Math.floor(i / nodesPerRow);
+    positions.set(node, { x: margin + col * colGap, y: 40 + row * rowGap });
   });
   const edgeSvg = edges
     .map(([from, to]) => {
@@ -95,10 +110,10 @@ export const renderDiagramSvg = (spec: string): string => {
       if (!p) return '';
       const escaped = node.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       return (
-        `<rect x="${p.x - 58}" y="${p.y - 18}" width="116" height="36" rx="10" fill="#121214" ` +
-        `stroke="rgba(255,255,255,0.12)"/>` +
-        `<text x="${p.x}" y="${p.y + 4}" text-anchor="middle" fill="rgba(255,255,255,0.85)" ` +
-        `font-size="12" font-family="system-ui">${escaped}</text>`
+        `<rect x="${p.x - boxWidth / 2}" y="${p.y - boxHeight / 2}" width="${boxWidth}" ` +
+        `height="${boxHeight}" rx="10" fill="#121214" stroke="rgba(255,255,255,0.12)"/>` +
+        `<text x="${p.x}" y="${p.y + 5}" text-anchor="middle" fill="rgba(255,255,255,0.85)" ` +
+        `font-size="14" font-family="system-ui">${escaped}</text>`
       );
     })
     .join('');

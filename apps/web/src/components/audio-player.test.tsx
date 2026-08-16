@@ -161,6 +161,41 @@ describe('scroll-synced transcript with a small fixture (GAP-038)', () => {
   });
 });
 
+describe('the floating dock (GAP-091)', () => {
+  it('renders the transport, speed, Transcript and Questions triggers', () => {
+    const html = renderView({
+      questions: { count: 2, children: <p>form-1</p> },
+    });
+    expect(html).toContain('class="study-dock"');
+    expect(html).toContain('aria-label="Previous segment"');
+    expect(html).toContain('aria-label="Play"');
+    expect(html).toContain('aria-label="Next segment"');
+    expect(html).toContain('class="player-speed"');
+    expect(html).toContain('>Transcript<');
+    expect(html).toContain('>Questions (2)<');
+  });
+
+  it('keeps the transcript and questions in sheets, closed by default', () => {
+    const html = renderView({
+      questions: { count: 1, children: <p>form-1</p> },
+    });
+    // Both sheets are in the DOM (hidden) — the questions children are mounted with them.
+    expect(html).toContain('aria-label="Transcript"');
+    expect(html).toContain('aria-label="Questions"');
+    expect(html).toContain('form-1');
+    // A closed sheet is hidden; nothing is open on first paint.
+    expect(html.match(/class="dock-sheet"/g)?.length ?? 0).toBe(2);
+    expect(html).not.toContain('dock-sheet is-open');
+    expect(html).toContain('hidden=""');
+  });
+
+  it('opens the questions sheet only when questions are provided', () => {
+    const html = renderView();
+    expect(html).not.toContain('>Questions (');
+    expect(html).not.toContain('aria-label="Questions"');
+  });
+});
+
 describe('the audio-unavailable fallback (GAP-038)', () => {
   it('renders the designed fallback with the transcript, never a raw error string', () => {
     const html = renderToStaticMarkup(

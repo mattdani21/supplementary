@@ -36,6 +36,24 @@ const PHASE_LABELS: Record<string, string> = {
   cancelled: 'Cancelled',
 };
 
+/** Statuses where the pipeline is actively running — the only ones that render the
+ * generation surface. Terminal states (complete / partial / failed / cancelled) show the
+ * calm course-progress card instead; the raw compile steps serve no purpose then. */
+const ACTIVE_RUN_STATUSES: readonly string[] = [
+  'queued',
+  'ingesting',
+  'planning',
+  'generating_lessons',
+  'generating_assessment',
+  'auditing',
+  'repairing',
+  'synthesising_audio',
+  'publishing',
+];
+
+export const isActiveRunStatus = (status?: string | null): boolean =>
+  ACTIVE_RUN_STATUSES.includes(status ?? '');
+
 const RUN_TONE: Record<string, string> = {
   complete: 'pill--ok',
   partial: 'pill--warn',

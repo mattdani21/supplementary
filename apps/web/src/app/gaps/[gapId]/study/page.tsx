@@ -184,8 +184,11 @@ export default async function StudyPage({
         <ExportControls gapId={gapId} lessonId={lesson.id} />
       </header>
 
-      <section className="card player-surface" aria-labelledby="listen-heading">
-        <h2 id="listen-heading">Study</h2>
+      {/* The notebook is always on screen (GAP-091): no Listen/Read toggle. Audio lives in
+          the floating dock below, and practice items open from the dock's Questions sheet —
+          the learner never scrolls away from the lesson. */}
+      <section className="card study-surface" aria-labelledby="study-heading">
+        <h2 id="study-heading">Lesson</h2>
         <NotebookSection
           notebookHtml={lesson.package.notebook ? notebookToHtml(lesson.package.notebook) : ''}
           transcript={transcriptText}
@@ -193,48 +196,21 @@ export default async function StudyPage({
             gapId,
             lessonId: lesson.id,
           }}
-          listenSurface={
-            <>
-              {audio.length > 0 ? (
-                <AudioPlayer
-                  gapId={gapId}
-                  segments={audio.map((artefact) => ({
-                    artefactId: artefact.id,
-                    durationSeconds: artefact.durationSeconds,
-                  }))}
-                  transcript={transcriptText}
-                  pausePrompts={pausePrompts}
-                  checkpointLocators={checkpointLocators}
-                />
-              ) : (
-                <>
-                  <p className="muted">No audio for this lesson.</p>
-                  {transcriptText ? (
-                    <p className="transcript">{transcriptText}</p>
-                  ) : (
-                    <p className="muted">Transcript unavailable for this lesson.</p>
-                  )}
-                </>
-              )}
-              {pausePrompts.length > 0 && (
-                <p className="muted checkpoint-note">
-                  <strong>Checkpoint:</strong> the lesson pauses at the question —{' '}
-                  {pausePrompts[0]!.prompt}
-                </p>
-              )}
-              {/* Traceability is user-visible (E24 US2, C-07): the locators behind this lesson,
-                  one step from the source. A general-knowledge lesson carries the label. */}
-              <SourceLinks
-                gapId={gapId}
-                basis={
-                  lesson.package.evidence?.basis === 'general_knowledge'
-                    ? 'general_knowledge'
-                    : 'source'
-                }
-                locators={checkpointLocators}
-              />
-            </>
+        />
+        {pausePrompts.length > 0 && (
+          <p className="muted checkpoint-note">
+            <strong>Checkpoint:</strong> the lesson pauses at the question —{' '}
+            {pausePrompts[0]!.prompt}
+          </p>
+        )}
+        {/* Traceability is user-visible (E24 US2, C-07): the locators behind this lesson,
+            one step from the source. A general-knowledge lesson carries the label. */}
+        <SourceLinks
+          gapId={gapId}
+          basis={
+            lesson.package.evidence?.basis === 'general_knowledge' ? 'general_knowledge' : 'source'
           }
+          locators={checkpointLocators}
         />
         {annotations.length > 0 && (
           <div className="notebook-annotations" aria-label="Your pinned notes">
@@ -249,29 +225,57 @@ export default async function StudyPage({
         )}
       </section>
 
-      <section id="questions" className="practice-section" aria-labelledby="questions-heading">
-        <h2 id="questions-heading">Questions</h2>
-        {lesson.questions.length === 0 ? (
-          <EmptyState
-            title="No practice items yet."
-            body="Compile the gap — verified practice items appear here once the course is published."
-            action={
-              <Link href={`/gaps/${gapId}`} className="btn">
-                Open the workspace
-              </Link>
-            }
-          />
-        ) : (
-          questions.map((question) => (
-            <AttemptForm
-              key={question.id}
-              gapId={gapId}
-              sessionId={sessionId}
-              question={question}
+      {audio.length > 0 ? (
+        <AudioPlayer
+          gapId={gapId}
+          segments={audio.map((artefact) => ({
+            artefactId: artefact.id,
+            durationSeconds: artefact.durationSeconds,
+          }))}
+          transcript={transcriptText}
+          pausePrompts={pausePrompts}
+          checkpointLocators={checkpointLocators}
+          questions={
+            questions.length > 0
+              ? {
+                  count: questions.length,
+                  children: questions.map((question) => (
+                    <AttemptForm
+                      key={question.id}
+                      gapId={gapId}
+                      sessionId={sessionId}
+                      question={question}
+                    />
+                  )),
+                }
+              : undefined
+          }
+        />
+      ) : (
+        <section className="card" aria-labelledby="questions-heading">
+          <h2 id="questions-heading">Questions</h2>
+          {questions.length === 0 ? (
+            <EmptyState
+              title="No practice items yet."
+              body="Compile the gap — verified practice items appear here once the course is published."
+              action={
+                <Link href={`/gaps/${gapId}`} className="btn">
+                  Open the workspace
+                </Link>
+              }
             />
-          ))
-        )}
-      </section>
+          ) : (
+            questions.map((question) => (
+              <AttemptForm
+                key={question.id}
+                gapId={gapId}
+                sessionId={sessionId}
+                question={question}
+              />
+            ))
+          )}
+        </section>
+      )}
 
       {next && (
         <nav className="next-lesson" aria-label="Continue">

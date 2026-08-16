@@ -1098,6 +1098,30 @@ tasks:
       - 'render test: 7/7 published lessons -> no "Continue — Day" text; shows completion state'
       - 'pnpm verify passes'
 
+  - id: GAP-094
+    title: 'Study surface: kill the Listen page, float the player + move questions to a popout (E27)'
+    epic: E27
+    priority: P0
+    status: done
+    dependencies: []
+    goal: 'The study page still has a Listen/Read toggle (audio page hides the notebook), practice questions sit below the notebook forcing repeated scrolling, notebook diagrams render as an unreadable one-row strip, and the home page shows the raw compile-progress card + debug log for finished courses (partial/failed/complete) where it serves no purpose.'
+    scope:
+      - 'notebook: always on screen — remove the Listen/Read toggle and its storage key'
+      - 'audio: floating dock above the tab bar (play/pause, prev/next segment, speed cycle, seek) with a Transcript sheet and a Questions sheet; a due checkpoint auto-opens its own sheet'
+      - 'questions: lifted from below the notebook into the dock Questions sheet; no-audio lessons keep the inline fallback section'
+      - 'diagrams: nodes flow in rows of 4 (not one long strip), bigger boxes/font, svg keeps a readable floor width with horizontal scroll on phones'
+      - 'home page: GenerationProgress renders only while the run is active (or never compiled); terminal statuses hide it — new isActiveRunStatus helper shared with the gap page'
+    acceptance:
+      - 'render test: study page has notebook + study-dock, transcript and Questions(count) in hidden sheets, no practice-section below'
+      - 'component test: dock renders transport + Transcript + Questions triggers; sheets closed by default; questions sheet only with questions'
+      - 'unit test: isActiveRunStatus true only for in-flight statuses'
+      - 'unit test: an 8-node diagram renders two rows (viewBox wider than tall, <800px) with font-size 14'
+      - 'pnpm verify passes'
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+
   - id: GAP-091
     title: 'Speak-a-gap record button is a silent dead control on prod (E27: STT unconfigured)'
     epic: E27

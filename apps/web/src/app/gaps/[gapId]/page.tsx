@@ -2,7 +2,7 @@ import Link from 'next/link';
 import type { Gap } from '@gapos/database';
 import { EmptyState } from '../../../components/empty-state';
 import { CourseProgress } from '../../../components/course-progress';
-import { GenerationProgress } from '../../../components/generation-progress';
+import { GenerationProgress, isActiveRunStatus } from '../../../components/generation-progress';
 import { SourceForm } from '../../../components/source-form';
 import { TransitionButtons } from '../../../components/transition-buttons';
 import { WorkspaceTabs, type WorkspaceTab } from '../../../components/workspace-tabs';
@@ -169,15 +169,7 @@ export default async function GapDetailPage({
             }
           />
 
-          {(log.run?.status === 'queued' ||
-            log.run?.status === 'ingesting' ||
-            log.run?.status === 'planning' ||
-            log.run?.status === 'generating_lessons' ||
-            log.run?.status === 'generating_assessment' ||
-            log.run?.status === 'auditing' ||
-            log.run?.status === 'repairing' ||
-            log.run?.status === 'synthesising_audio' ||
-            log.run?.status === 'publishing') && (
+          {log.run?.status !== undefined && isActiveRunStatus(log.run.status) && (
             <details className="course-progress__debug">
               <summary>Compilation details</summary>
               <GenerationProgress

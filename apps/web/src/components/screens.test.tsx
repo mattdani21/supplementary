@@ -279,31 +279,39 @@ describe('the course progress surface replaces the raw compile log (E26)', () =>
 });
 
 describe('the study surface (GAP-037)', () => {
-  it('renders the transcript text and the single-tap confidence control', async () => {
+  it('renders the notebook, the dock transcript and the confidence control (GAP-091)', async () => {
     const html = await renderWithShell(
       await StudyPage({ params: Promise.resolve({ gapId: compiledGapId }) }),
     );
 
-    // The transcript is rendered as readable text below the player — the audio fallback's
-    // "text below" promise (E23 quality spec §8).
-    expect(html).toContain('class="transcript"');
-    expect(html).not.toContain('transcript__id'); // placeholder id display is gone
+    // The notebook is always on screen; audio lives in the floating dock (GAP-091).
+    expect(html).toContain('class="notebook__read"');
+    expect(html).toContain('class="study-dock"');
+    expect(html).toContain('class="study-dock__actions"');
 
-    // Practice items carry the segmented confidence control (not three radios).
+    // The transcript ships with the dock (scroll-synced, tap-to-seek segments) and the
+    // placeholder id display is gone.
+    expect(html).toContain('class="transcript"');
+    expect(html).not.toContain('transcript__id');
+
+    // Practice items are lifted into the dock's Questions sheet — never below the notebook —
+    // and still carry the segmented confidence control (not three radios).
+    expect(html).toContain('>Questions (');
     expect(html).toContain('role="radiogroup"');
     expect(html).toMatch(/role="radio"/g);
     expect(html).not.toContain('type="radio"');
+    expect(html).not.toContain('class="practice-section"');
   });
 });
 
 describe('the checkpoint on the study page (E24 US1, T010)', () => {
-  it('renders the lesson checkpoint question inside the Listen section', async () => {
+  it('renders the lesson checkpoint note next to the lesson', async () => {
     const html = await renderWithShell(
       await StudyPage({ params: Promise.resolve({ gapId: compiledGapId }) }),
     );
 
-    // The published lesson carries a pause prompt; the study page surfaces the checkpoint
-    // question next to the player so the learner knows what they will be asked to respond to.
+    // The published lesson carries a pause prompt; the note under the notebook tells the
+    // learner what they will be asked to respond to (the prompt itself pauses the dock).
     expect(html).toContain('Checkpoint');
     expect(html).toMatch(/say out loud what[^<]*arbitrary[^<]*protecting you from/i);
   });

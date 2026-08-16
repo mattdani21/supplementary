@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { Gap } from '@gapos/database';
 import { EmptyState } from '../components/empty-state';
-import { GenerationProgress } from '../components/generation-progress';
+import { GenerationProgress, isActiveRunStatus } from '../components/generation-progress';
 import { OnboardingGate } from '../components/onboarding';
 import { isActionableGap } from '../lib/tab-bar-items';
 import { pillClass } from '../lib/status-pill';
@@ -90,7 +90,11 @@ export default async function HomePage() {
           </Link>
         )}
 
-        {featured && !today.lesson && (
+        {/* The generation surface only earns its place while the pipeline is actually
+            running (or never started — the "add sources" nudge). A finished course —
+            complete, partial or failed — gets the calm course-progress card on its
+            workspace instead; raw compile steps serve no purpose on Today then. */}
+        {featured && !today.lesson && (!log.run || isActiveRunStatus(log.run.status)) && (
           <GenerationProgress
             run={log.run}
             steps={log.steps}

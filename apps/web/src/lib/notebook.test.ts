@@ -111,4 +111,28 @@ describe('renderDiagramSvg', () => {
     expect(svg).toContain('Scores');
     expect(svg).toContain('role="img"');
   });
+
+  it('caps nodes per row so wide diagrams stay legible (GAP-091)', () => {
+    // The attention pipeline: 8 nodes. Before the fix the whole strip sat in one row,
+    // scaling the viewBox down to ~3px effective text on a phone.
+    const spec = [
+      'input tokens -> embeddings',
+      'embeddings -> Q and K',
+      'K -> K transpose',
+      'Q and K transpose -> scores',
+      'Q and K transpose -> softmax rows',
+    ].join('\n');
+    const svg = renderDiagramSvg(spec);
+    // The viewBox is wider than tall (two rows of four), never one long thin strip —
+    // height for 2 rows, width capped at 4 columns.
+    const viewBox = svg.match(/viewBox="0 0 (\d+) (\d+)"/);
+    expect(viewBox).not.toBeNull();
+    const width = Number(viewBox![1]);
+    const height = Number(viewBox![2]);
+    expect(width).toBeGreaterThan(height);
+    expect(height).toBeGreaterThan(150); // two rows of nodes
+    expect(width).toBeLessThan(800); // four columns, not eight
+    // Bigger readable type in the scaled viewBox.
+    expect(svg).toContain('font-size="14"');
+  });
 });
