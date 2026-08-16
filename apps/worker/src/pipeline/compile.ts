@@ -1156,7 +1156,10 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
         generateLesson(
           'Repair only the failed items in this lesson; leave everything else untouched. ' +
             'Findings to address: ' +
-            decision.findings.map((f) => `${f.category}: ${f.finding}`).join(' | '),
+            decision.findings.map((f) => `${f.category}: ${f.finding}`).join(' | ') +
+            ' Every free-response question in the repaired lesson MUST ship a concrete rubric ' +
+            '(grading criteria with at least 2-3 explicit checkpoints, a model answer, and ' +
+            'partial-credit rules) on this pass — a question without a rubric is rejected.',
           0,
         ),
     );

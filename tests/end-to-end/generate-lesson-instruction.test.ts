@@ -20,6 +20,7 @@
 import { describe, expect, it } from 'vitest';
 import type { OwnerId } from '@gapos/database';
 import { fixtureById } from '@gapos/evaluation';
+import { lessonMissingCheckpoint, referenceLesson } from '@gapos/test-fixtures';
 import type { ServerContext } from '../../apps/web/src/server/context.js';
 import {
   applyTransition,
@@ -30,6 +31,11 @@ import {
 import { buildRecordingContext } from './recording-provider.js';
 
 const OWNER: OwnerId = 'user_lesson_instruction';
+
+const dayFromSubject = (subject: string | undefined): number => {
+  const match = /(\d+)/.exec(subject ?? '');
+  return match?.[1] ? Number(match[1]) : 1;
+};
 
 /** Compile the eval_01 reference gap end-to-end against the recording fake. */
 const compileEvalOne = async (context: ServerContext, key: string): Promise<void> => {
@@ -134,5 +140,36 @@ describe('the generateLesson instruction demands a concrete rubric for every fre
 
     const instruction = firstLessonInstruction(calls);
     expect(instruction).toMatch(/partial[- ]credit/i);
+  });
+});
+
+describe('the REPAIR instruction re-demands rubrics for every free-response question (E25 T054)', () => {
+  it('appends the rubric demand to the repair prompt after a verification failure', async () => {
+    // Script the fake: the first lesson package is faulty (no checkpoint → verification
+    // fails → repair runs); every later lesson is clean reference content.
+    let faultyServed = false;
+    const { context, calls } = buildRecordingContext({
+      script: {
+        lesson_package: (request) => {
+          const day = dayFromSubject(request.subject);
+          if (!faultyServed) {
+            faultyServed = true;
+            return lessonMissingCheckpoint(day);
+          }
+          return referenceLesson(day);
+        },
+      },
+    });
+
+    await compileEvalOne(context, 't054-repair-rubric-demand');
+
+    const lessonCalls = calls.filter(
+      (c) => (c as { contractName?: string }).contractName === 'lesson_package',
+    );
+    expect(lessonCalls.length, 'the repair produced a second lesson call').toBeGreaterThan(1);
+    const repairInstruction = (lessonCalls[1] as { instruction: string }).instruction;
+    expect(repairInstruction).toMatch(/Findings to address/i);
+    expect(repairInstruction).toMatch(/MUST ship a concrete rubric/i);
+    expect(repairInstruction).toMatch(/a question without a rubric is rejected/i);
   });
 });

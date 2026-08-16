@@ -18,17 +18,20 @@ import {
   createLanguageModel,
   createTextToSpeech,
 } from '@gapos/provider-adapters';
+import type { FakeLanguageModelOptions } from '@gapos/provider-adapters';
 import { CostAccountant, createLogger, createMetrics } from '@gapos/observability';
 import { createServerContext, type ServerContext } from '../../apps/web/src/server/context.js';
 
-export const buildRecordingContext = (): {
+export const buildRecordingContext = (
+  fake?: FakeLanguageModelOptions,
+): {
   context: ServerContext;
   calls: readonly RawCompletionRequest[];
 } => {
   const costAccountant = new CostAccountant();
   const metrics = createMetrics();
   const logger = createLogger({}, { level: 'error' });
-  const backend = createFakeLanguageModel();
+  const backend = createFakeLanguageModel(fake);
   const context = createServerContext({
     logLevel: 'error',
     providers: {
