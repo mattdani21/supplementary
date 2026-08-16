@@ -10,7 +10,7 @@
  */
 
 import { beforeEach, describe, expect, it } from 'vitest';
-import { REFERENCE_GAP_STATEMENT, SET_THEORY_SOURCE } from '@gapos/test-fixtures';
+import { REFERENCE_GAP_STATEMENT, referenceLesson, SET_THEORY_SOURCE } from '@gapos/test-fixtures';
 import type { OwnerId } from '@gapos/database';
 import { CostAccountant, createLogger, createMetrics } from '@gapos/observability';
 import {
@@ -74,6 +74,11 @@ const seedLearner = async (context: ServerContext, id: OwnerId) => {
     locale: 'en',
     timezone: 'UTC',
   });
+};
+
+const dayFromSubject = (subject: string | undefined): number => {
+  const match = /(\d+)/.exec(subject ?? '');
+  return match?.[1] ? Number(match[1]) : 1;
 };
 
 /** Steps 1–5 of the journey, shared by the tests that need a compiled course. */
@@ -526,5 +531,46 @@ describe('the fake audio corresponds to the text', () => {
     // pipeline's checksum comparison would pass vacuously.
     expect(checksumFor('a')).not.toBe(checksumFor('b'));
     expect(checksumFor('a')).toBe(checksumFor('a'));
+  });
+});
+
+describe('speech normalisation and audio integrity (E26)', () => {
+  it('publishes audio for a script full of math symbols, verified against the spoken form', async () => {
+    // The reference script has no math notation; force the fake to emit one that does.
+    // The pipeline must synthesise the NORMALISED text ("a squared", "one over two")
+    // and verify integrity against that same spoken form — a checksum mismatch here
+    // means the normalisation and the integrity check disagree.
+    let served = false;
+    const { context } = buildContext({
+      fake: {
+        script: {
+          lesson_package: (request) => {
+            const lesson = referenceLesson(dayFromSubject(request.subject));
+            if (!served) {
+              served = true;
+              return {
+                ...lesson,
+                script: 'The variance a^2 grows, and 1/2 of the data lies within one sigma.',
+                transcript: 'The variance a^2 grows, and 1/2 of the data lies within one sigma.',
+              };
+            }
+            return lesson;
+          },
+        },
+      },
+    });
+    await seedLearner(context, LEARNER);
+    const { outcome } = await compileReferenceCourse(context);
+
+    expect(outcome.status).toBe('complete');
+    const dayOne = outcome.days.find((d) => d.day === 1)!;
+    expect(dayOne.textOnly).toBe(false);
+    expect(dayOne.audioSegments).toBeGreaterThan(0);
+
+    // The published audio artefact must exist and pass the integrity check (i.e. the
+    // checksum of the normalised text matches what was synthesised).
+    const artefacts = await context.uow.curricula.listArtefacts(LEARNER, dayOne.lessonId);
+    const audio = artefacts.filter((a) => a.kind === 'audio');
+    expect(audio.length).toBe(dayOne.audioSegments);
   });
 });

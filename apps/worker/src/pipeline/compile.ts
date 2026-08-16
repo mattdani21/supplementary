@@ -1229,10 +1229,13 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
             segments,
             deps.concurrency ?? 3,
             async (segment) => {
+              // Speech normalisation (E26): the script is written for the eye (a^2, 1/2,
+              // ≤, Σ); TTS reads symbols literally unless rewritten to words. The SAME
+              // normalised text feeds the checksum below, so integrity matches what was
+              // actually synthesised (a lesson is only recorded once its audio is verified).
+              const spokenText = normaliseForSpeech(segment.text);
               const audio = await providers.textToSpeech.synthesise({
-                // Speech normalisation (E26): the script is written for the eye (a^2,
-                // 1/2, ≤, Σ); TTS reads symbols literally unless rewritten to words.
-                text: normaliseForSpeech(segment.text),
+                text: spokenText,
                 segmentId: segment.id,
                 voice: 'default',
                 locale: 'en',
@@ -1254,7 +1257,13 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
           // check runs inside the step, so a lesson is recorded as synthesised only once its
           // audio is verified, uploaded and recorded as artefacts — a re-entered run reuses the
           // recorded summary and never re-pays for synthesis.
-          const failures = checkAudioIntegrity(segments, results, shortChecksum);
+          const failures = checkAudioIntegrity(
+            segments,
+            results,
+            // The synthesised text is the speech-normalised form (E26), so integrity is
+            // verified against that same form.
+            (text) => shortChecksum(normaliseForSpeech(text)),
+          );
           if (failures.length > 0) {
             throw new Error(
               `Audio integrity check failed: ${failures.map((f) => f.code).join(', ')}`,
