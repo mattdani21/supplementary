@@ -10,6 +10,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import { ExplainLayer } from './explain-layer';
 
 export type StudyMode = 'listen' | 'read';
 
@@ -27,6 +28,12 @@ interface NotebookSectionProps {
   readonly transcript: string;
   /** The listen surface (audio player + transcript). Rendered when mode is listen. */
   readonly listenSurface: React.ReactNode;
+  /** Explain layer (E25 / GAP-085): selection → AI explanation → pin to notebook. */
+  readonly explain?: {
+    readonly gapId: string;
+    readonly lessonId: string;
+    readonly onPinned: (selection: string, explanation: string) => void;
+  };
 }
 
 export function StudyModeToggle({
@@ -58,7 +65,12 @@ export function StudyModeToggle({
   );
 }
 
-export function NotebookSection({ notebookHtml, transcript, listenSurface }: NotebookSectionProps) {
+export function NotebookSection({
+  notebookHtml,
+  transcript,
+  listenSurface,
+  explain,
+}: NotebookSectionProps) {
   const [mode, setMode] = useState<StudyMode>('listen');
 
   useEffect(() => {
@@ -74,19 +86,32 @@ export function NotebookSection({ notebookHtml, transcript, listenSurface }: Not
     }
   }, []);
 
+  const readSurface = notebookHtml ? (
+    // The HTML is server-rendered from the lesson's own notebook markdown through
+    // KaTeX + our diagram renderer — no user-supplied HTML reaches this point.
+    <div className="notebook__read" dangerouslySetInnerHTML={{ __html: notebookHtml }} />
+  ) : (
+    <div className="notebook__read">
+      <p className="transcript">{transcript}</p>
+    </div>
+  );
+
   return (
     <div className="notebook">
       <StudyModeToggle mode={mode} onChange={changeMode} />
       {mode === 'listen' ? (
         <div className="notebook__listen">{listenSurface}</div>
-      ) : notebookHtml ? (
-        // The HTML is server-rendered from the lesson's own notebook markdown through
-        // KaTeX + our diagram renderer — no user-supplied HTML reaches this point.
-        <div className="notebook__read" dangerouslySetInnerHTML={{ __html: notebookHtml }} />
+      ) : explain ? (
+        <ExplainLayer
+          gapId={explain.gapId}
+          lessonId={explain.lessonId}
+          context={transcript || ''}
+          onPinned={explain.onPinned}
+        >
+          {readSurface}
+        </ExplainLayer>
       ) : (
-        <div className="notebook__read">
-          <p className="transcript">{transcript}</p>
-        </div>
+        readSurface
       )}
     </div>
   );

@@ -6,7 +6,7 @@ import { EmptyState } from '../../../../components/empty-state';
 import { NotebookSection } from '../../../../components/notebook-section';
 import { SourceLinks } from '../../../../components/source-links';
 import { WorkspaceTabs } from '../../../../components/workspace-tabs';
-import { getLesson, listSources, todayView } from '../../../../server/api';
+import { getLesson, listAnnotations, listSources, todayView } from '../../../../server/api';
 import { getServerContext } from '../../../../server/bootstrap';
 import { formatDuration } from '../../../../lib/audio';
 import { notebookToHtml } from '../../../../lib/notebook';
@@ -90,6 +90,14 @@ export default async function StudyPage({ params }: { params: Promise<{ gapId: s
   const { lesson } = (await getLesson(context, owner, gapId, today.lesson.lessonId)) as {
     lesson: LessonView;
   };
+  const { annotations } = (await listAnnotations(context, owner, lesson.id)) as {
+    annotations: {
+      id: string;
+      lessonId: string;
+      selection: string;
+      explanation: string;
+    }[];
+  };
 
   const { sources } = (await listSources(context, owner, gapId)) as {
     sources: { id: string; filename: string }[];
@@ -159,6 +167,13 @@ export default async function StudyPage({ params }: { params: Promise<{ gapId: s
         <NotebookSection
           notebookHtml={lesson.package.notebook ? notebookToHtml(lesson.package.notebook) : ''}
           transcript={transcriptText}
+          explain={{
+            gapId,
+            lessonId: lesson.id,
+            onPinned: () => {
+              // The annotation is persisted server-side; the page reflects it on next load.
+            },
+          }}
           listenSurface={
             <>
               {audio.length > 0 ? (
@@ -202,6 +217,17 @@ export default async function StudyPage({ params }: { params: Promise<{ gapId: s
             </>
           }
         />
+        {annotations.length > 0 && (
+          <div className="notebook-annotations" aria-label="Your pinned notes">
+            <h3 className="notebook-annotations__title">Your notes</h3>
+            {annotations.map((annotation) => (
+              <blockquote key={annotation.id} className="notebook-annotation">
+                <p className="notebook-annotation__selection">“{annotation.selection}”</p>
+                <p className="notebook-annotation__body">{annotation.explanation}</p>
+              </blockquote>
+            ))}
+          </div>
+        )}
       </section>
 
       <section id="questions" className="practice-section" aria-labelledby="questions-heading">

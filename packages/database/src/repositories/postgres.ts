@@ -37,6 +37,8 @@ import {
   type Lesson,
   type MasteryEvidenceRecord,
   type MasteryRepository,
+  type NotebookAnnotationRecord,
+  type NotebookAnnotationsRepository,
   type ReviewItem,
   type Source,
   type SourceChunk,
@@ -221,6 +223,15 @@ const toEvidence = (row: any): MasteryEvidenceRecord => ({
   independent: row.independent,
   difficulty: row.difficulty,
   recordedAt: row.recorded_at,
+});
+
+const toNotebookAnnotation = (row: any): NotebookAnnotationRecord => ({
+  id: row.id,
+  ownerId: row.owner_id,
+  lessonId: row.lesson_id,
+  selection: row.selection,
+  explanation: row.explanation,
+  createdAt: row.created_at,
 });
 
 const toReview = (row: any): ReviewItem => ({
@@ -931,6 +942,28 @@ export const createPostgresUnitOfWork = (pool: Pool): UnitOfWork => {
     },
   };
 
+  const annotations: NotebookAnnotationsRepository = {
+    async add(owner, annotation) {
+      const { rows } = await db.query(
+        `INSERT INTO notebook_annotations (id, owner_id, lesson_id, selection, explanation)
+         VALUES ($1,$2,$3,$4,$5)
+         ON CONFLICT (owner_id, lesson_id, selection) DO UPDATE SET explanation = EXCLUDED.explanation
+         RETURNING *`,
+        [annotation.id, owner, annotation.lessonId, annotation.selection, annotation.explanation],
+      );
+      return require_(one(rows, toNotebookAnnotation), 'NotebookAnnotation', annotation.id);
+    },
+
+    async listForLesson(owner, lessonId) {
+      const { rows } = await db.query(
+        `SELECT * FROM notebook_annotations WHERE owner_id = $1 AND lesson_id = $2
+         ORDER BY created_at`,
+        [owner, lessonId],
+      );
+      return rows.map(toNotebookAnnotation);
+    },
+  };
+
   const generation: GenerationRepository = {
     async startRun(owner, run) {
       const inserted = await db.query(
@@ -1107,7 +1140,7 @@ export const createPostgresUnitOfWork = (pool: Pool): UnitOfWork => {
     },
   };
 
-  return { users, gaps, sources, curricula, attempts, mastery, generation, knowledge };
+  return { users, gaps, sources, curricula, attempts, mastery, generation, knowledge, annotations };
 };
 
 /** Remove every row, preserving the schema. Used to isolate integration tests from each other. */
@@ -1116,7 +1149,7 @@ export const truncateAll = async (pool: Pool): Promise<void> => {
     TRUNCATE users, gaps, sources, source_chunks, diagnostics, curricula, objectives, lessons,
              artefacts, questions, attempts, mastery_evidence, review_items, generation_runs,
              generation_steps, audit_findings, knowledge_edges, jobs, provider_usage, audit_log,
-             learner_profiles
+             learner_profiles, notebook_annotations
     RESTART IDENTITY CASCADE
   `);
 };

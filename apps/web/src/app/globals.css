@@ -1636,3 +1636,91 @@ summary:focus-visible {
 .notebook .transcript {
   white-space: pre-wrap;
 }
+
+/* ------------------------------------------- explain layer (E25/GAP-085) */
+
+.explain-layer {
+  position: relative;
+}
+
+.explain-popover__anchor {
+  position: fixed;
+  transform: translate(-50%, -100%);
+  z-index: 40;
+  max-width: min(22rem, calc(100vw - 2rem));
+}
+
+.explain-popover {
+  background: var(--surface-2, #1a1a1e);
+  border: 1px solid var(--hairline, rgba(255, 255, 255, 0.1));
+  border-radius: 14px;
+  padding: 0.9rem 1rem;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  color: var(--text-primary, #fff);
+  font-size: 0.875rem;
+}
+
+.explain-popover__selection {
+  font-weight: 600;
+  margin: 0 0 0.5rem;
+  color: var(--accent, #4f8cff);
+}
+
+.explain-popover__body {
+  margin: 0 0 0.75rem;
+  line-height: 1.55;
+}
+
+.explain-popover__actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.explain-popover__pinned {
+  color: var(--ok, #34d399);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.explain-popover__error {
+  color: var(--warn, #fbbf24);
+  margin: 0 0 0.5rem;
+}
+
+.notebook-annotations {
+  margin-top: 1.25rem;
+  border-top: 1px solid var(--hairline, rgba(255, 255, 255, 0.08));
+  padding-top: 1rem;
+}
+
+.notebook-annotations__title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary, rgba(255, 255, 255, 0.55));
+  margin: 0 0 0.75rem;
+}
+
+.notebook-annotation {
+  margin: 0 0 0.75rem;
+  padding: 0.75rem 1rem;
+  border-left: 3px solid var(--accent, #4f8cff);
+  background: var(--surface, #121214);
+  border-radius: 0 10px 10px 0;
+}
+
+.notebook-annotation__selection {
+  font-weight: 600;
+  color: var(--accent, #4f8cff);
+  font-size: 0.8125rem;
+  margin: 0 0 0.35rem;
+}
+
+.notebook-annotation__body {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.55;
+}

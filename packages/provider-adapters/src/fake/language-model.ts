@@ -58,6 +58,13 @@ export const referenceScript = (): Required<Record<string, FakeHandler>> => ({
     addressedFindings: ['Regenerated the failed artefact.'],
   }),
   claim_audit: (request) => claimAuditClean(request.subject ?? 'artefact'),
+  explain_selection: (request) => ({
+    schemaVersion: '1.0.0',
+    selection: request.subject ?? 'selected text',
+    explanation:
+      'This phrase names the operation that keeps attention scores from growing with the ' +
+      'embedding dimension. (Fake deterministic explanation for tests.)',
+  }),
 });
 
 export class FakeProviderFailure extends Error {

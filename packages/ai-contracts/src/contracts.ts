@@ -365,6 +365,22 @@ export const RepairResultContract = defineContract('repair_result', '1.0.0', {
 });
 export type RepairResult = z.infer<typeof RepairResultContract.schema>;
 
+/* --------------------------------------------------------------- stage H: explain */
+
+/**
+ * The explain layer (E25 / GAP-085): a learner selects a word/sentence in a lesson and
+ * gets a short, source-grounded explanation they can pin into the notebook. Free-form
+ * but contract-validated like every provider call (AGENTS.md §2.3).
+ */
+export const ExplainSelectionContract = defineContract('explain_selection', '1.0.0', {
+  selection: z.string().min(1),
+  /** Plain-language explanation, 2-4 sentences, written to be read. */
+  explanation: z.string().min(1),
+  /** Optional one-line note the learner sees in the notebook next to the selection. */
+  note: z.string().optional(),
+});
+export type ExplainSelection = z.infer<typeof ExplainSelectionContract.schema>;
+
 export const ALL_CONTRACTS = {
   gap_normalisation: GapNormalisationContract,
   diagnostic_interpretation: DiagnosticInterpretationContract,
@@ -373,4 +389,5 @@ export const ALL_CONTRACTS = {
   verification_report: VerificationReportContract,
   repair_result: RepairResultContract,
   claim_audit: ClaimAuditContract,
+  explain_selection: ExplainSelectionContract,
 } as const;

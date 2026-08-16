@@ -10,12 +10,14 @@
  */
 
 import { z } from 'zod';
+import { ExplainSelectionContract, type ExplainSelection } from '@gapos/ai-contracts';
 import type { GapTransition } from '@gapos/domain';
 import {
   ConcurrentModificationError,
   NotFoundError,
   type Lesson,
   type OwnerId,
+  type NotebookAnnotationRecord,
 } from '@gapos/database';
 import { ProviderBudgetError } from '@gapos/provider-adapters';
 import type { ServerContext } from './context.js';
@@ -318,6 +320,94 @@ export const submitAttemptHandler = async (
   const input = attemptSchema.parse(body) as SubmitAttemptInput;
   const result = await submitAttempt(context, owner, gapId, input);
   return { attempt: result };
+};
+
+/* ------------------------------------------------------------ explain (E25/GAP-085) */
+
+const explainSchema = z.object({
+  lessonId: z.string().min(1),
+  selection: z.string().min(1).max(2000),
+  /** Surrounding lesson text so the model explains in context. */
+  context: z.string().min(1).max(20000).optional(),
+});
+
+/**
+ * Explain a selected word/sentence in a lesson (E25 / GAP-085). The call goes through
+ * the budget-gated, contract-validated language model; the response is schema-checked
+ * before it is returned, and the learner can pin it into the notebook (the route also
+ * accepts an optional `pin: true` to persist the annotation).
+ */
+export const explainSelection = async (
+  context: ServerContext,
+  owner: OwnerId,
+  gapId: string,
+  body: unknown,
+): Promise<{ explanation: ExplainSelection }> => {
+  const input = explainSchema.parse(body) as {
+    lessonId: string;
+    selection: string;
+    context?: string;
+    pin?: boolean;
+  };
+  const response = await context.providers.languageModel.generate({
+    contract: ExplainSelectionContract,
+    purpose: 'teaching',
+    temperature: 0.2,
+    maxOutputTokens: 500,
+    reasoningEffort: 'low',
+    runId: `explain-${gapId}-${input.lessonId}`,
+    userId: owner,
+    subject: input.selection,
+    instruction:
+      'Explain the selected text from a lesson as a careful teacher would: plain language, ' +
+      '2-4 sentences, defining any term inside the explanation, and connecting it to the ' +
+      'surrounding lesson. The selection is the only thing to explain; do not restate it at ' +
+      'length. Never invent: if the context does not support a claim, say what it likely ' +
+      'means and mark the uncertainty.',
+    evidence: input.context
+      ? [
+          {
+            sourceId: 'lesson-context',
+            chunkId: input.lessonId,
+            locator: 'lesson',
+            text: input.context,
+          },
+        ]
+      : undefined,
+  });
+  return { explanation: response.value as ExplainSelection };
+};
+
+/** Pin an explanation into the notebook (E25 / GAP-085). */
+export const pinAnnotation = async (
+  context: ServerContext,
+  owner: OwnerId,
+  body: unknown,
+): Promise<{ annotation: NotebookAnnotationRecord }> => {
+  const input = z
+    .object({
+      lessonId: z.string().min(1),
+      selection: z.string().min(1),
+      explanation: z.string().min(1),
+    })
+    .parse(body) as { lessonId: string; selection: string; explanation: string };
+  const annotation = await context.uow.annotations.add(owner, {
+    id: `note_${input.lessonId}_${input.selection.slice(0, 32)}`,
+    lessonId: input.lessonId,
+    selection: input.selection,
+    explanation: input.explanation,
+  });
+  return { annotation };
+};
+
+/** List the learner's pinned notes for a lesson (E25 / GAP-085). */
+export const listAnnotations = async (
+  context: ServerContext,
+  owner: OwnerId,
+  lessonId: string,
+): Promise<{ annotations: NotebookAnnotationRecord[] }> => {
+  const annotations = await context.uow.annotations.listForLesson(owner, lessonId);
+  return { annotations };
 };
 
 export const masteryView = async (

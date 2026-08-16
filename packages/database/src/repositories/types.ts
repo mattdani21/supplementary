@@ -337,6 +337,24 @@ export interface MasteryRepository {
   completeReview(owner: OwnerId, id: string): Promise<ReviewItem>;
 }
 
+export interface NotebookAnnotationRecord {
+  readonly id: string;
+  readonly ownerId: OwnerId;
+  readonly lessonId: string;
+  readonly selection: string;
+  readonly explanation: string;
+  readonly createdAt: Date;
+}
+
+/** The explain layer's pinned notes (E25 / GAP-085), scoped per owner + lesson. */
+export interface NotebookAnnotationsRepository {
+  add(
+    owner: OwnerId,
+    annotation: Omit<NotebookAnnotationRecord, 'ownerId' | 'createdAt'>,
+  ): Promise<NotebookAnnotationRecord>;
+  listForLesson(owner: OwnerId, lessonId: string): Promise<NotebookAnnotationRecord[]>;
+}
+
 export interface GenerationRepository {
   /** Returns the existing run when the idempotency key has been seen. */
   startRun(
@@ -439,6 +457,7 @@ export interface UnitOfWork {
   readonly mastery: MasteryRepository;
   readonly generation: GenerationRepository;
   readonly knowledge: KnowledgeRepository;
+  readonly annotations: NotebookAnnotationsRepository;
 }
 
 /** Thrown when a write targets a row the caller does not own or that does not exist. */

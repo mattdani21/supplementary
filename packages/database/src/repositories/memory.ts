@@ -29,6 +29,8 @@ import {
   type Lesson,
   type MasteryEvidenceRecord,
   type MasteryRepository,
+  type NotebookAnnotationRecord,
+  type NotebookAnnotationsRepository,
   type OwnerId,
   type ReviewItem,
   type Source,
@@ -92,6 +94,7 @@ export interface MemoryStore {
   readonly attempts: OwnedTable<Attempt>;
   readonly evidence: OwnedTable<MasteryEvidenceRecord>;
   readonly reviews: OwnedTable<ReviewItem>;
+  readonly annotations: OwnedTable<NotebookAnnotationRecord>;
   readonly runs: OwnedTable<GenerationRun>;
   readonly steps: Map<string, GenerationStepRecord>;
   readonly findings: OwnedTable<AuditFinding>;
@@ -126,6 +129,7 @@ export const createMemoryStore = (): MemoryStore => ({
   attempts: new OwnedTable(),
   evidence: new OwnedTable(),
   reviews: new OwnedTable(),
+  annotations: new OwnedTable(),
   runs: new OwnedTable(),
   steps: new Map(),
   findings: new OwnedTable(),
@@ -397,6 +401,26 @@ export const createMemoryUnitOfWork = (store: MemoryStore = createMemoryStore())
     },
   };
 
+  const annotations: NotebookAnnotationsRepository = {
+    async add(owner, annotation) {
+      const existing = store.annotations.where(
+        owner,
+        (a) => a.lessonId === annotation.lessonId && a.selection === annotation.selection,
+      )[0];
+      if (existing) {
+        return store.annotations.replace({ ...existing, explanation: annotation.explanation });
+      }
+      return store.annotations.insert({
+        ...annotation,
+        ownerId: owner,
+        createdAt: new Date(),
+      });
+    },
+    async listForLesson(owner, lessonId) {
+      return store.annotations.where(owner, (a) => a.lessonId === lessonId);
+    },
+  };
+
   const generation: GenerationRepository = {
     async startRun(owner, run) {
       const existing = store.runs.where(owner, (r) => r.idempotencyKey === run.idempotencyKey)[0];
@@ -463,5 +487,5 @@ export const createMemoryUnitOfWork = (store: MemoryStore = createMemoryStore())
     },
   };
 
-  return { users, gaps, sources, curricula, attempts, mastery, generation, knowledge };
+  return { users, gaps, sources, curricula, attempts, mastery, generation, knowledge, annotations };
 };

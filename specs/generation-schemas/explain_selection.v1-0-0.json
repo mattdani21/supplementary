@@ -1,0 +1,30 @@
+{
+  "$id": "https://gapos.dev/generation-schemas/explain_selection/1.0.0",
+  "title": "explain_selection",
+  "description": "Structured response contract for the \"explain_selection\" model call, version 1.0.0. Generated from packages/ai-contracts; do not edit by hand.",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "selection": {
+      "type": "string",
+      "minLength": 1
+    },
+    "explanation": {
+      "type": "string",
+      "minLength": 1
+    },
+    "note": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "selection",
+    "explanation"
+  ],
+  "additionalProperties": false
+}
