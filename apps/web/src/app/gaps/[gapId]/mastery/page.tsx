@@ -1,7 +1,9 @@
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import { masteryView } from '../../../../server/api';
 import { getServerContext } from '../../../../server/bootstrap';
 import { viewerOwner } from '../../../../lib/viewer';
+import { isMissingCurriculumError, isNotFoundError } from '../error-guards';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,7 +27,26 @@ export default async function MasteryPage({ params }: { params: Promise<{ gapId:
   const owner = await viewerOwner();
   const context = await getServerContext();
 
-  const { mastery } = (await masteryView(context, owner, gapId)) as { mastery: MasterySummary };
+  let mastery: MasterySummary;
+  try {
+    ({ mastery } = (await masteryView(context, owner, gapId)) as { mastery: MasterySummary });
+  } catch (error) {
+    if (isMissingCurriculumError(error)) {
+      return (
+        <main>
+          <p>
+            <Link href={`/gaps/${gapId}`}>← gap</Link>
+          </p>
+          <h1>Mastery</h1>
+          <p className="muted">
+            This gap hasn&apos;t been compiled yet. Compile it to start measuring mastery.
+          </p>
+        </main>
+      );
+    }
+    if (isNotFoundError(error)) notFound();
+    throw error;
+  }
 
   return (
     <main>

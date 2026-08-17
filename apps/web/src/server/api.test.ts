@@ -236,6 +236,80 @@ describe('health', () => {
   });
 });
 
+describe('gap creation provisions the owner (FK safety)', () => {
+  it('creates the users row for a brand-new owner before inserting the gap', async () => {
+    const { context } = buildContext();
+    const NEW_OWNER = 'brand_new_learner';
+    // A brand-new learner has no users row (the UI has no signup flow).
+    expect(await context.uow.users.find(NEW_OWNER)).toBeUndefined();
+
+    const created = (await createGap(context, NEW_OWNER, {
+      title: 'A fresh gap',
+      rawStatement: REFERENCE_GAP_STATEMENT,
+      dailyMinutes: 20,
+    })) as { gap: Gap };
+    expect(created.gap.status).toBe('draft');
+
+    const user = await context.uow.users.find(NEW_OWNER);
+    expect(user).toBeDefined();
+    expect(user?.id).toBe(NEW_OWNER);
+  });
+
+  it('is idempotent: repeated createGap for the same owner never throws', async () => {
+    const { context } = buildContext();
+    const NEW_OWNER = 'repeat_learner';
+    await createGap(context, NEW_OWNER, {
+      title: 'First gap',
+      rawStatement: REFERENCE_GAP_STATEMENT,
+      dailyMinutes: 20,
+    });
+    await expect(
+      createGap(context, NEW_OWNER, {
+        title: 'Second gap',
+        rawStatement: REFERENCE_GAP_STATEMENT,
+        dailyMinutes: 20,
+      }),
+    ).resolves.toBeDefined();
+    expect(((await listGaps(context, NEW_OWNER)) as { gaps: Gap[] }).gaps).toHaveLength(2);
+  });
+
+  it('maps a raw foreign-key constraint error to a clean, non-leaky response', () => {
+    const mapped = toHttpError(
+      new Error(
+        'insert or update on table "gaps" violates foreign key constraint "gaps_owner_id_fkey"',
+      ),
+    );
+    expect(mapped.status).toBe(409);
+    expect(mapped.code).toBe('constraint_violation');
+    expect(mapped.message).not.toMatch(/gaps_owner_id_fkey/);
+    expect(mapped.message).not.toMatch(/insert or update/);
+  });
+});
+
+describe('mastery view labels', () => {
+  it('labels each assessment with its objective capability statement, not the raw id', async () => {
+    const { context } = buildContext();
+    const gapId = await seedCompiledGap(context);
+
+    const { curriculum } = (await getCurriculum(context, OWNER, gapId)) as {
+      curriculum: { plan: { objectives: { id: string; capabilityStatement: string }[] } };
+    };
+    expect(curriculum.plan.objectives.length).toBeGreaterThan(0);
+
+    const { mastery } = (await masteryView(context, OWNER, gapId)) as {
+      mastery: { assessments: { objectiveId: string; label?: string }[] };
+    };
+    expect(mastery.assessments.length).toBeGreaterThan(0);
+
+    for (const assessment of mastery.assessments) {
+      const objective = curriculum.plan.objectives.find((o) => o.id === assessment.objectiveId);
+      expect(objective).toBeDefined();
+      expect(assessment.label).toBe(objective!.capabilityStatement);
+      expect(assessment.label).not.toBe(assessment.objectiveId);
+    }
+  });
+});
+
 describe('voice gap capture (E16)', () => {
   it('transcribes audio into an editable draft with a suggested title', async () => {
     const costAccountant = new CostAccountant();

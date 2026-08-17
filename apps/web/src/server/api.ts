@@ -63,6 +63,14 @@ export const toHttpError = (error: unknown): { status: number; code: string; mes
     };
   if (error instanceof Error && /not found/i.test(error.message))
     return { status: 404, code: 'not_found', message: error.message };
+  // Raw Postgres integrity errors (foreign-key / unique / check / not-null) must not leak SQL
+  // text through a 500. Surface a clean, non-leaky 409 instead.
+  if (error instanceof Error && /violates .*constraint/i.test(error.message))
+    return {
+      status: 409,
+      code: 'constraint_violation',
+      message: 'The request conflicts with existing data.',
+    };
   return {
     status: 500,
     code: 'internal',
@@ -324,9 +332,20 @@ export const masteryView = async (
   context: ServerContext,
   owner: OwnerId,
   gapId: string,
-): Promise<{ mastery: unknown }> => ({
-  mastery: await assessMastery(context, owner, gapId),
-});
+): Promise<{ mastery: unknown }> => {
+  const mastery = await assessMastery(context, owner, gapId);
+  // The domain assessment carries only objective ids; the Mastery tab wants the human-readable
+  // capability statement. Join it in here (the web layer), leaving the domain result pure.
+  const curriculum = await context.uow.curricula.getCurrentForGap(owner, gapId);
+  const labelById = new Map(
+    (curriculum?.plan.objectives ?? []).map((o) => [o.id, o.capabilityStatement]),
+  );
+  const assessments = mastery.assessments.map((assessment) => {
+    const label = labelById.get(assessment.objectiveId);
+    return label === undefined ? assessment : { ...assessment, label };
+  });
+  return { mastery: { ...mastery, assessments } };
+};
 
 export interface ReviewQueueItem {
   readonly lessonId: string;

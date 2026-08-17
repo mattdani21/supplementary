@@ -1,10 +1,12 @@
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import type { Gap } from '@gapos/database';
 import { SourceForm } from '../../../components/source-form';
 import { TransitionButtons } from '../../../components/transition-buttons';
 import { getGap, listSources, todayView } from '../../../server/api';
 import { getServerContext } from '../../../server/bootstrap';
 import { viewerOwner } from '../../../lib/viewer';
+import { isNotFoundError } from './error-guards';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,7 +27,14 @@ export default async function GapDetailPage({ params }: { params: Promise<{ gapI
   const owner = await viewerOwner();
   const context = await getServerContext();
 
-  const { gap } = (await getGap(context, owner, gapId)) as { gap: Gap };
+  let gap: Gap;
+  try {
+    ({ gap } = (await getGap(context, owner, gapId)) as { gap: Gap });
+  } catch (error) {
+    if (isNotFoundError(error)) notFound();
+    throw error;
+  }
+
   const { sources } = (await listSources(context, owner, gapId)) as {
     sources: {
       id: string;

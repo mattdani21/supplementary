@@ -44,8 +44,10 @@ export function AttemptForm({
           idempotencyKey: `web-${question.id}-${Date.now()}`,
         }),
       })) as { attempt: { correct: boolean; feedback: { answer: string } } };
+      // Show the grade and model answer, but do NOT refresh yet: answering advances the
+      // "today" lesson server-side, and a refresh here would remount this form and wipe the
+      // feedback before the learner can read it. Refresh when they choose to continue.
       setResult(outcome.attempt);
-      router.refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
@@ -59,7 +61,14 @@ export function AttemptForm({
         <p>
           {result.correct ? '✓ Correct' : '✗ Not quite'} — model answer: {result.feedback.answer}
         </p>
-        <button onClick={() => setResult(null)}>Try the next one</button>
+        <button
+          onClick={() => {
+            setResult(null);
+            router.refresh();
+          }}
+        >
+          Try the next one
+        </button>
       </div>
     );
   }
