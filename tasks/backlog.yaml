@@ -649,7 +649,7 @@ tasks:
     title: Web application and offline PWA (E14)
     epic: E14
     priority: P1
-    status: ready
+    status: done
     goal: A learner can run the whole loop in a browser.
     scope:
       - Next.js app router pages — gap list, gap detail with source upload and compile, curriculum,

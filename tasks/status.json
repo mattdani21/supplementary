@@ -1,6 +1,6 @@
 {
  "schemaVersion": 1,
- "updatedAt": "2026-08-17T19:25:03.000Z",
+ "updatedAt": "2026-08-17T19:26:16.000Z",
  "controller": "gapos-controller",
  "tasks": {
   "GAP-083": {
@@ -648,6 +648,11 @@
      "command": "pnpm test tests/end-to-end/pwa.test.ts",
      "result": "pass",
      "note": "The web application and offline PWA (E14). Next.js app router pages over the API handlers: /gaps (list + create + owner switcher), /gaps/[gapId] (status, transitions, today, sources with chunks, source form), /gaps/[gapId]/study (lesson player: audio player via signed URLs, questions with hint + attempt form posting to /api), /gaps/[gapId]/mastery (objective statuses + ready-to-fill). PWA: manifest route (study start_url), icon, and a stale-while-revalidate service worker that serves the lesson offline after first load; writes always go to the network. Server pages call the handlers in-process; client interactivity uses the /api routes with the owner cookie as X-Owner-Id."
+    },
+    {
+     "command": "pnpm exec vitest run tests/end-to-end/pwa.test.ts && env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL -u GAPOS_TEST_DATABASE_URL -u DATABASE_URL -u GAPOS_S3_ACCESS_KEY_ID -u GAPOS_S3_SECRET_ACCESS_KEY -u GAPOS_S3_ENDPOINT -u GAPOS_S3_BUCKET pnpm verify && env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL -u GAPOS_TEST_DATABASE_URL -u DATABASE_URL -u GAPOS_S3_ACCESS_KEY_ID -u GAPOS_S3_SECRET_ACCESS_KEY -u GAPOS_S3_ENDPOINT -u GAPOS_S3_BUCKET pnpm --filter @gapos/web build",
+     "result": "pass",
+     "note": "A/B j-space re-verification (2026-08-17, autopilot/m1-fresh-checkout): GAP-022 was already implemented on this branch (commit a584154); the graph was stale (backlog ready vs status.json done). Re-verified concretely: pwa.test.ts 5/5 (SW artifact contract: same-origin GETs only, writes + signed audio to network, cached-first stale-while-revalidate so the lesson renders offline, skipWaiting activation; manifest points at study surface with icon); full gate 691 passed | 26 loud skips (Postgres + S3 suites skipped without env, per the loud-skip contract); next build compiles every route including /gaps, /gaps/[gapId], study, mastery, map, review and /manifest.webmanifest (both GAP-022 acceptance criteria). No code change needed; backlog reconciled to done."
     }
    ]
   },
