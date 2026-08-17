@@ -1,6 +1,6 @@
 {
  "schemaVersion": 1,
- "updatedAt": "2026-08-17T19:26:16.000Z",
+ "updatedAt": "2026-08-17T19:27:22.000Z",
  "controller": "gapos-controller",
  "tasks": {
   "GAP-083": {
@@ -665,6 +665,16 @@
      "command": "pnpm test packages/provider-adapters/src/live-mode.test.ts",
      "result": "pass",
      "note": "Live speech-to-text and a real live-mode factory. createLiveSpeechToText speaks OpenAI-compatible /audio/transcriptions over plain fetch (multipart form, bearer auth, typed errors, cost from env price/minute with a floor). createLiveSpeechToTextFromEnv + createLiveEmbeddingsFromEnv assemble from GAPOS_* env. createProviders({mode:'live'}) now boots all four adapters instead of throwing; constructors still refuse without keys, which is the AGENTS.md §5 human gate."
+    },
+    {
+     "command": "pnpm test packages/provider-adapters/src/live-mode.test.ts",
+     "result": "pass",
+     "note": "Independent re-verification 2026-08-17 (A/B j-space run t_52bda14b): 14/14 pass — multipart round trip to /audio/transcriptions, bearer auth, typed http/network/shape errors, env factory assembly of all four live adapters, optional-STT boot."
+    },
+    {
+     "command": "pnpm verify",
+     "result": "pass",
+     "note": "Independent re-verification 2026-08-17 (A/B j-space run t_52bda14b): full quality gate exit 0 (format + lint + typecheck + test); 60 files / 691 tests passed, 26 skipped (Postgres/S3 integration suites skip without GAPOS_TEST_DATABASE_URL per AGENTS.md §7)."
     }
    ]
   },
