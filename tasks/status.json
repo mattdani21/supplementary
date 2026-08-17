@@ -669,6 +669,11 @@
      "command": "pnpm test apps/cli/src/cli.test.ts",
      "result": "pass",
      "note": "The command-line study client. apps/cli exposes : gap new (flags or prompts), gap list/show, source add (--file or --text), compile, plan, study (interactive answer loop with graded feedback), mastery. Commands are plain functions over the service layer with injectable IO; main.ts builds the context from env (Postgres or in-memory with a loud warning) and dispatches. The acceptance is proven in-process: a scripted session (gap new -> source add -> compile -> plan -> study -> mastery) runs end to end without a server or database."
+    },
+    {
+     "command": "pnpm test apps/cli/src/cli.test.ts && env -u GAPOS_TEST_DATABASE_URL -u DATABASE_URL -u GAPOS_S3_ACCESS_KEY_ID -u GAPOS_S3_SECRET_ACCESS_KEY -u GAPOS_S3_ENDPOINT -u GAPOS_S3_BUCKET pnpm verify",
+     "result": "pass",
+     "note": "A/B control re-verification (2026-08-17, autopilot/m1-fresh-checkout): GAP-025 was already implemented on this branch (commit 7582ac7); the graph was stale (backlog ready vs status.json done). Re-verified concretely: cli.test.ts targeted run passes; full gate 691 passed | 26 loud skips (Postgres + S3 suites skipped without env, per the loud-skip contract). No code change needed; backlog reconciled to done."
     }
    ]
   },
