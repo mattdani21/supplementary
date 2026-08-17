@@ -1,6 +1,6 @@
 {
  "schemaVersion": 1,
- "updatedAt": "2026-08-16T18:45:00.000Z",
+ "updatedAt": "2026-08-17T19:25:03.000Z",
  "controller": "gapos-controller",
  "tasks": {
   "GAP-083": {
@@ -621,6 +621,21 @@
      "command": "pnpm test apps/web/src/server/api.test.ts",
      "result": "pass",
      "note": "The HTTP API over the service layer. Handlers are plain functions (context, owner, params, body) in server/api.ts with zod validation and an error map (400 validation, 401 owner header, 404 missing, 409 conflict, 402 budget, 422 screening); Next.js route handlers are thin adapters. Owner scoping is enforced by X-Owner-Id on every learner endpoint. Endpoints: health, users, gaps (list/create/get/transition/compile), sources (list with chunks/register), today, curriculum, lesson, artefact audio URL, attempts, mastery. The web process bootstraps from env (Postgres + migrate when GAPOS_DATABASE_URL, else memory; storage + providers by env). next build compiles; the repo's extension-alias webpack config makes the .js-specifier workspace imports resolve. CI now builds the web app."
+    },
+    {
+     "command": "pnpm test apps/web/src/server/api.test.ts",
+     "result": "pass",
+     "note": "A/B control re-verification 2026-08-17: 15/15 handler tests pass — in-process handler logic, every endpoint maps errors to HTTP (400/401/404/409/422), owner scoping via X-Owner-Id, full learner journey gap->source->compile->today->attempt->mastery (GAP-021 acceptance 1)."
+    },
+    {
+     "command": "pnpm test tests/end-to-end/journey.test.ts",
+     "result": "pass",
+     "note": "A/B control re-verification 2026-08-17: 24/24 — a compiled gap serves lessons, playable audio artefacts and mastery (GAP-021 acceptance 2); budget-degradation fallback to transcript asserted."
+    },
+    {
+     "command": "pnpm verify",
+     "result": "pass",
+     "note": "Full quality gate on the reconciled tree (2026-08-17): format:check + lint + typecheck + 691 tests passed, 26 env-gated skipped (Postgres/S3/live provider need GAPOS_TEST_DATABASE_URL). GAP-021 was already implemented (commit ed70121) and marked done in status.json since 2026-08-03; this A/B control run re-verified both acceptance criteria and reconciled the stale backlog.yaml ready->done. No source change was needed."
     }
    ]
   },

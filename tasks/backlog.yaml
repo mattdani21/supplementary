@@ -630,7 +630,7 @@ tasks:
     title: HTTP API over the service layer
     epic: E20
     priority: P0
-    status: ready
+    status: done
     goal: Every capability of the engine is reachable over HTTP.
     scope:
       - Next.js route handlers over the existing services (no second HTTP server)
