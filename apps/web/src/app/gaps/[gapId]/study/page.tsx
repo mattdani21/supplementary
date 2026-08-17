@@ -59,7 +59,9 @@ export default async function StudyPage({ params }: { params: Promise<{ gapId: s
             <Link href={`/gaps/${gapId}`}>← gap</Link>
           </p>
           <h1>Not ready yet</h1>
-          <p className="muted">This gap hasn&apos;t been compiled yet. Compile it to start learning.</p>
+          <p className="muted">
+            This gap hasn&apos;t been compiled yet. Compile it to start learning.
+          </p>
         </main>
       );
     }
