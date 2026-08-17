@@ -131,3 +131,44 @@ They must never be the only coverage for a behaviour.
 - Errors are typed domain errors, not thrown strings.
 - Prefer pure functions and explicit dependency injection over module-level singletons.
 - Name things the way the domain model in `docs/PRODUCT.md` names them.
+
+## Cursor Cloud specific instructions
+
+Node 22 and pnpm 10.33.0 are already provisioned; the startup update script runs `pnpm install`.
+The quality gate (`pnpm verify`) and the whole test suite run fully offline with the default `fake`
+provider set — no services, keys, or Docker needed. Standard commands live in the README §"Run it"
+and root `package.json`; the notes below are only the non-obvious caveats.
+
+### Running the full stack (web + worker + Postgres + MinIO)
+
+- Docker is installed in this environment but the daemon is not started automatically. Start it once
+  per session before `pnpm local:up`: run `sudo dockerd` in the background (or reuse a running one —
+  check `docker info`). The `ubuntu` user is in the `docker` group, so `docker`/`pnpm local:up` work
+  without `sudo` once the daemon is up (if the socket 401s, `sudo chmod 666 /var/run/docker.sock`).
+- `pnpm local:up` starts Postgres (`pgvector/pgvector:pg16`, `:5432`, creds `gapos/gapos`, db `gapos`)
+  and MinIO (`:9000` API / `:9001` console, creds `gapos/gapos-local-secret`). Then migrate with
+  `DATABASE_URL=postgres://gapos:gapos@localhost:5432/gapos pnpm db:migrate` (idempotent).
+- Run the apps with the shared env: `GAPOS_DATABASE_URL` (same DSN), and for cross-process audio
+  `GAPOS_STORAGE=s3` + `GAPOS_S3_ENDPOINT=http://localhost:9000` / `GAPOS_S3_REGION=us-east-1` /
+  `GAPOS_S3_BUCKET=gapos-local` / `GAPOS_S3_ACCESS_KEY_ID=gapos` / `GAPOS_S3_SECRET_ACCESS_KEY=gapos-local-secret`.
+  Web: `pnpm --filter @gapos/web dev` (`:3000`); worker: `pnpm --filter @gapos/worker start`. The
+  S3 bucket is auto-created on boot via `ensureBucket()`.
+
+### Non-obvious gotchas
+
+- Env var names: the apps read `GAPOS_DATABASE_URL` and `GAPOS_S3_*`, but the migrate CLI reads
+  `DATABASE_URL` (or `GAPOS_TEST_DATABASE_URL`). `.env.example` still uses the stale names
+  `DATABASE_URL` and `GAPOS_STORAGE_*`, which do NOT configure the running apps — set the
+  `GAPOS_*` vars explicitly.
+- Web UI owner: server-rendered pages fall back to owner `local-learner`, but client-side calls
+  (creating a gap from the form, audio playback, answering questions) send `X-Owner-Id` from the
+  `gapos_owner` cookie. Set it first via the "Learner" switcher on `/gaps` (type an id, click
+  Switch) or client calls return 401.
+- Compilation trigger: the UI "Compile" button only transitions a `ready` gap to `compiling`.
+  Curriculum generation actually runs through `POST /api/gaps/:gapId/compile` (used by the CLI
+  `compile` command and tests), which drives `compiling → active`.
+- `fake` provider mode returns deterministic set-theory lesson content and tiny placeholder audio
+  (a ~43-byte stub, so players show `0:00`) regardless of the gap topic. That is expected offline;
+  real content requires `GAPOS_PROVIDER_MODE=live` plus provider keys.
+- Postgres-backed integration tests are skipped unless `GAPOS_TEST_DATABASE_URL` is set (see
+  `.github/workflows/ci.yml` for the DB/MinIO service matrix used in CI).
