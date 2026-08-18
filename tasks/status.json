@@ -1,6 +1,6 @@
 {
  "schemaVersion": 1,
- "updatedAt": "2026-08-17T03:20:00.000Z",
+ "updatedAt": "2026-08-18T01:40:00.000Z",
  "controller": "gapos-controller",
  "tasks": {
   "GAP-083": {
@@ -2046,6 +2046,11 @@
      "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm verify; pnpm --filter @gapos/web build",
      "result": "pass",
      "note": "692 passed | 26 skipped (718 total), 60 files passed | 4 skipped. Production build compiled successfully with the new PATCH route."
+    },
+    {
+     "command": "PATCH /api/gaps/gap_34693e04 {title, rawStatement naming DeepSeek V4} → POST /compile → poll run_da7009e8 → GET /curriculum",
+     "result": "pass",
+     "note": "Part 2 complete. Revised the frontier gap's statement to name DeepSeek V4 (hybrid CSA/HCA attention, mHC residuals, Muon optimizer, 1M-token context) and the Sutskever-30 implementation suite. Recompiled (run_da7009e8, complete, ~23 min): new curriculum cur_26a3edbf with 9 objectives including obj-v4, and 7 published lessons all with audio. Day 7 is now 'DeepSeek-V4 Architecture: CSA/HCA, Lightning Indexer, mHC, Muon, and FP4 Efficiency' (8 audio segments). The track ladder now runs Attention → RoPE/GQA → FlashAttention/LoRA → V2 MLA → V3 MoE/FP8 → R1 RL → V4."
     }
    ],
    "notes": "GAP-096 (part 1) DONE: sources registered + recompile proven. PATCH /api/gaps/[gapId] shipped so the statement can be revised. Part 2 (pending): PATCH the frontier gap's statement to name DeepSeek V4, recompile, and verify a V4 objective + lesson lands in the curriculum."

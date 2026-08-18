@@ -1126,7 +1126,7 @@ tasks:
     title: 'ML literacy track: include DeepSeek V4 papers (E27: sources + statement revision)'
     epic: E27
     priority: P0
-    status: in_progress
+    status: done
     dependencies: []
     goal: 'Add DeepSeek V4 to the Frontier ML papers track (gap_34693e04). The planner anchors objectives to the gap rawStatement, which stops at DeepSeek R1 — so the statement must name V4, and the app needs a way to revise it. Also register the Sutskever-30 implementations repo as source material.'
     scope:
