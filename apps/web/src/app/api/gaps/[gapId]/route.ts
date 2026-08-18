@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { getGap, requireOwner, toHttpError } from '../../../../server/api';
+import { getGap, requireOwner, toHttpError, updateGap } from '../../../../server/api';
 import { getServerContext } from '../../../../server/bootstrap';
 
 export const GET = async (
@@ -12,6 +12,21 @@ export const GET = async (
     const context = await getServerContext();
     const owner = requireOwner(request.headers);
     return NextResponse.json(await getGap(context, owner, gapId));
+  } catch (error) {
+    const mapped = toHttpError(error);
+    return NextResponse.json({ error: mapped }, { status: mapped.status });
+  }
+};
+
+export const PATCH = async (
+  request: NextRequest,
+  { params }: { params: Promise<{ gapId: string }> },
+) => {
+  try {
+    const { gapId } = await params;
+    const context = await getServerContext();
+    const owner = requireOwner(request.headers);
+    return NextResponse.json(await updateGap(context, owner, gapId, await request.json()));
   } catch (error) {
     const mapped = toHttpError(error);
     return NextResponse.json({ error: mapped }, { status: mapped.status });

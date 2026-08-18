@@ -1122,6 +1122,27 @@ tasks:
     risk: low
     human_gate: false
 
+  - id: GAP-096
+    title: 'ML literacy track: include DeepSeek V4 papers (E27: sources + statement revision)'
+    epic: E27
+    priority: P0
+    status: in_progress
+    dependencies: []
+    goal: 'Add DeepSeek V4 to the Frontier ML papers track (gap_34693e04). The planner anchors objectives to the gap rawStatement, which stops at DeepSeek R1 — so the statement must name V4, and the app needs a way to revise it. Also register the Sutskever-30 implementations repo as source material.'
+    scope:
+      - 'register deepseek-v4-technical-report.md + sutskever-30-implementations.md as sources'
+      - 'PATCH /api/gaps/[gapId] to revise the gap statement (updateGap handler, owner-scoped)'
+      - 'revise the frontier gap statement to name DeepSeek V4 (CSA/HCA, mHC, Muon)'
+      - 'recompile and verify a V4 objective + published lesson lands in the curriculum'
+    acceptance:
+      - 'api test: updateGap revises the rawStatement'
+      - 'live: recompiled curriculum contains a DeepSeek V4 module with audio'
+      - 'pnpm verify passes'
+    verification:
+      - pnpm verify
+    risk: low
+    human_gate: false
+
   - id: GAP-095
     title: 'Stale/empty owner cookie crashes every gap page with a raw server error (E27)'
     epic: E27

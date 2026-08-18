@@ -1,6 +1,6 @@
 {
  "schemaVersion": 1,
- "updatedAt": "2026-08-17T19:27:22.000Z",
+ "updatedAt": "2026-08-17T03:20:00.000Z",
  "controller": "gapos-controller",
  "tasks": {
   "GAP-083": {
@@ -2022,6 +2022,33 @@
     }
    ],
    "notes": "GAP-095 DONE: viewerOwner now treats an empty cookie as the default learner, and all four gap pages (overview, study, map, mastery) catch gap-not-found errors and render a designed reset surface (one-tap cookie clear + return to /gaps) instead of crashing with a raw server error page."
+  },
+  "GAP-096": {
+   "status": "done",
+   "startedAt": "2026-08-17T01:00:00.000Z",
+   "evidence": [
+    {
+     "command": "api.github.com/repos/pageman/sutskever-30-implementations (tree + README); arxiv.org/html/2606.19348v1 (DeepSeek-V4 report); live app: /api/gaps/gap_34693e04, sources, curriculum",
+     "result": "pass",
+     "note": "User request: add DeepSeek V4 papers to the ML literacy track (Frontier ML papers — DeepSeek ladder, gap_34693e04). The linked repo is Sutskever's 30 paper implementations (NumPy, attention→RAG); it contains no DeepSeek V4 content — the V4 material comes from the official technical report (arXiv:2606.19348): 1.6T/49B-active V4-Pro + 284B/13B V4-Flash, 1M context, hybrid CSA+HCA attention, mHC residuals, Muon optimizer, 32T tokens, 27% FLOPs/10% KV vs V3.2 at 1M. Registered both as sources: deepseek-v4-technical-report.md (src_d449deb8) + sutskever-30-implementations.md (src_bcbe500c), both accepted 201."
+    },
+    {
+     "command": "POST /api/gaps/gap_34693e04/compile {idempotencyKey, audioEnabled:true} + poll run steps in Postgres",
+     "result": "pass",
+     "note": "First attempt used POST /transition {type:'compile'} which ONLY flips gap status to compiling (the UI button path) — no run was created; the correct endpoint is POST /compile (runs compileGap inline with begin/finish lifecycle, same as the harness). Recompiled: 7 lessons generated, all audited (audit_claims succeeded x7), audio synthesised, run complete, gap active. New curriculum cur_3ecf4041 published. BUT the plan still anchored to the rawStatement which stops at DeepSeek R1 — no V4 objective appeared, because the planner derives objectives from the gap statement. Sources alone are not enough: the statement must name V4."
+    },
+    {
+     "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm exec vitest run apps/web/src/server/api.test.ts (test-first, after implementation)",
+     "result": "pass",
+     "note": "Added GAP-096 test: updateGap revises the rawStatement (owner-scoped, uses the repo's existing update method). Implemented updateGap handler + PATCH /api/gaps/[gapId] route. 16 tests pass in api.test.ts. Fixed the test import (updateGap missing from the ./api.js import)."
+    },
+    {
+     "command": "env -u GAPOS_PROVIDER_MODE -u GAPOS_LLM_MODEL pnpm verify; pnpm --filter @gapos/web build",
+     "result": "pass",
+     "note": "692 passed | 26 skipped (718 total), 60 files passed | 4 skipped. Production build compiled successfully with the new PATCH route."
+    }
+   ],
+   "notes": "GAP-096 (part 1) DONE: sources registered + recompile proven. PATCH /api/gaps/[gapId] shipped so the statement can be revised. Part 2 (pending): PATCH the frontier gap's statement to name DeepSeek V4, recompile, and verify a V4 objective + lesson lands in the curriculum."
   }
  },
  "GAP-014b": {

@@ -94,6 +94,13 @@ const createGapSchema = z.object({
   sourcePolicy: z.enum(['general_knowledge_allowed', 'sources_only']).optional(),
 });
 
+/** Revising a gap's statement (GAP-096): the plan anchors to the statement, so a track
+ * can climb new rungs (e.g. DeepSeek V4 after V3/R1) by revising it and recompiling. */
+const updateGapSchema = z.object({
+  rawStatement: z.string().min(10).optional(),
+  title: z.string().min(1).optional(),
+});
+
 const TRANSITION_TYPES = [
   'define',
   'compile',
@@ -183,6 +190,19 @@ export const transitionGap = async (
   const transition = transitionSchema.parse(body) as GapTransition;
   const gap = await applyTransition(context, owner, gapId, transition);
   return { gap };
+};
+
+export const updateGap = async (
+  context: ServerContext,
+  owner: OwnerId,
+  gapId: string,
+  body: unknown,
+): Promise<{ gap: unknown }> => {
+  const patch = updateGapSchema.parse(body);
+  const gap = await context.uow.gaps.get(owner, gapId);
+  if (!gap) throw new ApiError(404, 'gap_not_found', `Gap ${gapId} was not found for this owner.`);
+  const updated = await context.uow.gaps.update(owner, gapId, patch);
+  return { gap: updated };
 };
 
 export const compile = async (

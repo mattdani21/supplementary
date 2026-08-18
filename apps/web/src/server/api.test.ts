@@ -43,6 +43,7 @@ import {
   toHttpError,
   todayView,
   transitionGap,
+  updateGap,
   voiceGapDraft,
 } from './api.js';
 
@@ -106,6 +107,19 @@ describe('owner scoping', () => {
   it('requires the X-Owner-Id header', () => {
     expect(() => requireOwner(new Headers())).toThrow(/X-Owner-Id/);
     expect(() => requireOwner(new Headers({ 'x-owner-id': 'alice' }))).not.toThrow();
+  });
+
+  it('revises the gap statement so a track can climb new rungs (GAP-096)', async () => {
+    const { context } = buildContext();
+    const gapId = await seedCompiledGap(context, OWNER);
+
+    const revised = (await updateGap(context, OWNER, gapId, {
+      rawStatement:
+        REFERENCE_GAP_STATEMENT +
+        ' Extend the ladder with DeepSeek V4: hybrid CSA/HCA attention, mHC residuals, Muon.',
+    })) as { gap: Gap };
+    expect(revised.gap.rawStatement).toContain('DeepSeek V4');
+    expect(revised.gap.id).toBe(gapId);
   });
 
   it('keeps every learner endpoint inside the owner', async () => {
