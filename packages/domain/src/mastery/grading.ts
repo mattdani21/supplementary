@@ -7,7 +7,7 @@
  * rubric grade is needed, it never performs one.
  */
 
-export type GradableType = 'multiple_choice' | 'short_answer' | 'worked_problem';
+export type GradableType = 'multiple_choice' | 'short_answer' | 'worked_problem' | 'code_proof';
 
 export interface GradableQuestion {
   readonly id: string;
@@ -16,6 +16,8 @@ export interface GradableQuestion {
   readonly acceptableAlternatives: readonly string[];
   readonly options?: readonly string[];
   readonly rubric?: string;
+  /** Notebook proof checks; only present on `code_proof` questions. */
+  readonly checks?: readonly { name: string; expression: string }[];
 }
 
 export interface Response {
@@ -47,6 +49,13 @@ export const normaliseResponse = (text: string): string =>
 
 export const grade = (question: GradableQuestion, response: Response): Grade => {
   const given = normaliseResponse(response.text);
+
+  if (question.type === 'code_proof') {
+    // A code proof is decided by execution, never by reading its source. The caller runs the
+    // learner's code in the sandbox and grades the executed check results with
+    // `gradeCodeProof`; reaching `grade` with a code proof is a bug, so fail closed.
+    return { method: 'deterministic', correct: false, score: 0 };
+  }
 
   if (question.type === 'multiple_choice') {
     // An option match is exact by construction: the learner selected from a fixed list.
@@ -84,4 +93,33 @@ export const grade = (question: GradableQuestion, response: Response): Grade => 
 export const applyHintPenalty = (score: number, hintsUsed: number): number => {
   if (hintsUsed <= 0) return score;
   return Math.max(0, Number((score * Math.max(0.4, 1 - 0.3 * hintsUsed)).toFixed(4)));
+};
+
+/* --------------------------------------------------------------- code proofs */
+
+/** One check result as reported by the sandbox executor. */
+export interface CodeCheckResult {
+  readonly name: string;
+  readonly passed: boolean;
+}
+
+/**
+ * Grade a notebook proof from its executed check results. The domain never inspects the code;
+ * it only interprets what the sandbox reported. Every check the question declares must have run
+ * and passed — a missing or failing check is a wrong proof.
+ */
+export const gradeCodeProof = (
+  question: { readonly checks?: readonly { name: string; expression: string }[] },
+  results: readonly CodeCheckResult[],
+): Grade => {
+  const checks = question.checks ?? [];
+  const covered =
+    checks.length > 0 &&
+    results.length === checks.length &&
+    results.every((result) => result.passed);
+  return {
+    method: 'deterministic',
+    correct: covered,
+    score: covered ? 1 : 0,
+  };
 };

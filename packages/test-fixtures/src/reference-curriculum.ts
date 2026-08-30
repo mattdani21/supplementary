@@ -8,6 +8,7 @@
  */
 
 import type {
+  Calibration,
   CurriculumPlan,
   DiagnosticInterpretation,
   GapNormalisation,
@@ -220,6 +221,34 @@ const questionsForDay = (day: number): Question[] => {
   if (day === 1) {
     return [
       {
+        id: 'q_d1_code',
+        objectiveId: 'obj_subset_proof',
+        type: 'code_proof',
+        role: 'application',
+        difficulty: 3,
+        prompt:
+          'A subset proof works for every element at once. Implement isSubset(a, b): it must ' +
+          'return true exactly when every element of a is an element of b.',
+        answer: `function isSubset(a, b) {
+  return a.every((x) => b.includes(x));
+}`,
+        starterCode: `function isSubset(a, b) {
+  // return true when every element of a is in b
+}
+
+// Try it:
+isSubset([1, 2], [1, 2, 3])`,
+        checks: [
+          { name: 'all members present', expression: 'isSubset([1, 2], [1, 2, 3]) === true' },
+          { name: 'missing member', expression: 'isSubset([1, 2], [2, 3]) === false' },
+          { name: 'empty set is a subset', expression: 'isSubset([], [1]) === true' },
+        ],
+        language: 'js',
+        acceptableAlternatives: [],
+        evidence: sourced('chunk_2', '§2 Subsets and set equality'),
+        hint: 'The empty case must pass: every element of [] is vacuously in b.',
+      },
+      {
         id: 'q_d1_r1',
         objectiveId: 'obj_subset_proof',
         type: 'multiple_choice',
@@ -279,6 +308,44 @@ const questionsForDay = (day: number): Question[] => {
   if (day === 2) {
     return [
       {
+        id: 'q_d2_code',
+        objectiveId: 'obj_double_inclusion',
+        type: 'code_proof',
+        role: 'application',
+        difficulty: 3,
+        prompt:
+          'Equality is two inclusions. Implement intersection(a, b): it must return a new ' +
+          'array holding exactly the elements that appear in both a and b.',
+        answer: `function intersection(a, b) {
+  return a.filter((x) => b.includes(x));
+}`,
+        starterCode: `function intersection(a, b) {
+  // return exactly the elements present in both a and b
+}
+
+// Try it:
+intersection([1, 2, 3], [2, 3, 4])`,
+        checks: [
+          {
+            name: 'shared elements only',
+            expression:
+              'JSON.stringify(intersection([1, 2, 3], [2, 3, 4])) === JSON.stringify([2, 3])',
+          },
+          {
+            name: 'disjoint sets',
+            expression: 'JSON.stringify(intersection([1], [2])) === JSON.stringify([])',
+          },
+          {
+            name: 'empty set',
+            expression: 'JSON.stringify(intersection([], [1])) === JSON.stringify([])',
+          },
+        ],
+        language: 'js',
+        acceptableAlternatives: [],
+        evidence: sourced('chunk_3', '§3 Operations on sets'),
+        hint: 'Filter a by membership in b — a.filter((x) => b.includes(x)).',
+      },
+      {
         id: 'q_d2_r1',
         objectiveId: 'obj_double_inclusion',
         type: 'multiple_choice',
@@ -335,6 +402,34 @@ const questionsForDay = (day: number): Question[] => {
   }
 
   return [
+    {
+      id: 'q_d3_code',
+      objectiveId: 'obj_equivalence_classes',
+      type: 'code_proof',
+      role: 'transfer',
+      difficulty: 4,
+      prompt:
+        'The integers modulo 5 form an equivalence relation. Implement sameMod5(a, b): it ' +
+        'must return true exactly when a and b leave the same remainder on division by 5.',
+      answer: `function sameMod5(a, b) {
+  return a % 5 === b % 5;
+}`,
+      starterCode: `function sameMod5(a, b) {
+  // return true when a and b leave the same remainder mod 5
+}
+
+// Try it:
+sameMod5(7, 12)`,
+      checks: [
+        { name: 'same remainder', expression: 'sameMod5(7, 12) === true' },
+        { name: 'different remainder', expression: 'sameMod5(7, 13) === false' },
+        { name: 'reflexive', expression: 'sameMod5(9, 9) === true' },
+      ],
+      language: 'js',
+      acceptableAlternatives: [],
+      evidence: sourced('chunk_6', '§6 Equivalence relations and classes'),
+      hint: 'Two numbers share a remainder mod 5 exactly when a % 5 === b % 5.',
+    },
     {
       id: 'q_d3_r1',
       objectiveId: 'obj_relation_properties',
@@ -654,7 +749,35 @@ export const referenceVerification = (artefactId: string, day: number): Verifica
     questionId: q.id,
     answer: q.answer,
     agrees: true,
-    reasoningSummary: 'Solved independently from the prompt; reached the published answer.',
+    reasoningSummary:
+      q.type === 'code_proof'
+        ? 'The reference solution was executed against every check expression and passed.'
+        : 'Solved independently from the prompt; reached the published answer.',
   })),
   findings: [],
+});
+
+/* --------------------------------------------------------- Arc calibration (GAP-032) */
+
+/**
+ * The reference calibration kit the fake provider returns for any subject. The baseline
+ * question is a real placement item from the evaluation pack lineage: it is multiple choice on
+ * displayed code, so the answer is graded by exact option match — the learner's *outcome*
+ * adapts the diagnostic, never a self-reported confidence label.
+ */
+export const referenceCalibration = (subject = 'Python for data work'): Calibration => ({
+  schemaVersion: '1.0.0',
+  subject,
+  goalOptions: [
+    'Build a project I can show',
+    'Become confident at work',
+    'Understand the foundations',
+  ],
+  baselineQuestion: {
+    id: 'baseline_loop_total',
+    prompt: 'What is total after the loop?',
+    code: 'values = [2, 4, 6]\ntotal = 0\nfor value in values:\n    total += value',
+    options: ['2', '6', '12', '24'],
+    answer: '12',
+  },
 });

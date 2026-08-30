@@ -1,6 +1,6 @@
 {
  "schemaVersion": 1,
- "updatedAt": "2026-08-30T20:15:00.000Z",
+ "updatedAt": "2026-08-30T20:49:22.176152Z",
  "controller": "gapos-controller",
  "tasks": {
   "GAP-000": {
@@ -558,10 +558,47 @@
    ]
   },
   "GAP-032": {
-   "status": "ready",
-   "startedAt": null,
-   "evidence": [],
-   "notes": "Arc UI founder spec 2026-08-30: docs/ARC-UI.md + docs/prototypes/arc-skill-learning-prototype.html"
+   "status": "done",
+   "startedAt": "2026-08-30T20:26:19.875464Z",
+   "completedAt": "2026-08-30T20:49:22.176152Z",
+   "evidence": [
+    {
+     "command": "pnpm verify",
+     "result": "pass",
+     "note": "Baseline at start: gate was red because the GAP-032 backlog entry used double quotes in YAML and .pnpm-store (created by pnpm install in this worktree) was scanned by prettier; fixed by formatting tasks/backlog.yaml and ignoring .pnpm-store/ + docs/prototypes (static demo spec, not code)."
+    },
+    {
+     "command": "pnpm vitest run apps/worker/src/notebook/executor.test.ts",
+     "result": "pass",
+     "note": "11 tests for the notebook sandbox: real execution with completion-value output, check expressions evaluated in the cell realm, wrong code fails without source inspection, syntax/runtime/timeout errors are supportive, length and output caps, host globals (require/process) unreachable, classic constructor escape refused, fresh realm per run, infinite loop killed."
+    },
+    {
+     "command": "pnpm vitest run apps/web/src/server/arc-api.test.ts",
+     "result": "pass",
+     "note": "13 tests for the Arc surface in-process: calibration kit without the answer key; calibration persists selections (repository round-trip), creates a real draft gap, adapts the diagnostic on the baseline outcome via the provider adapter (correct=3 gaps/difficulty 3, wrong=4 gaps/difficulty 1), maps to existing gaps by subject terms, owner-isolated; run cell executes server-side and records nothing; wrong proof is supportive and state-neutral (no attempt, no evidence, status unchanged); correct proof records an attempt + mastery evidence (persistence round-trip) and replays idempotently; the final proof advances the gap to filled through the state machine; preferences default and round-trip; the spaced-review toggle gates the real due-review queue in Today; map/progress/lesson views reflect real DB state; the Arc lesson's audio resolves to the real compiled TTS bytes."
+    },
+    {
+     "command": "GAPOS_TEST_DATABASE_URL=postgresql://gapos@localhost:5432/gapos_test pnpm vitest run tests/end-to-end/arc-postgres.test.ts",
+     "result": "pass",
+     "note": "2 tests against the running local Postgres (created gapos_test, migrated public + per-suite schemas; no docker/brew services started or stopped). Migration 006 applies cleanly from an empty database; calibration selections and preferences round-trip through SQL with ownership enforced at the SQL level; a wrong proof writes no attempt row and the correct final proof records the attempt + evidence and fills the gap on Postgres."
+    },
+    {
+     "command": "GAPOS_TEST_DATABASE_URL=postgresql://gapos@localhost:5432/gapos_test pnpm vitest run tests/end-to-end/postgres-journey.test.ts tests/end-to-end/postgres-worker.test.ts packages/database/src/repositories/shared-suite.test.ts",
+     "result": "pass",
+     "note": "Existing Postgres suites still pass with migration 006 (questions CHECK extended with code_proof, learner_preferences, arc_calibrations) and the code_proof questions in the reference curriculum."
+    },
+    {
+     "command": "pnpm --filter @gapos/web build",
+     "result": "pass",
+     "note": "All Arc pages compile: /arc (Today), /arc/skills, /arc/calibrate, /arc/skills/[gapId] (map), /arc/skills/[gapId]/lesson (theory + notebook tabs), /arc/progress, /arc/profile; root redirects to /arc; manifest start_url is /arc."
+    },
+    {
+     "command": "pnpm verify",
+     "result": "pass",
+     "note": "Final gate: format + lint + typecheck + 434 tests passed (29 loud skips: Postgres/S3 suites without their env). Full vertical slice (journey, capability reuse, security, worker, evaluation pack) still green; evaluation scorer now treats a code_proof with checks as solvable; verifier refuses a code cell whose reference solution fails under execution."
+    }
+   ],
+   "notes": "Arc UI founder spec implemented. Notebook proofs run REAL server-side sandboxed code (apps/worker/src/notebook/executor.ts: fresh node:vm realm with no host objects, timeouts, length/output caps) validated by the independent verifier at generation time (cellRuns: a code_proof whose reference solution fails its own checks blocks publication). Correctness is decided by executing the learner's code and its check expressions - no regex on source text, no fake audio timer; the prototype's demo JS does not survive. Audio is the compiled lesson's real TTS artefact driven through a real <audio> element (play/pause, +-15s, 1x/1.25x/1.5x, transcript drawer). Calibration is a real 3-step flow through the provider adapters (arc_calibration contract + adaptive diagnostic on the baseline outcome), persisted in arc_calibrations, creating the real gap and mapping to existing gaps. Proofs record attempt + mastery evidence (GAP-012) and advance the gap state machine; wrong answers are state-neutral. The spaced-review preference gates the real due-review queue in Today without cancelling scheduling. All seven screens (Today, Skills, AI calibration, Skill map, Lesson theory+notebook, Progress, Profile) implemented in apps/web in the prototype design language (paper/surface/line tokens, blue AI signal, mint cleared, dark+light themes, focus rings, prefers-reduced-motion, aria labels). Migration 006 (forward-only) extends the questions type CHECK with code_proof and adds learner_preferences + arc_calibrations; rollback of the CHECK change would require a new forward-only migration. Specs: openapi.yaml documents the /arc/* surface; generation schemas regenerated. Telemetry: arc_calibration_total, arc_cell_run_total, arc_proof_submit_total, arc_preferences_updated_total. NOTE: the environment sandbox denies git index writes (no approval channel available), so the commit step of the controller loop could not be executed by the agent; the change set is in the working tree and ready for a human \"git add -A && git commit\"."
   }
  },
  "GAP-014b": {

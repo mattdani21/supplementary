@@ -42,7 +42,7 @@ export interface Finding {
 export interface VerifiableQuestion {
   readonly id: string;
   readonly objectiveId: string;
-  readonly type: 'multiple_choice' | 'short_answer' | 'worked_problem';
+  readonly type: 'multiple_choice' | 'short_answer' | 'worked_problem' | 'code_proof';
   readonly role: 'retrieval' | 'application' | 'transfer';
   readonly difficulty: number;
   readonly prompt: string;
@@ -50,6 +50,8 @@ export interface VerifiableQuestion {
   readonly answer: string;
   readonly rubric?: string;
   readonly acceptableAlternatives: readonly string[];
+  /** Notebook proof checks; only present on `code_proof` questions. */
+  readonly checks?: readonly { name: string; expression: string }[];
   readonly evidence: {
     readonly basis: 'source' | 'general_knowledge';
     readonly locators: readonly unknown[];
@@ -80,6 +82,12 @@ export interface VerificationContext {
     agrees: boolean;
   }[];
   readonly injectionSignals?: readonly { chunkId: string; excerpt: string }[];
+  /**
+   * Executed notebook proofs (GAP-032): the pipeline runs each code_proof question's reference
+   * solution through the sandbox before verification and reports the outcomes here. A code_proof
+   * question with no entry — or one that failed its own checks — cannot be published.
+   */
+  readonly cellRuns?: readonly { questionId: string; passed: boolean; error?: string }[];
 }
 
 /** Spoken-word rate used to check a script against its claimed duration. */
@@ -247,7 +255,7 @@ const checkDistractors = (question: VerifiableQuestion): Finding[] => {
 };
 
 const checkRubricTolerance = (question: VerifiableQuestion): Finding[] => {
-  if (question.type === 'multiple_choice') return [];
+  if (question.type === 'multiple_choice' || question.type === 'code_proof') return [];
   const findings: Finding[] = [];
 
   if (!question.rubric) {
@@ -303,6 +311,41 @@ const checkSourceSupport = (question: VerifiableQuestion): Finding[] => {
       targetId: question.id,
       finding: 'The item claims source grounding but cites no locator.',
       suggestedRepair: 'Cite the chunk the item is drawn from, or relabel it general knowledge.',
+    },
+  ];
+};
+
+/**
+ * A notebook proof is only worth publishing if its own reference solution passes under
+ * execution: an unsolvable code cell would fail every learner who tried it. The pipeline runs
+ * the sandbox; this check decides what the outcome means.
+ */
+const checkCellRuns = (question: VerifiableQuestion, context: VerificationContext): Finding[] => {
+  if (question.type !== 'code_proof') return [];
+  const run = context.cellRuns?.find((r) => r.questionId === question.id);
+  if (!run) {
+    return [
+      {
+        category: 'independent_solution',
+        severity: 'critical',
+        targetId: question.id,
+        finding:
+          'A code_proof question was submitted without an executed reference solution; the ' +
+          'pipeline must run every check expression in the sandbox before verification.',
+        suggestedRepair: 'Execute the reference solution against the checks and supply the result.',
+      },
+    ];
+  }
+  if (run.passed) return [];
+  return [
+    {
+      category: 'independent_solution',
+      severity: 'critical',
+      targetId: question.id,
+      finding:
+        'The reference solution failed its own checks under execution: ' +
+        `${run.error ?? 'one or more checks did not pass.'}`,
+      suggestedRepair: 'Regenerate the question with a reference solution that passes its checks.',
     },
   ];
 };
@@ -411,6 +454,7 @@ export const verifyLesson = (lesson: VerifiableLesson, context: VerificationCont
       ...checkRubricTolerance(question),
       ...checkDifficulty(question, context),
       ...checkSourceSupport(question),
+      ...checkCellRuns(question, context),
     );
   }
 

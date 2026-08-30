@@ -27,9 +27,25 @@ import {
   type RegisterSourceInput,
 } from './services/gap-service.js';
 import {
+  arcLesson,
+  arcMap,
+  arcProfile,
+  arcProgress,
+  arcSkills,
+  arcToday,
+  calibrationKit,
+  getPreferences,
+  runCalibration,
+  setPreferences,
+  type CalibrationInput,
+} from './services/arc-service.js';
+import {
   assessMastery,
   getToday,
+  runProofCell,
   submitAttempt,
+  submitProof,
+  type RunCellResult,
   type SubmitAttemptInput,
 } from './services/learning-service.js';
 
@@ -125,6 +141,42 @@ const attemptSchema = z.object({
   confidence: z.enum(['low', 'medium', 'high']).optional(),
   idempotencyKey: z.string().min(1),
 });
+
+/* --------------------------------------------------------------- Arc (GAP-032) */
+
+const preferencesSchema = z
+  .object({
+    audioTheory: z.boolean(),
+    gentleHints: z.boolean(),
+    darkMode: z.boolean(),
+    spacedReview: z.boolean(),
+  })
+  .strict();
+
+const calibrationSchema = z
+  .object({
+    subject: z.string().min(1),
+    goal: z.string().min(1),
+    baselineAnswer: z.string().min(1),
+  })
+  .strict();
+
+const runCellSchema = z
+  .object({
+    questionId: z.string().min(1),
+    code: z.string().min(1).max(20_000),
+  })
+  .strict();
+
+const proofSchema = z
+  .object({
+    questionId: z.string().min(1),
+    sessionId: z.string().min(1),
+    code: z.string().min(1).max(20_000),
+    hintsUsed: z.number().int().min(0).optional(),
+    idempotencyKey: z.string().min(1),
+  })
+  .strict();
 
 /* ------------------------------------------------------------------- handlers */
 
@@ -494,4 +546,119 @@ export const knowledgeMap = async (
   }
 
   return { nodes: [...nodes.values()], edges };
+};
+
+/* ----------------------------------------------------------------- Arc handlers */
+
+export const arcTodayHandler = async (
+  context: ServerContext,
+  owner: OwnerId,
+): Promise<{ today: Awaited<ReturnType<typeof arcToday>> }> => ({
+  today: await arcToday(context, owner),
+});
+
+export const arcSkillsHandler = async (
+  context: ServerContext,
+  owner: OwnerId,
+): Promise<{ skills: Awaited<ReturnType<typeof arcSkills>> }> => ({
+  skills: await arcSkills(context, owner),
+});
+
+export const arcCalibrationKitHandler = async (
+  context: ServerContext,
+  owner: OwnerId,
+  subject: string,
+): Promise<{ calibration: Awaited<ReturnType<typeof calibrationKit>> }> => ({
+  calibration: await calibrationKit(context, owner, subject),
+});
+
+export const arcCalibrateHandler = async (
+  context: ServerContext,
+  owner: OwnerId,
+  body: unknown,
+): Promise<{ calibration: Awaited<ReturnType<typeof runCalibration>> }> => {
+  const input = calibrationSchema.parse(body) as CalibrationInput;
+  return { calibration: await runCalibration(context, owner, input) };
+};
+
+const arcGapOrThrow = async (
+  context: ServerContext,
+  owner: OwnerId,
+  gapId: string,
+): Promise<void> => {
+  const gap = await context.uow.gaps.get(owner, gapId);
+  if (!gap) throw new ApiError(404, 'gap_not_found', `Gap ${gapId} was not found for this owner.`);
+};
+
+export const arcMapHandler = async (
+  context: ServerContext,
+  owner: OwnerId,
+  gapId: string,
+): Promise<{ map: NonNullable<Awaited<ReturnType<typeof arcMap>>> }> => {
+  await arcGapOrThrow(context, owner, gapId);
+  const map = await arcMap(context, owner, gapId);
+  return { map: map! };
+};
+
+export const arcLessonHandler = async (
+  context: ServerContext,
+  owner: OwnerId,
+  gapId: string,
+): Promise<{ lesson: NonNullable<Awaited<ReturnType<typeof arcLesson>>> }> => {
+  await arcGapOrThrow(context, owner, gapId);
+  const lesson = await arcLesson(context, owner, gapId);
+  if (!lesson) {
+    throw new ApiError(404, 'no_curriculum', `Gap ${gapId} has no published lessons yet.`);
+  }
+  return { lesson };
+};
+
+export const arcRunCellHandler = async (
+  context: ServerContext,
+  owner: OwnerId,
+  gapId: string,
+  body: unknown,
+): Promise<{ run: RunCellResult }> => {
+  const input = runCellSchema.parse(body);
+  return { run: await runProofCell(context, owner, gapId, input.questionId, input.code) };
+};
+
+export const arcSubmitProofHandler = async (
+  context: ServerContext,
+  owner: OwnerId,
+  gapId: string,
+  body: unknown,
+): Promise<{ proof: Awaited<ReturnType<typeof submitProof>> }> => {
+  const input = proofSchema.parse(body);
+  return { proof: await submitProof(context, owner, gapId, input) };
+};
+
+export const arcProgressHandler = async (
+  context: ServerContext,
+  owner: OwnerId,
+): Promise<{ progress: Awaited<ReturnType<typeof arcProgress>> }> => ({
+  progress: await arcProgress(context, owner),
+});
+
+export const arcProfileHandler = async (
+  context: ServerContext,
+  owner: OwnerId,
+): Promise<{ profile: Awaited<ReturnType<typeof arcProfile>> }> => ({
+  profile: await arcProfile(context, owner),
+});
+
+export const arcPreferencesHandler = async (
+  context: ServerContext,
+  owner: OwnerId,
+): Promise<{ preferences: Awaited<ReturnType<typeof getPreferences>> }> => ({
+  preferences: await getPreferences(context, owner),
+});
+
+export const arcSetPreferencesHandler = async (
+  context: ServerContext,
+  owner: OwnerId,
+  body: unknown,
+): Promise<{ preferences: Awaited<ReturnType<typeof setPreferences>> }> => {
+  const values = preferencesSchema.parse(body);
+  return { preferences: await setPreferences(context, owner, values) };
 };

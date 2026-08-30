@@ -775,28 +775,28 @@ tasks:
       - a flagged lesson appears in the queue, is rejected with a note, and the note is visible on
         the lesson
   - id: GAP-032
-    title: "Arc UI — adaptive learning app surface (founder spec)"
+    title: 'Arc UI — adaptive learning app surface (founder spec)'
     epic: E21
     priority: P0
-    status: ready
-    goal: "The GapOS engine becomes the Arc app: calibration, gap map, audio theory and notebook proofs with verified practice as the spine."
+    status: done
+    goal: 'The GapOS engine becomes the Arc app: calibration, gap map, audio theory and notebook proofs with verified practice as the spine.'
     scope:
-      - "All screens from docs/ARC-UI.md in apps/web (Next.js, responsive, prototype design language)"
-      - "Real server-side code execution for notebook proofs, validated by the independent verifier (GAP-010)"
-      - "Real synthesized audio playback from the compile pipeline (GAP-011)"
-      - "Real 3-step calibration via provider adapters, mapped to knowledge-map gaps (E15, GAP-029)"
-      - "Attempt + mastery evidence recorded on proof (GAP-012); proofs ledger reads mastery records"
-      - "Spaced-review toggle wired to real review scheduling (GAP-012/GAP-013)"
+      - 'All screens from docs/ARC-UI.md in apps/web (Next.js, responsive, prototype design language)'
+      - 'Real server-side code execution for notebook proofs, validated by the independent verifier (GAP-010)'
+      - 'Real synthesized audio playback from the compile pipeline (GAP-011)'
+      - 'Real 3-step calibration via provider adapters, mapped to knowledge-map gaps (E15, GAP-029)'
+      - 'Attempt + mastery evidence recorded on proof (GAP-012); proofs ledger reads mastery records'
+      - 'Spaced-review toggle wired to real review scheduling (GAP-012/GAP-013)'
     out_of_scope:
-      - "No new backend services; no new paid providers; demo JS from the prototype must not survive"
+      - 'No new backend services; no new paid providers; demo JS from the prototype must not survive'
     dependencies: [GAP-021, GAP-022, GAP-023, GAP-027, GAP-029]
     acceptance:
-      - "All screens implemented; vertical slice (AGENTS.md §1) keeps working"
-      - "Run cell executes server-side; correct proof records an attempt and advances gap state; wrong answer is state-neutral"
-      - "Audio player plays the real compiled lesson TTS URL; controls work"
-      - "Calibration persists selections and maps to real gaps"
-      - "Map/progress reflect real DB state"
-      - "pnpm verify green; no weakened tests; tests cover real execution, state transitions and persistence round-trips"
+      - 'All screens implemented; vertical slice (AGENTS.md §1) keeps working'
+      - 'Run cell executes server-side; correct proof records an attempt and advances gap state; wrong answer is state-neutral'
+      - 'Audio player plays the real compiled lesson TTS URL; controls work'
+      - 'Calibration persists selections and maps to real gaps'
+      - 'Map/progress reflect real DB state'
+      - 'pnpm verify green; no weakened tests; tests cover real execution, state transitions and persistence round-trips'
     verification:
       - pnpm verify
     risk: medium

@@ -12,10 +12,12 @@ import type { GapStatus, GenerationStatus } from '@gapos/domain';
 import {
   ConcurrentModificationError,
   NotFoundError,
+  type ArcCalibration,
   type Artefact,
   type Attempt,
   type AttemptRepository,
   type AuditFinding,
+  type CalibrationRepository,
   type Curriculum,
   type CurriculumRepository,
   type Gap,
@@ -25,10 +27,12 @@ import {
   type GenerationStepRecord,
   type KnowledgeEdge,
   type KnowledgeRepository,
+  type LearnerPreferences,
   type Lesson,
   type MasteryEvidenceRecord,
   type MasteryRepository,
   type OwnerId,
+  type PreferencesRepository,
   type ReviewItem,
   type Source,
   type SourceChunk,
@@ -95,6 +99,8 @@ export interface MemoryStore {
   readonly steps: Map<string, GenerationStepRecord>;
   readonly findings: OwnedTable<AuditFinding>;
   readonly edges: OwnedTable<KnowledgeEdge>;
+  readonly preferences: Map<string, LearnerPreferences>;
+  readonly calibrations: OwnedTable<ArcCalibration>;
   readonly auditLog: { ownerId?: OwnerId; action: string; target: string }[];
 }
 
@@ -129,6 +135,8 @@ export const createMemoryStore = (): MemoryStore => ({
   steps: new Map(),
   findings: new OwnedTable(),
   edges: new OwnedTable(),
+  preferences: new Map(),
+  calibrations: new OwnedTable(),
   auditLog: [],
 });
 
@@ -160,12 +168,14 @@ export const createMemoryUnitOfWork = (store: MemoryStore = createMemoryStore())
         store.runs,
         store.findings,
         store.edges,
+        store.calibrations,
       ]) {
         table.deleteOwnedBy(id);
       }
       for (const [key, step] of store.steps) {
         if (step.ownerId === id) store.steps.delete(key);
       }
+      store.preferences.delete(id);
       store.auditLog.push({ ownerId: id, action: 'account_deleted', target: id });
     },
   };
@@ -458,5 +468,41 @@ export const createMemoryUnitOfWork = (store: MemoryStore = createMemoryStore())
     },
   };
 
-  return { users, gaps, sources, curricula, attempts, mastery, generation, knowledge };
+  const preferences: PreferencesRepository = {
+    async get(owner) {
+      return store.preferences.get(owner);
+    },
+    async set(owner, values, at) {
+      const row: LearnerPreferences = { ownerId: owner, ...values, updatedAt: at };
+      store.preferences.set(owner, row);
+      return row;
+    },
+  };
+
+  const calibrations: CalibrationRepository = {
+    async create(owner, calibration) {
+      return store.calibrations.insert({ ...calibration, ownerId: owner });
+    },
+    async get(owner, id) {
+      return store.calibrations.get(owner, id);
+    },
+    async listForOwner(owner) {
+      return store.calibrations
+        .where(owner)
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    },
+  };
+
+  return {
+    users,
+    gaps,
+    sources,
+    curricula,
+    attempts,
+    mastery,
+    generation,
+    knowledge,
+    preferences,
+    calibrations,
+  };
 };

@@ -1,26 +1,36 @@
-# M1.4: Fresh-checkout verification of the deployment surface (GAP-026)
+feat(arc): GAP-032 — Arc adaptive-learning UI over the real engine
 
-## What
-Verified the OPERATIONS.md deployment surface from a completely fresh checkout of `main`, and made the smoke step executable + the docs honest.
+The GapOS engine becomes the Arc app (founder spec docs/ARC-UI.md, visual
+spec docs/prototypes/arc-skill-learning-prototype.html).
 
-## Why
-M1's DoD needs the documented surface proven from zero. Items 1-3 (Dockerfile, railway.json, audio proxy) shipped in PR #6; this closes the verification item and fixes two documentation claims the verification disproved.
+Screens (apps/web, /arc): Today, Skills, AI calibration, Skill map, Lesson
+(theory + notebook), Progress, Profile — prototype design language, dark/light
+from persisted preference, focus rings, aria labels, reduced-motion support;
+root redirects to /arc, manifest start_url updated.
 
-## How tested
-From a clean clone (`/tmp/gapos-fresh`, `git clone` of `main`):
+REAL, not demo (the prototype's static JS did not survive):
+- Notebook proofs execute learner code server-side in a fresh node:vm realm
+  (no host objects, 16K cell cap, 1s timeout, 4K output cap); checks are
+  expressions evaluated in the same realm, correctness by execution; the
+  reference solution is validated the same way by the independent verifier at
+  generation time (code_proof question type, verifier + grading support).
+- Audio: lesson page drives a real audio element on the compiled lesson's TTS
+  artefact (play/pause, ±15s, 1x/1.25x/1.5x, waveform, transcript drawer).
+- Calibration: real 3-step flow through provider adapters (arc_calibration
+  contract, adaptive diagnostic: correct baseline -> 3 gaps / difficulty 3,
+  miss -> 4 gaps / difficulty 1), persisted (migration 006 arc_calibrations),
+  creates the real gap; answer key never leaves the server.
+- Proofs record attempt + mastery evidence; proofs ledger reads mastery.
+- Spaced review: Profile toggle gates the real due-review queue in Today
+  without cancelling scheduling (learner_preferences, migration 006).
 
-| Check | Command | Result |
-| --- | --- | --- |
-| One-command install | `pnpm install` | Done (cached store) |
-| Quality gate | `pnpm verify` | **400 passed \| 26 loud skips** |
-| Web boots env-only | `pnpm --filter @gapos/web start` (no env) | `/api/health` 200 with `X-Owner-Id`; loud in-memory warning logged |
-| Worker graceful shutdown | `pnpm --filter @gapos/worker start` + SIGTERM | `"gapos-worker stopped cleanly"`, exit 0 |
-| Full journey, no-S3 path | `pnpm tsx scripts/smoke-compile.ts` (new) | `SMOKE OK: published course, 3 lessons, audio/mpeg (43 bytes)` |
+Specs/ops: openapi.yaml documents the /arc/* surface; generation schemas
+regenerated; 4 new telemetry metrics; evaluation scorer understands code
+proofs; docs/ARC-UI.md spec committed alongside.
 
-## Findings fixed in this PR
-1. **`scripts/smoke-compile.ts`** — new executable smoke compilation (release strategy step 4 now names it). Runs gap → source → define → compile → lessons → audio bytes with no keys, no DB, no S3.
-2. **OPERATIONS.md no-S3 claim was wrong for the deployed topology**: in-memory repositories/storage are per-process, so a no-S3/no-Postgres trial only works as a single process (web + worker as separate services cannot share either). Corrected with the single-process requirement.
-3. **GOAL.md M1 items checked off** (items 1-3 shipped in #6; item 4 by this PR). M1's DoD (a *deployed* instance) still needs the owner-gated Railway step.
+Gate: pnpm verify 434 passed / 0 failed; arc-postgres e2e 2/2 on a real
+Postgres; web build green. Evidence in tasks/status.json (GAP-032).
 
-## Notes
-- The verification also surfaced the session-environment pitfall: a leaked `GAPOS_TEST_DATABASE_URL` makes the Postgres suites run instead of skip — the fresh checkout must be clean-env.
+Known limitation: node:vm is not a hard security boundary; the sandbox is
+caps-hardened for the learner surface but a production hardening pass should
+move execution into a dedicated worker with OS-level isolation.

@@ -38,7 +38,12 @@ export const EvidenceSchema = z
     message: 'An objective grounded in a source must cite at least one locator.',
   });
 
-export const QUESTION_TYPES = ['multiple_choice', 'short_answer', 'worked_problem'] as const;
+export const QUESTION_TYPES = [
+  'multiple_choice',
+  'short_answer',
+  'worked_problem',
+  'code_proof',
+] as const;
 export type QuestionType = (typeof QUESTION_TYPES)[number];
 
 /**
@@ -48,6 +53,24 @@ export type QuestionType = (typeof QUESTION_TYPES)[number];
  */
 export const QUESTION_ROLES = ['retrieval', 'application', 'transfer'] as const;
 export type QuestionRole = (typeof QUESTION_ROLES)[number];
+
+/**
+ * A notebook proof (GAP-032). The learner writes code; the server executes it in a sandbox and
+ * every `checks` expression must evaluate truthy in the same realm. The expressions are authored
+ * by the curriculum generator and validated by the independent verifier at generation time —
+ * correctness is decided by execution, never by inspecting the source text.
+ */
+export const CODE_PROOF_LANGUAGES = ['js'] as const;
+export type CodeProofLanguage = (typeof CODE_PROOF_LANGUAGES)[number];
+
+export const CodeCheckSchema = z
+  .object({
+    name: z.string().min(1),
+    /** A boolean expression evaluated after the learner's code, in the same realm. */
+    expression: z.string().min(1),
+  })
+  .strict();
+export type CodeCheck = z.infer<typeof CodeCheckSchema>;
 
 export const QuestionSchema = z
   .object({
@@ -67,6 +90,10 @@ export const QuestionSchema = z
     acceptableAlternatives: z.array(z.string()).default([]),
     evidence: EvidenceSchema,
     hint: z.string().optional(),
+    /** Notebook proof fields: only a `code_proof` question may carry them. */
+    language: z.enum(CODE_PROOF_LANGUAGES).optional(),
+    starterCode: z.string().optional(),
+    checks: z.array(CodeCheckSchema).optional(),
   })
   .strict()
   .superRefine((q, ctx) => {
@@ -98,7 +125,47 @@ export const QuestionSchema = z
       });
     }
 
-    if (q.type !== 'multiple_choice' && !q.rubric) {
+    if (q.type === 'code_proof') {
+      if (!q.checks || q.checks.length === 0) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'A code_proof question must ship at least one check expression.',
+          path: ['checks'],
+        });
+      }
+      if (!q.starterCode) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'A code_proof question must ship starter code.',
+          path: ['starterCode'],
+        });
+      }
+      if (q.language !== 'js') {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'A code_proof question must declare its sandbox language ("js").',
+          path: ['language'],
+        });
+      }
+      // The reference solution lives in `answer`; the verifier executes it against the checks.
+      if (q.acceptableAlternatives.length > 0) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'A code_proof question is graded by execution, not by answer text.',
+          path: ['acceptableAlternatives'],
+        });
+      }
+    } else {
+      if (q.checks || q.starterCode || q.language) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Only a code_proof question may carry checks, starterCode or language.',
+          path: ['type'],
+        });
+      }
+    }
+
+    if (q.type !== 'multiple_choice' && q.type !== 'code_proof' && !q.rubric) {
       ctx.addIssue({
         code: 'custom',
         message: 'A free-response question must ship with a rubric.',
@@ -324,6 +391,40 @@ export const RepairResultContract = defineContract('repair_result', '1.0.0', {
 });
 export type RepairResult = z.infer<typeof RepairResultContract.schema>;
 
+/* --------------------------------------------------------- Arc calibration (GAP-032) */
+
+/**
+ * The Arc calibration kit: goal options for the chosen subject and the baseline code question
+ * ("show me how you think") used for adaptive placement. The question is authored and
+ * schema-validated like every other model output; the learner's answer is graded by exact
+ * option match server-side, and the outcome feeds the diagnostic interpretation through the
+ * provider adapter. No self-reported confidence ever reaches the plan.
+ */
+export const CalibrationContract = defineContract('arc_calibration', '1.0.0', {
+  subject: z.string().min(1),
+  goalOptions: z.array(z.string().min(1)).min(1),
+  baselineQuestion: z
+    .object({
+      id: z.string().min(1),
+      prompt: z.string().min(1),
+      /** Code shown in the placement card; the learner reads it before choosing. */
+      code: z.string().min(1),
+      options: z.array(z.string().min(1)).min(3),
+      answer: z.string().min(1),
+    })
+    .strict()
+    .superRefine((question, ctx) => {
+      if (!question.options.includes(question.answer)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'The baseline answer must be one of the options.',
+          path: ['answer'],
+        });
+      }
+    }),
+});
+export type Calibration = z.infer<typeof CalibrationContract.schema>;
+
 export const ALL_CONTRACTS = {
   gap_normalisation: GapNormalisationContract,
   diagnostic_interpretation: DiagnosticInterpretationContract,
@@ -331,4 +432,5 @@ export const ALL_CONTRACTS = {
   lesson_package: LessonPackageContract,
   verification_report: VerificationReportContract,
   repair_result: RepairResultContract,
+  arc_calibration: CalibrationContract,
 } as const;

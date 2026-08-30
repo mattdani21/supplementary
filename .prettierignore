@@ -7,6 +7,10 @@ tasks/status.json
 .worktrees
 *.md
 
+# The Arc prototype is a static demo spec (docs/ARC-UI.md), not code; its formatting is
+# irrelevant to the build and reformatting it would bury the spec's real changes.
+docs/prototypes
+
 # Generated from the zod contracts by `pnpm specs:generate`; reformatting them would
 # break the drift check in tests/architecture/specs.test.ts.
 specs/generation-schemas
