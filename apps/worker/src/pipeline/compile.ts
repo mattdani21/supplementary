@@ -52,6 +52,7 @@ import {
 import type { Logger, Metrics } from '@gapos/observability';
 import { ProviderContractError, type Providers } from '@gapos/provider-adapters';
 import { mapWithConcurrency, runStep, type StepContext } from './step-runner.js';
+import { runCell } from '../notebook/executor.js';
 
 export const PIPELINE_VERSION = '1.0.0';
 
@@ -824,6 +825,20 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
         ).value,
     );
 
+    // A notebook proof (GAP-032) is only trustworthy if its reference solution passes under
+    // execution: the verifier refuses to publish a code cell that fails its own checks. The
+    // sandbox runs here; the domain verifier interprets the outcomes.
+    const cellRuns = lesson.questions
+      .filter((question) => question.type === 'code_proof')
+      .map((question) => {
+        const executed = runCell(question.answer, question.checks ?? []);
+        return {
+          questionId: question.id,
+          passed: executed.passed,
+          ...(executed.error ? { error: executed.error } : {}),
+        };
+      });
+
     findings = verifyLesson(
       {
         id: lessonId,
@@ -834,7 +849,11 @@ const compileDay = async (params: CompileDayParams): Promise<DayOutcome> => {
         estimatedMinutes: lesson.estimatedMinutes,
         questions: lesson.questions,
       },
-      { ...verificationContext, independentSolutions: report.independentSolutions },
+      {
+        ...verificationContext,
+        independentSolutions: report.independentSolutions,
+        cellRuns,
+      },
     );
 
     for (const finding of findings) {

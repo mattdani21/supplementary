@@ -93,7 +93,8 @@
             "enum": [
               "multiple_choice",
               "short_answer",
-              "worked_problem"
+              "worked_problem",
+              "code_proof"
             ]
           },
           "role": {
@@ -180,6 +181,36 @@
           },
           "hint": {
             "type": "string"
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "js"
+            ]
+          },
+          "starterCode": {
+            "type": "string"
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "expression": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "name",
+                "expression"
+              ],
+              "additionalProperties": false
+            }
           }
         },
         "required": [

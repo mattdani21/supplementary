@@ -13,6 +13,7 @@ import {
   assessCurriculum,
   buildTodayQueue,
   grade,
+  gradeCodeProof,
   scheduleAfterAttempt,
   scheduleAfterReview,
   transitionGap,
@@ -22,6 +23,7 @@ import {
   type Grade,
   type ObjectiveNode,
 } from '@gapos/domain';
+import { runCell } from '../../../../worker/src/notebook/executor.js';
 import type { ServerContext } from '../context.js';
 
 /* ----------------------------------------------------------------------- today */
@@ -141,7 +143,21 @@ export const submitAttempt = async (
   if (!curriculum) throw new Error(`No curriculum for gap ${gapId}.`);
 
   const hintsUsed = input.hintsUsed ?? 0;
-  const verdict = grade(question.payload, { text: input.response, hintsUsed });
+
+  let verdict: Grade;
+  if (question.payload.type === 'code_proof') {
+    // A notebook proof is decided by real server-side execution (GAP-032), never by comparing
+    // its source text. The sandbox runs the learner's code and every check expression; the
+    // domain then grades the executed results.
+    const executed = runCell(input.response, question.payload.checks ?? []);
+    const results = (question.payload.checks ?? []).map((check) => ({
+      name: check.name,
+      passed: executed.passed && executed.failures.every((f) => !f.startsWith(check.name)),
+    }));
+    verdict = gradeCodeProof(question.payload, results);
+  } else {
+    verdict = grade(question.payload, { text: input.response, hintsUsed });
+  }
 
   // A rubric-required grade needs a model. In the fixture-driven slice it is conservative:
   // unmatched free text is not credited rather than being optimistically accepted.
@@ -218,6 +234,146 @@ export const submitAttempt = async (
       ...(question.payload.rubric ? { rubric: question.payload.rubric } : {}),
     },
     scheduledReviews,
+  };
+};
+
+/* ------------------------------------------------------------- notebook proofs */
+
+export interface RunCellInput {
+  readonly questionId: string;
+  readonly code: string;
+}
+
+export interface RunCellResult {
+  readonly output: string;
+  readonly passed: boolean;
+  readonly failures: readonly string[];
+  readonly error?: string;
+}
+
+/**
+ * The Arc "Run cell" action (GAP-032): execute the learner's code server-side and report the
+ * outcome. Deliberately records nothing — running a cell is practice, not evidence; only a
+ * submitted proof can record an attempt. The question must belong to the gap's curriculum.
+ */
+export const runProofCell = async (
+  context: ServerContext,
+  owner: OwnerId,
+  gapId: string,
+  questionId: string,
+  code: string,
+): Promise<RunCellResult> => {
+  const question = await context.uow.curricula.getQuestion(owner, questionId);
+  if (!question) throw new Error(`Question ${questionId} was not found for this owner.`);
+  if (question.payload.type !== 'code_proof') {
+    throw new Error(`Question ${questionId} is not a code_proof question.`);
+  }
+  const curriculum = await context.uow.curricula.getCurrentForGap(owner, gapId);
+  const lesson = curriculum
+    ? (await context.uow.curricula.listLessons(owner, curriculum.id)).find(
+        (l) => l.id === question.lessonId,
+      )
+    : undefined;
+  if (!lesson) throw new Error(`Question ${questionId} is not part of gap ${gapId}.`);
+  const executed = runCell(code, question.payload.checks ?? []);
+  context.metrics.increment('arc_cell_run_total');
+  return {
+    output: executed.output,
+    passed: executed.passed,
+    failures: executed.failures,
+    ...(executed.error ? { error: executed.error } : {}),
+  };
+};
+
+export interface SubmitProofInput {
+  readonly questionId: string;
+  readonly sessionId: string;
+  readonly code: string;
+  readonly hintsUsed?: number;
+  readonly idempotencyKey: string;
+}
+
+export interface ProofResult {
+  readonly correct: boolean;
+  readonly passed: boolean;
+  readonly output: string;
+  readonly error?: string;
+  readonly attempt?: Attempt;
+  readonly attemptCreated: boolean;
+  readonly gapStatus?: string;
+  /** Present once the proof was submitted; what the mastery rule says right now. */
+  readonly mastery?: CurriculumMastery;
+  readonly filled: boolean;
+}
+
+/**
+ * The Arc proof submission: re-execute the code server-side (the client never declares its own
+ * correctness), record the attempt and its mastery evidence only when every check passed, and
+ * let the gap state machine advance when the evidence is enough.
+ *
+ * A wrong proof is supportive and state-neutral: no attempt, no evidence, no transition.
+ */
+export const submitProof = async (
+  context: ServerContext,
+  owner: OwnerId,
+  gapId: string,
+  input: SubmitProofInput,
+): Promise<ProofResult> => {
+  const question = await context.uow.curricula.getQuestion(owner, input.questionId);
+  if (!question) throw new Error(`Question ${input.questionId} was not found for this owner.`);
+  if (question.payload.type !== 'code_proof') {
+    throw new Error(`Question ${input.questionId} is not a code_proof question.`);
+  }
+
+  const executed = runCell(input.code, question.payload.checks ?? []);
+  if (!executed.passed) {
+    context.metrics.increment('arc_proof_submit_total', { correct: 'false' });
+    const gap = await context.uow.gaps.get(owner, gapId);
+    return {
+      correct: false,
+      passed: false,
+      output: executed.output,
+      ...(executed.error ? { error: executed.error } : {}),
+      attemptCreated: false,
+      ...(gap ? { gapStatus: gap.status } : {}),
+      filled: false,
+    };
+  }
+
+  const result = await submitAttempt(context, owner, gapId, {
+    questionId: input.questionId,
+    sessionId: input.sessionId,
+    response: input.code,
+    ...(input.hintsUsed === undefined ? {} : { hintsUsed: input.hintsUsed }),
+    idempotencyKey: input.idempotencyKey,
+  });
+  context.metrics.increment('arc_proof_submit_total', { correct: String(result.correct) });
+
+  // Advance the gap through the state machine when the evidence now accounts for every
+  // required objective. A replay of an already-submitted proof finds the gap filled and says so.
+  const gap = await context.uow.gaps.get(owner, gapId);
+  let mastery: CurriculumMastery | undefined;
+  let filled = false;
+  if (gap) {
+    if (gap.status === 'active') {
+      const checked = await runMasteryCheck(context, owner, gapId);
+      mastery = checked.mastery;
+      filled = checked.filled;
+    } else if (gap.status === 'filled') {
+      filled = true;
+      mastery = await assessMastery(context, owner, gapId);
+    }
+  }
+
+  return {
+    correct: result.correct,
+    passed: true,
+    output: executed.output,
+    attempt: result.attempt,
+    attemptCreated: result.created,
+    ...(gap ? { gapStatus: (await context.uow.gaps.get(owner, gapId))?.status } : {}),
+    ...(mastery ? { mastery } : {}),
+    filled,
   };
 };
 

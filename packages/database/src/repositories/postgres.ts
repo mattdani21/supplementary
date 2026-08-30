@@ -20,10 +20,12 @@ import type { GapStatus, GenerationStatus, StepState } from '@gapos/domain';
 import {
   ConcurrentModificationError,
   NotFoundError,
+  type ArcCalibration,
   type Artefact,
   type Attempt,
   type AttemptRepository,
   type AuditFinding,
+  type CalibrationRepository,
   type Curriculum,
   type CurriculumRepository,
   type Gap,
@@ -33,9 +35,11 @@ import {
   type GenerationStepRecord,
   type KnowledgeEdge,
   type KnowledgeRepository,
+  type LearnerPreferences,
   type Lesson,
   type MasteryEvidenceRecord,
   type MasteryRepository,
+  type PreferencesRepository,
   type ReviewItem,
   type Source,
   type SourceChunk,
@@ -277,6 +281,28 @@ const toEdge = (row: any): KnowledgeEdge => ({
   toCapability: row.to_capability,
   relationship: row.relationship,
   confidence: Number(row.confidence),
+});
+
+const toPreferences = (row: any): LearnerPreferences => ({
+  ownerId: row.owner_id,
+  audioTheory: row.audio_theory,
+  gentleHints: row.gentle_hints,
+  darkMode: row.dark_mode,
+  spacedReview: row.spaced_review,
+  updatedAt: row.updated_at,
+});
+
+const toCalibration = (row: any): ArcCalibration => ({
+  id: row.id,
+  ownerId: row.owner_id,
+  gapId: row.gap_id,
+  subject: row.subject,
+  goal: row.goal,
+  baselineAnswer: row.baseline_answer,
+  baselineCorrect: row.baseline_correct,
+  gapsIdentified: row.gaps_identified,
+  startingDifficulty: row.starting_difficulty,
+  createdAt: row.created_at,
 });
 
 /* eslint-enable @typescript-eslint/no-explicit-any */
@@ -1093,7 +1119,82 @@ export const createPostgresUnitOfWork = (pool: Pool): UnitOfWork => {
     },
   };
 
-  return { users, gaps, sources, curricula, attempts, mastery, generation, knowledge };
+  const preferences: PreferencesRepository = {
+    async get(owner) {
+      const { rows } = await db.query('SELECT * FROM learner_preferences WHERE owner_id = $1', [
+        owner,
+      ]);
+      return one(rows, toPreferences);
+    },
+    async set(owner, values, at) {
+      const { rows } = await db.query(
+        `INSERT INTO learner_preferences (owner_id, audio_theory, gentle_hints, dark_mode,
+                                          spaced_review, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6)
+         ON CONFLICT (owner_id) DO UPDATE
+            SET audio_theory = EXCLUDED.audio_theory,
+                gentle_hints = EXCLUDED.gentle_hints,
+                dark_mode    = EXCLUDED.dark_mode,
+                spaced_review = EXCLUDED.spaced_review,
+                updated_at   = EXCLUDED.updated_at
+         RETURNING *`,
+        [owner, values.audioTheory, values.gentleHints, values.darkMode, values.spacedReview, at],
+      );
+      return toPreferences(rows[0]);
+    },
+  };
+
+  const calibrations: CalibrationRepository = {
+    async create(owner, calibration) {
+      const { rows } = await db.query(
+        `INSERT INTO arc_calibrations (id, owner_id, gap_id, subject, goal, baseline_answer,
+                                       baseline_correct, gaps_identified, starting_difficulty,
+                                       created_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+         RETURNING *`,
+        [
+          calibration.id,
+          owner,
+          calibration.gapId,
+          calibration.subject,
+          calibration.goal,
+          calibration.baselineAnswer,
+          calibration.baselineCorrect,
+          JSON.stringify(calibration.gapsIdentified),
+          calibration.startingDifficulty,
+          calibration.createdAt,
+        ],
+      );
+      return toCalibration(rows[0]);
+    },
+    async get(owner, id) {
+      const { rows } = await db.query(
+        'SELECT * FROM arc_calibrations WHERE id = $1 AND owner_id = $2',
+        [id, owner],
+      );
+      return one(rows, toCalibration);
+    },
+    async listForOwner(owner) {
+      const { rows } = await db.query(
+        'SELECT * FROM arc_calibrations WHERE owner_id = $1 ORDER BY created_at DESC, id',
+        [owner],
+      );
+      return rows.map(toCalibration);
+    },
+  };
+
+  return {
+    users,
+    gaps,
+    sources,
+    curricula,
+    attempts,
+    mastery,
+    generation,
+    knowledge,
+    preferences,
+    calibrations,
+  };
 };
 
 /** Remove every row, preserving the schema. Used to isolate integration tests from each other. */
@@ -1102,7 +1203,7 @@ export const truncateAll = async (pool: Pool): Promise<void> => {
     TRUNCATE users, gaps, sources, source_chunks, diagnostics, curricula, objectives, lessons,
              artefacts, questions, attempts, mastery_evidence, review_items, generation_runs,
              generation_steps, audit_findings, knowledge_edges, jobs, provider_usage, audit_log,
-             learner_profiles
+             learner_profiles, learner_preferences, arc_calibrations
     RESTART IDENTITY CASCADE
   `);
 };

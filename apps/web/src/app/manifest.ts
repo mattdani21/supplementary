@@ -2,10 +2,10 @@ import type { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'GapOS — close the gap',
-    short_name: 'GapOS',
-    description: 'A gap-to-mastery learning companion.',
-    start_url: '/gaps',
+    name: 'Arc — adaptive skill learning',
+    short_name: 'Arc',
+    description: 'Learn the gap. Prove the skill.',
+    start_url: '/arc',
     display: 'standalone',
     background_color: '#0f172a',
     theme_color: '#0f172a',

@@ -347,6 +347,250 @@ paths:
               schema: { $ref: '#/components/schemas/KnowledgeMap' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  # ------------------------------------------------------------------ Arc (GAP-032)
+
+  /arc/today:
+    get:
+      tags: [arc]
+      operationId: arcToday
+      summary: The Arc Today screen
+      description: |
+        The greeting, the daily focus, the continue card (the gap with a next lesson or due
+        reviews), the aggregate map progress ring, keep-exploring suggestions, momentum from
+        evidence dates, and — only while the spaced-review preference is on — the real due
+        review queue.
+      responses:
+        '200':
+          description: The Today view.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ArcToday' }
+        '401': { $ref: '#/components/responses/Unauthorised' }
+
+  /arc/skills:
+    get:
+      tags: [arc]
+      operationId: arcSkills
+      summary: The Arc skills library
+      responses:
+        '200':
+          description: Every non-archived gap with its real objective progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  skills:
+                    type: array
+                    items: { $ref: '#/components/schemas/ArcSkill' }
+
+  /arc/calibration:
+    get:
+      tags: [arc]
+      operationId: arcCalibrationKit
+      summary: The calibration kit for a subject
+      description: |
+        Goal options and the baseline code question, produced through the provider adapter and
+        schema-validated. The answer key is never returned.
+      parameters:
+        - name: subject
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: The kit, without the answer.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  calibration: { $ref: '#/components/schemas/ArcCalibrationKit' }
+    post:
+      tags: [arc]
+      operationId: arcCalibrate
+      summary: Run the 3-step calibration
+      description: |
+        Grades the baseline answer server-side, creates the real gap the route leads to,
+        interprets the diagnostic through the provider adapter (a correct baseline raises the
+        starting point), persists the selections, and reports the gaps identified with a
+        next/after/later preview plus any existing gaps matching the subject.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ArcCalibrationRequest' }
+      responses:
+        '200':
+          description: The persisted calibration and its result.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  calibration: { $ref: '#/components/schemas/ArcCalibrationResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorised' }
+
+  /arc/gaps/{gapId}/map:
+    parameters:
+      - $ref: '#/components/parameters/GapId'
+    get:
+      tags: [arc]
+      operationId: arcMap
+      summary: The Arc skill map for a gap
+      responses:
+        '200':
+          description: The objective sequence with cleared/current/later states and the next-gap hero.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  map: { $ref: '#/components/schemas/ArcMap' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /arc/gaps/{gapId}/lesson:
+    parameters:
+      - $ref: '#/components/parameters/GapId'
+    get:
+      tags: [arc]
+      operationId: arcLesson
+      summary: The Arc lesson for a gap
+      description: |
+        The next published lesson the learner has not attempted: theory text, the real compiled
+        TTS audio artefact, the transcript, and the notebook proof question.
+      responses:
+        '200':
+          description: The lesson view.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  lesson: { $ref: '#/components/schemas/ArcLesson' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /arc/gaps/{gapId}/proofs/run:
+    parameters:
+      - $ref: '#/components/parameters/GapId'
+    post:
+      tags: [arc]
+      operationId: arcRunCell
+      summary: Execute a notebook cell server-side
+      description: |
+        Runs the learner's code in the sandbox and reports the output and check results.
+        Records nothing: running a cell is practice, not evidence.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ArcRunCellRequest' }
+      responses:
+        '200':
+          description: The executed cell.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  run: { $ref: '#/components/schemas/ArcRunCellResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /arc/gaps/{gapId}/proofs:
+    parameters:
+      - $ref: '#/components/parameters/GapId'
+    post:
+      tags: [arc]
+      operationId: arcSubmitProof
+      summary: Submit a notebook proof
+      description: |
+        Re-executes the code server-side; only a proof whose checks all pass records an attempt
+        and mastery evidence and may advance the gap state machine. A wrong proof is supportive
+        and state-neutral. Requires an `Idempotency-Key` header: replaying a submission returns
+        the original result rather than double-counting evidence.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ArcProofRequest' }
+      responses:
+        '200':
+          description: The proof verdict and any state change.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  proof: { $ref: '#/components/schemas/ArcProofResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /arc/progress:
+    get:
+      tags: [arc]
+      operationId: arcProgress
+      summary: The Arc progress screen
+      responses:
+        '200':
+          description: The proofs ledger, weekly focus and momentum.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  progress: { $ref: '#/components/schemas/ArcProgress' }
+
+  /arc/profile:
+    get:
+      tags: [arc]
+      operationId: arcProfile
+      summary: The Arc profile
+      responses:
+        '200':
+          description: The learner's name, email and preferences.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  profile: { $ref: '#/components/schemas/ArcProfile' }
+
+  /arc/preferences:
+    get:
+      tags: [arc]
+      operationId: arcGetPreferences
+      summary: Read the learning preferences
+      responses:
+        '200':
+          description: The stored preferences, or the defaults.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  preferences: { $ref: '#/components/schemas/ArcPreferences' }
+    put:
+      tags: [arc]
+      operationId: arcSetPreferences
+      summary: Persist the learning preferences
+      description: |
+        Replaces the stored preferences. The spaced-review toggle does not cancel scheduling —
+        it decides whether due reviews surface in Today.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ArcPreferences' }
+      responses:
+        '200':
+          description: The stored preferences.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  preferences: { $ref: '#/components/schemas/ArcPreferences' }
+
 components:
   securitySchemes:
     sessionCookie:
@@ -750,3 +994,295 @@ components:
         edges:
           type: array
           items: { $ref: '#/components/schemas/KnowledgeEdge' }
+
+    # ------------------------------------------------------------------ Arc (GAP-032)
+
+    ArcPreferences:
+      type: object
+      required: [audioTheory, gentleHints, darkMode, spacedReview]
+      properties:
+        audioTheory: { type: boolean }
+        gentleHints: { type: boolean }
+        darkMode: { type: boolean }
+        spacedReview: { type: boolean }
+
+    ArcCalibrationKit:
+      type: object
+      required: [subject, goalOptions, baselineQuestion]
+      properties:
+        subject: { type: string }
+        goalOptions:
+          type: array
+          items: { type: string }
+        baselineQuestion:
+          type: object
+          required: [id, prompt, code, options]
+          properties:
+            id: { type: string }
+            prompt: { type: string }
+            code: { type: string }
+            options:
+              type: array
+              items: { type: string }
+
+    ArcCalibrationRequest:
+      type: object
+      required: [subject, goal, baselineAnswer]
+      properties:
+        subject: { type: string, minLength: 1 }
+        goal: { type: string, minLength: 1 }
+        baselineAnswer: { type: string, minLength: 1 }
+
+    ArcCalibrationResult:
+      type: object
+      required:
+        [calibrationId, gapId, subject, goal, baselineCorrect, gapsIdentified, startingDifficulty]
+      properties:
+        calibrationId: { type: string }
+        gapId: { type: string }
+        subject: { type: string }
+        goal: { type: string }
+        baselineCorrect: { type: boolean }
+        gapsIdentified:
+          type: array
+          items: { type: string }
+        startingDifficulty: { type: integer, minimum: 1, maximum: 5 }
+        preview:
+          type: object
+          properties:
+            next: { type: string }
+            after: { type: string }
+            later:
+              type: array
+              items: { type: string }
+        relatedGapIds:
+          type: array
+          items: { type: string }
+
+    ArcSkill:
+      type: object
+      required: [gapId, title, status, objectivesTotal, objectivesCleared, percent, started]
+      properties:
+        gapId: { type: string }
+        title: { type: string }
+        status: { $ref: '#/components/schemas/GapStatus' }
+        objectivesTotal: { type: integer }
+        objectivesCleared: { type: integer }
+        percent: { type: integer }
+        started: { type: boolean }
+
+    ArcMap:
+      type: object
+      required: [gap, progress, sequence]
+      properties:
+        gap:
+          type: object
+          required: [id, title, status]
+          properties:
+            id: { type: string }
+            title: { type: string }
+            status: { $ref: '#/components/schemas/GapStatus' }
+        progress:
+          type: object
+          required: [percent, cleared, total]
+          properties:
+            percent: { type: integer }
+            cleared: { type: integer }
+            total: { type: integer }
+        hero:
+          type: object
+          required: [objectiveId, capabilityStatement, etaMinutes]
+          properties:
+            objectiveId: { type: string }
+            capabilityStatement: { type: string }
+            etaMinutes: { type: integer }
+            lessonDay: { type: integer }
+            lessonId: { type: string }
+        sequence:
+          type: array
+          items:
+            type: object
+            required: [objectiveId, capabilityStatement, state]
+            properties:
+              objectiveId: { type: string }
+              capabilityStatement: { type: string }
+              state: { type: string, enum: [cleared, current, later] }
+              lessonDay: { type: integer }
+
+    ArcLesson:
+      type: object
+      required: [gap, lesson, transcript]
+      properties:
+        gap:
+          type: object
+          required: [id, title]
+          properties:
+            id: { type: string }
+            title: { type: string }
+        lesson:
+          type: object
+          required: [lessonId, day, title, summary, script, estimatedMinutes, totalDays]
+          properties:
+            lessonId: { type: string }
+            day: { type: integer }
+            title: { type: string }
+            summary: { type: string }
+            script: { type: string }
+            estimatedMinutes: { type: integer }
+            totalDays: { type: integer }
+        audio:
+          type: object
+          required: [artefactId, durationSeconds]
+          properties:
+            artefactId: { type: string }
+            durationSeconds: { type: number }
+        transcript: { type: string }
+        notebook:
+          type: object
+          required: [questionId, prompt, starterCode]
+          properties:
+            questionId: { type: string }
+            prompt: { type: string }
+            starterCode: { type: string }
+            hint: { type: string }
+
+    ArcRunCellRequest:
+      type: object
+      required: [questionId, code]
+      properties:
+        questionId: { type: string, minLength: 1 }
+        code: { type: string, minLength: 1, maxLength: 20000 }
+
+    ArcRunCellResult:
+      type: object
+      required: [output, passed, failures]
+      properties:
+        output: { type: string }
+        passed: { type: boolean }
+        failures:
+          type: array
+          items: { type: string }
+        error: { type: string }
+
+    ArcProofRequest:
+      type: object
+      required: [questionId, sessionId, code, idempotencyKey]
+      properties:
+        questionId: { type: string, minLength: 1 }
+        sessionId: { type: string, minLength: 1 }
+        code: { type: string, minLength: 1, maxLength: 20000 }
+        hintsUsed: { type: integer, minimum: 0 }
+        idempotencyKey: { type: string, minLength: 1 }
+
+    ArcProofResult:
+      type: object
+      required: [correct, passed, output, attemptCreated, filled]
+      properties:
+        correct: { type: boolean }
+        passed: { type: boolean }
+        output: { type: string }
+        error: { type: string }
+        attemptCreated: { type: boolean }
+        gapStatus: { $ref: '#/components/schemas/GapStatus' }
+        filled: { type: boolean }
+
+    ArcProgress:
+      type: object
+      required: [percent, clearedGaps, totalGaps, weeklyMinutes, momentumDays, proofs]
+      properties:
+        percent: { type: integer }
+        clearedGaps: { type: integer }
+        totalGaps: { type: integer }
+        weeklyMinutes: { type: integer }
+        momentumDays: { type: integer }
+        proofs:
+          type: array
+          items:
+            type: object
+            required: [objectiveId, capabilityStatement, gapId, gapTitle, recordedAt]
+            properties:
+              objectiveId: { type: string }
+              capabilityStatement: { type: string }
+              gapId: { type: string }
+              gapTitle: { type: string }
+              recordedAt: { type: string, format: date-time }
+
+    ArcProfile:
+      type: object
+      required: [name, email, preferences]
+      properties:
+        name: { type: string }
+        email: { type: string }
+        preferences: { $ref: '#/components/schemas/ArcPreferences' }
+        stats:
+          type: object
+          required: [clearedGaps, totalGaps]
+          properties:
+            clearedGaps: { type: integer }
+            totalGaps: { type: integer }
+
+    ArcToday:
+      type: object
+      required: [greeting, focus, mapProgress, suggestions, momentumDays, dueReviews]
+      properties:
+        greeting:
+          type: object
+          required: [dayLabel, partOfDay, name]
+          properties:
+            dayLabel: { type: string }
+            partOfDay: { type: string }
+            name: { type: string }
+        focus:
+          type: object
+          required: [plannedMinutes, completedMinutes, itemsLabel]
+          properties:
+            plannedMinutes: { type: integer }
+            completedMinutes: { type: integer }
+            itemsLabel: { type: string }
+        continueGap:
+          type: object
+          required: [gapId, title, status, progress]
+          properties:
+            gapId: { type: string }
+            title: { type: string }
+            status: { $ref: '#/components/schemas/GapStatus' }
+            progress:
+              type: object
+              required: [done, total]
+              properties:
+                done: { type: integer }
+                total: { type: integer }
+            lesson:
+              type: object
+              required: [day, lessonId, title]
+              properties:
+                day: { type: integer }
+                lessonId: { type: string }
+                title: { type: string }
+        mapProgress:
+          type: object
+          required: [percent, cleared, total]
+          properties:
+            percent: { type: integer }
+            cleared: { type: integer }
+            total: { type: integer }
+        suggestions:
+          type: array
+          items:
+            type: object
+            required: [gapId, title, status]
+            properties:
+              gapId: { type: string }
+              title: { type: string }
+              status: { $ref: '#/components/schemas/GapStatus' }
+        momentumDays: { type: integer }
+        dueReviews:
+          type: array
+          items:
+            type: object
+            required: [reviewId, gapId, objectiveId, dueAt]
+            properties:
+              reviewId: { type: string }
+              gapId: { type: string }
+              objectiveId: { type: string }
+              dueAt: { type: string, format: date-time }

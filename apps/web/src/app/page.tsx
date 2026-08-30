@@ -1,13 +1,9 @@
-import Link from 'next/link';
+import { redirect } from 'next/navigation';
 
+/**
+ * The GapOS engine is the Arc app (GAP-032): the landing surface is the Arc Today screen.
+ * The legacy /gaps surface remains reachable for the full engineering slice.
+ */
 export default function HomePage() {
-  return (
-    <main>
-      <h1>GapOS</h1>
-      <p>A gap-to-mastery learning companion. The study surface is coming next.</p>
-      <p>
-        <Link href="/gaps">Open your gaps</Link>
-      </p>
-    </main>
-  );
+  redirect('/arc');
 }

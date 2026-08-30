@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { referenceLesson, referencePlan } from '@gapos/test-fixtures';
+import { runCell } from '../../../../apps/worker/src/notebook/executor.js';
 import {
   MAX_REPAIR_ATTEMPTS,
   assertIndependentVerifier,
@@ -14,12 +15,29 @@ import { DomainError } from '../errors.js';
 
 const plan = referencePlan();
 
+/**
+ * Execute every code_proof question's reference solution in the real sandbox, exactly as the
+ * compile pipeline does, so the verifier's cell-run checks are exercised against real execution.
+ */
+const cellRunsFor = (lesson: VerifiableLesson) =>
+  lesson.questions
+    .filter((q) => q.type === 'code_proof')
+    .map((q) => {
+      const executed = runCell(q.answer, q.checks ?? []);
+      return {
+        questionId: q.id,
+        passed: executed.passed,
+        ...(executed.error ? { error: executed.error } : {}),
+      };
+    });
+
 const contextFor = (lesson: VerifiableLesson): VerificationContext => ({
   glossaryTerms: plan.glossary.map((g) => g.term),
   targetDifficulty: new Map(
     plan.assessmentBlueprint.map((b) => [b.objectiveId, b.targetDifficulty]),
   ),
   plannedObjectiveIds: lesson.objectiveIds,
+  cellRuns: cellRunsFor(lesson),
 });
 
 const toVerifiable = (day: number): VerifiableLesson => {
@@ -48,7 +66,7 @@ describe('verification of good content', () => {
 describe('answer leakage', () => {
   it('rejects a prompt that contains the answer verbatim', () => {
     const lesson = toVerifiable(1);
-    const question = lesson.questions[1]!;
+    const question = lesson.questions.find((q) => q.type === 'multiple_choice')!;
     const leaky: VerifiableLesson = {
       ...lesson,
       questions: [{ ...question, prompt: `${question.prompt} The answer is ${question.answer}` }],
@@ -72,7 +90,7 @@ describe('answer leakage', () => {
   it('does not flag a short answer that legitimately echoes a prompt word', () => {
     const lesson = toVerifiable(1);
     const short = {
-      ...lesson.questions[1]!,
+      ...lesson.questions.find((q) => q.type === 'short_answer')!,
       prompt: 'Is the empty relation reflexive on a non-empty set?',
       answer: 'No.',
       acceptableAlternatives: [],
@@ -85,7 +103,7 @@ describe('answer leakage', () => {
 describe('distractor validity', () => {
   const mcqLesson = (options: string[], answer: string): VerifiableLesson => {
     const lesson = toVerifiable(1);
-    const question = lesson.questions[0]!;
+    const question = lesson.questions.find((q) => q.type === 'multiple_choice')!;
     return { ...lesson, questions: [{ ...question, options, answer }] };
   };
 
@@ -125,7 +143,7 @@ describe('distractor validity', () => {
 describe('rubric tolerance', () => {
   it('rejects a free-response item with no rubric', () => {
     const lesson = toVerifiable(1);
-    const question = lesson.questions[1]!;
+    const question = lesson.questions.find((q) => q.type === 'short_answer')!;
     const noRubric: VerifiableLesson = {
       ...lesson,
       questions: [{ ...question, rubric: undefined }],
@@ -137,7 +155,7 @@ describe('rubric tolerance', () => {
 
   it('warns when a terse rubric lists no acceptable alternatives', () => {
     const lesson = toVerifiable(1);
-    const question = lesson.questions[1]!;
+    const question = lesson.questions.find((q) => q.type === 'short_answer')!;
     const terse: VerifiableLesson = {
       ...lesson,
       questions: [{ ...question, rubric: 'Correct answers only.', acceptableAlternatives: [] }],
@@ -186,6 +204,49 @@ describe('coverage, duration and transcript', () => {
     const mismatched = { ...lesson, transcript: 'Something else entirely.' };
     const findings = verifyLesson(mismatched, contextFor(lesson));
     expect(findings.some((f) => f.finding.includes('transcript does not match'))).toBe(true);
+  });
+});
+
+describe('notebook proofs (GAP-032)', () => {
+  it('blocks publication when a code_proof was never executed', () => {
+    const lesson = toVerifiable(1);
+    const findings = verifyLesson(lesson, { ...contextFor(lesson), cellRuns: [] });
+    const cellFinding = findings.find((f) => f.targetId === 'q_d1_code');
+    expect(cellFinding?.category).toBe('independent_solution');
+    expect(blocksPublication(findings)).toBe(true);
+  });
+
+  it('blocks publication when the reference solution fails its own checks', () => {
+    const lesson = toVerifiable(1);
+    const findings = verifyLesson(lesson, {
+      ...contextFor(lesson),
+      cellRuns: [
+        { questionId: 'q_d1_code', passed: false, error: 'check "missing member" failed' },
+      ],
+    });
+    const cellFinding = findings.find((f) => f.targetId === 'q_d1_code');
+    expect(cellFinding?.category).toBe('independent_solution');
+    expect(cellFinding?.finding).toContain('failed its own checks');
+    expect(blocksPublication(findings)).toBe(true);
+  });
+
+  it('accepts a code_proof whose reference solution passes under real execution', () => {
+    const lesson = toVerifiable(1);
+    const findings = verifyLesson(lesson, contextFor(lesson));
+    expect(
+      findings.some((f) => f.targetId === 'q_d1_code' && f.category === 'independent_solution'),
+    ).toBe(false);
+    expect(blocksPublication(findings)).toBe(false);
+  });
+
+  it('does not demand a rubric from a code_proof — execution is the rubric', () => {
+    const lesson = toVerifiable(1);
+    const codeProof = lesson.questions.find((q) => q.type === 'code_proof')!;
+    const findings = verifyLesson(
+      { ...lesson, questions: [{ ...codeProof, rubric: undefined }] },
+      contextFor(lesson),
+    );
+    expect(categories(findings)).not.toContain('rubric_tolerance');
   });
 });
 

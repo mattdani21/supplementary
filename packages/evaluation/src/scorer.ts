@@ -147,8 +147,8 @@ const scoreFactualAccuracy = (
 
 /**
  * Is every published item actually answerable? An item with no answer, a multiple choice whose
- * key is absent from its options, or a free response with no rubric cannot be graded, so it
- * teaches nothing and blocks mastery forever.
+ * key is absent from its options, a free response with no rubric, or a code proof with no
+ * checks cannot be graded, so it teaches nothing and blocks mastery forever.
  */
 const scoreQuestionSolvability = (produced: ProducedCurriculum): DimensionScore => {
   const questions = allQuestions(produced);
@@ -163,6 +163,13 @@ const scoreQuestionSolvability = (produced: ProducedCurriculum): DimensionScore 
     if (question.type === 'multiple_choice') {
       if (!question.options?.some((o) => normalise(o) === normalise(question.answer))) {
         observations.push(`${question.id} has an answer that is not among its options.`);
+        continue;
+      }
+    } else if (question.type === 'code_proof') {
+      // A notebook proof is graded by executing its checks in the sandbox — the rubric is the
+      // code, so a proof with checks and a reference solution is answerable.
+      if (!question.checks || question.checks.length === 0) {
+        observations.push(`${question.id} is a code proof with no checks, so it cannot be graded.`);
         continue;
       }
     } else if (!question.rubric || question.rubric.trim().length === 0) {

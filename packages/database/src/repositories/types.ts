@@ -213,6 +213,38 @@ export interface KnowledgeEdge {
   readonly confidence: number;
 }
 
+/* ------------------------------------------------------------- Arc learner surface */
+
+/**
+ * The Profile toggles (GAP-032). `spacedReview` does not cancel review scheduling — the
+ * schedule is always recorded; the toggle decides whether due reviews surface in Today.
+ */
+export interface LearnerPreferences {
+  readonly ownerId: OwnerId;
+  readonly audioTheory: boolean;
+  readonly gentleHints: boolean;
+  readonly darkMode: boolean;
+  readonly spacedReview: boolean;
+  readonly updatedAt: Date;
+}
+
+/** One completed 3-step calibration, persisted so the flow can be replayed and audited. */
+export interface ArcCalibration {
+  readonly id: string;
+  readonly ownerId: OwnerId;
+  /** The gap the calibration created — the map this route leads to. */
+  readonly gapId: string;
+  readonly subject: string;
+  readonly goal: string;
+  readonly baselineAnswer: string;
+  readonly baselineCorrect: boolean;
+  /** From the schema-validated diagnostic interpretation: the gaps identified, in order. */
+  readonly gapsIdentified: readonly string[];
+  /** Adaptive placement: raised by a correct baseline, lowered by a miss. */
+  readonly startingDifficulty: number;
+  readonly createdAt: Date;
+}
+
 /* ------------------------------------------------------------------- repositories */
 
 export interface UserRepository {
@@ -362,6 +394,23 @@ export interface KnowledgeRepository {
   listEdges(owner: OwnerId): Promise<KnowledgeEdge[]>;
 }
 
+export interface PreferencesRepository {
+  /** The stored preferences, or undefined when the owner has never written any. */
+  get(owner: OwnerId): Promise<LearnerPreferences | undefined>;
+  /** Upsert: the caller's values replace the stored ones wholesale. */
+  set(
+    owner: OwnerId,
+    preferences: Omit<LearnerPreferences, 'ownerId' | 'updatedAt'>,
+    at: Date,
+  ): Promise<LearnerPreferences>;
+}
+
+export interface CalibrationRepository {
+  create(owner: OwnerId, calibration: Omit<ArcCalibration, 'ownerId'>): Promise<ArcCalibration>;
+  get(owner: OwnerId, id: string): Promise<ArcCalibration | undefined>;
+  listForOwner(owner: OwnerId): Promise<ArcCalibration[]>;
+}
+
 /* --------------------------------------------------------------------- job queue */
 
 export type JobKind = 'compile';
@@ -431,6 +480,8 @@ export interface UnitOfWork {
   readonly mastery: MasteryRepository;
   readonly generation: GenerationRepository;
   readonly knowledge: KnowledgeRepository;
+  readonly preferences: PreferencesRepository;
+  readonly calibrations: CalibrationRepository;
 }
 
 /** Thrown when a write targets a row the caller does not own or that does not exist. */

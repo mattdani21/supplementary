@@ -25,6 +25,11 @@ export const METRICS = [
   'job_completed_total',
   'job_failed_total',
   'job_dead_lettered_total',
+  // Arc learner surface (GAP-032).
+  'arc_calibration_total',
+  'arc_cell_run_total',
+  'arc_proof_submit_total',
+  'arc_preferences_updated_total',
 ] as const;
 
 export type MetricName = (typeof METRICS)[number];
