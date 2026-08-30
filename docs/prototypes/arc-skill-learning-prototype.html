@@ -1,0 +1,1677 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Arc — Adaptive skill learning</title>
+  <style>
+    :root {
+      --ink: #17191d;
+      --ink-soft: #515861;
+      --ink-faint: #8a919b;
+      --paper: #f8f9f7;
+      --surface: #ffffff;
+      --surface-soft: #f0f2f1;
+      --line: #e5e8e6;
+      --blue: #3f5cf4;
+      --blue-deep: #1f2fbc;
+      --blue-soft: #e5e9ff;
+      --mint: #dcefe6;
+      --mint-deep: #2d6d57;
+      --amber: #fff0c7;
+      --amber-deep: #8a5a10;
+      --coral: #fae3dc;
+      --shadow: 0 24px 70px rgba(19, 24, 37, .15), 0 4px 14px rgba(19, 24, 37, .08);
+      --radius-lg: 27px;
+      --radius-md: 18px;
+      --radius-sm: 12px;
+      --ease: cubic-bezier(.22, .7, .2, 1);
+    }
+
+    html[data-theme="dark"] {
+      --ink: #f1f3f5;
+      --ink-soft: #a9b1bb;
+      --ink-faint: #7f8995;
+      --paper: #111419;
+      --surface: #1b2028;
+      --surface-soft: #222832;
+      --line: #2c333d;
+      --blue: #8d9aff;
+      --blue-deep: #bcc4ff;
+      --blue-soft: #252d59;
+      --mint: #183a2e;
+      --mint-deep: #77d4aa;
+      --amber: #3d321d;
+      --amber-deep: #ffd47f;
+      --coral: #432b35;
+      --shadow: 0 28px 90px rgba(0, 0, 0, .48), 0 4px 18px rgba(0, 0, 0, .3);
+      color-scheme: dark;
+    }
+
+    html[data-theme="light"] { color-scheme: light; }
+
+    * { box-sizing: border-box; }
+    html { background: #eef0ef; }
+    body {
+      margin: 0;
+      min-width: 320px;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 8% 8%, rgba(63,92,244,.08), transparent 26rem),
+        radial-gradient(circle at 90% 80%, rgba(210,231,223,.7), transparent 30rem),
+        #eef0ef;
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    html[data-theme="dark"] body {
+      background:
+        radial-gradient(circle at 8% 8%, rgba(63,92,244,.15), transparent 26rem),
+        radial-gradient(circle at 90% 80%, rgba(19,63,47,.55), transparent 30rem),
+        #0d1014;
+    }
+
+    button, input, textarea { font: inherit; }
+    button { color: inherit; }
+    button:focus-visible, input:focus-visible, textarea:focus-visible {
+      outline: 3px solid rgba(63, 92, 244, .38);
+      outline-offset: 3px;
+    }
+
+    .prototype-shell {
+      width: min(1240px, calc(100% - 48px));
+      min-height: 100vh;
+      margin: 0 auto;
+      padding: 32px 0 42px;
+    }
+
+    .demo-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 48px;
+    }
+
+    .wordmark {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      border: 0;
+      padding: 0;
+      background: transparent;
+      cursor: pointer;
+      letter-spacing: -.05em;
+      font-size: 21px;
+      font-weight: 750;
+    }
+
+    .wordmark-dot {
+      width: 22px;
+      height: 22px;
+      position: relative;
+      display: inline-block;
+      border-radius: 50%;
+      background: var(--ink);
+    }
+
+    .wordmark-dot::after {
+      content: "";
+      position: absolute;
+      top: 5px;
+      left: 5px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #eef0ef;
+    }
+
+    .header-note {
+      margin: 0 0 0 12px;
+      color: var(--ink-faint);
+      font-size: 12px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .header-left, .header-right { display: flex; align-items: center; gap: 12px; }
+
+    .platform-switch {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 4px;
+      border: 1px solid rgba(23,25,29,.1);
+      border-radius: 99px;
+      background: rgba(255,255,255,.66);
+      box-shadow: 0 4px 16px rgba(23,25,29,.04);
+    }
+
+    .platform-button {
+      border: 0;
+      border-radius: 99px;
+      padding: 8px 13px;
+      color: var(--ink-faint);
+      background: transparent;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .platform-button.is-active {
+      color: var(--ink);
+      background: var(--surface);
+      box-shadow: 0 2px 7px rgba(23,25,29,.08);
+    }
+
+    .reset-button {
+      border: 0;
+      padding: 8px 4px;
+      color: var(--ink-faint);
+      background: transparent;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .reset-button:hover, .wordmark:hover { color: var(--blue-deep); }
+
+    .theme-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      border: 1px solid rgba(23,25,29,.1);
+      border-radius: 99px;
+      padding: 8px 11px;
+      color: var(--ink-soft);
+      background: rgba(255,255,255,.66);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 750;
+    }
+
+    .theme-toggle:hover { color: var(--blue-deep); border-color: rgba(63,92,244,.25); }
+    .theme-toggle-icon { font-size: 14px; line-height: 1; }
+
+    html[data-theme="dark"] .platform-switch,
+    html[data-theme="dark"] .theme-toggle {
+      border-color: rgba(255,255,255,.12);
+      background: rgba(27,32,40,.86);
+    }
+
+    html[data-theme="dark"] .platform-button.is-active {
+      color: var(--ink);
+      background: #2b323c;
+    }
+
+    .stage {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 500px;
+      align-items: center;
+      gap: clamp(56px, 8vw, 126px);
+    }
+
+    .stage-copy { max-width: 575px; }
+
+    .kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--blue-deep);
+      font-size: 11px;
+      font-weight: 750;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+
+    .kicker::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--blue);
+      box-shadow: 0 0 0 5px rgba(63,92,244,.1);
+    }
+
+    .stage-copy h1 {
+      max-width: 520px;
+      margin: 20px 0 24px;
+      letter-spacing: -.075em;
+      font-size: clamp(48px, 6vw, 82px);
+      line-height: .96;
+      font-weight: 720;
+    }
+
+    .stage-copy h1 em {
+      color: var(--blue);
+      font-style: normal;
+    }
+
+    .stage-copy > p {
+      max-width: 465px;
+      margin: 0;
+      color: var(--ink-soft);
+      font-size: 17px;
+      line-height: 1.55;
+    }
+
+    .flow-list {
+      display: grid;
+      gap: 14px;
+      margin: 38px 0 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .flow-item {
+      display: grid;
+      grid-template-columns: 34px 1fr;
+      gap: 13px;
+      align-items: start;
+    }
+
+    .flow-number {
+      display: grid;
+      place-items: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      color: var(--blue-deep);
+      background: var(--blue-soft);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .flow-item strong {
+      display: block;
+      margin: 1px 0 3px;
+      font-size: 14px;
+    }
+
+    .flow-item span {
+      color: var(--ink-faint);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .stage-note {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 42px;
+      padding-top: 18px;
+      border-top: 1px solid rgba(23,25,29,.1);
+      color: var(--ink-soft);
+      font-size: 13px;
+    }
+
+    .stage-note b { color: var(--ink); font-weight: 700; }
+
+    .device-wrap { display: flex; justify-content: center; }
+
+    .device-frame {
+      position: relative;
+      width: 394px;
+      height: 852px;
+      padding: 10px;
+      border: 1px solid rgba(255,255,255,.4);
+      border-radius: 48px;
+      background: #111317;
+      box-shadow: var(--shadow);
+    }
+
+    .device-frame::after {
+      content: "";
+      position: absolute;
+      z-index: 0;
+      top: 16px;
+      left: 50%;
+      width: 106px;
+      height: 26px;
+      transform: translateX(-50%);
+      border-radius: 20px;
+      background: #111317;
+    }
+
+    .device-frame.android::after { display: none; }
+
+    .device-screen {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      border-radius: 38px;
+      background: var(--paper);
+    }
+
+    .device-status {
+      display: flex;
+      flex: 0 0 34px;
+      align-items: end;
+      justify-content: space-between;
+      padding: 0 22px 7px;
+      color: var(--ink);
+      background: var(--paper);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .01em;
+    }
+
+    .device-status-icons { display: flex; align-items: center; gap: 7px; color: var(--ink-soft); }
+    .android-status { display: none; }
+    .device-frame.android .ios-status { display: none; }
+    .device-frame.android .android-status { display: inline; }
+
+    .app {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      flex-direction: column;
+    }
+
+    .screen-host {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      scrollbar-width: none;
+    }
+
+    .screen-host::-webkit-scrollbar { display: none; }
+
+    .screen {
+      min-height: 100%;
+      padding: 20px 20px 30px;
+      animation: screen-in .36s var(--ease);
+    }
+
+    @keyframes screen-in {
+      from { opacity: .25; transform: translateY(7px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .app-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 27px;
+    }
+
+    .mini-wordmark {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      border: 0;
+      padding: 0;
+      color: var(--ink);
+      background: transparent;
+      cursor: pointer;
+      letter-spacing: -.06em;
+      font-size: 16px;
+      font-weight: 800;
+    }
+
+    .mini-wordmark::before {
+      content: "";
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--ink);
+      box-shadow: inset 0 0 0 4px var(--paper);
+    }
+
+    .icon-button {
+      display: inline-grid;
+      place-items: center;
+      min-width: 38px;
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      color: var(--ink-soft);
+      background: var(--surface);
+      cursor: pointer;
+      font-size: 17px;
+      transition: transform .2s var(--ease), background .2s ease, color .2s ease;
+    }
+
+    .icon-button:hover { color: var(--blue-deep); background: var(--blue-soft); transform: translateY(-1px); }
+
+    .avatar-button {
+      display: grid;
+      place-items: center;
+      width: 38px;
+      height: 38px;
+      border: 0;
+      border-radius: 50%;
+      color: var(--surface);
+      background: var(--ink);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .eyebrow {
+      margin: 0;
+      color: var(--ink-faint);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+
+    .home-greeting {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 27px;
+    }
+
+    .home-greeting h1 {
+      margin: 9px 0 0;
+      letter-spacing: -.065em;
+      font-size: 32px;
+      line-height: 1.02;
+      font-weight: 750;
+    }
+
+    .home-greeting h1 span { color: var(--blue); }
+
+    .daily-focus {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 14px;
+      border-bottom: 1px solid var(--line);
+      padding: 0 2px 16px;
+    }
+
+    .daily-focus strong { display: block; margin-top: 4px; letter-spacing: -.025em; font-size: 13px; }
+    .daily-focus small { color: var(--ink-faint); font-size: 10px; white-space: nowrap; }
+    .daily-focus-bar { height: 5px; overflow: hidden; border-radius: 99px; background: var(--surface-soft); }
+    .daily-focus-bar span { display: block; width: 60%; height: 100%; border-radius: inherit; background: var(--mint-deep); }
+    html[data-theme="dark"] .daily-focus-bar span { background: #0ea96b; }
+
+    .continue-card {
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 27px;
+      padding: 21px;
+      border-radius: var(--radius-lg);
+      color: var(--ink);
+      background: var(--blue-soft);
+    }
+
+    .continue-card::after {
+      content: "";
+      position: absolute;
+      right: -43px;
+      bottom: -55px;
+      width: 156px;
+      height: 156px;
+      border: 20px solid rgba(63, 92, 244, .13);
+      border-radius: 50%;
+    }
+
+    .continue-card h2 {
+      max-width: 245px;
+      margin: 10px 0 8px;
+      letter-spacing: -.045em;
+      font-size: 23px;
+      line-height: 1.05;
+    }
+
+    .continue-card p {
+      max-width: 240px;
+      margin: 0;
+      color: #4a5791;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .continue-meta {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      margin-top: 20px;
+    }
+
+    .progress-track {
+      flex: 1;
+      height: 5px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: rgba(63,92,244,.16);
+    }
+
+    .progress-track > span {
+      display: block;
+      width: 58%;
+      height: 100%;
+      border-radius: inherit;
+      background: var(--blue);
+    }
+
+    .progress-copy {
+      color: #3f4c87;
+      font-size: 11px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .card-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      margin-top: 19px;
+      border: 0;
+      padding: 0;
+      color: var(--blue-deep);
+      background: transparent;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .card-action:hover { text-decoration: underline; }
+
+    .section-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 0 0 12px;
+    }
+
+    .section-heading h2 {
+      margin: 0;
+      letter-spacing: -.035em;
+      font-size: 16px;
+      font-weight: 800;
+    }
+
+    .text-button {
+      border: 0;
+      padding: 4px 0;
+      color: var(--ink-faint);
+      background: transparent;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 750;
+    }
+
+    .text-button:hover { color: var(--blue-deep); }
+
+    .active-skill {
+      display: grid;
+      grid-template-columns: 58px 1fr 24px;
+      gap: 13px;
+      align-items: center;
+      width: 100%;
+      margin-bottom: 23px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      padding: 13px;
+      text-align: left;
+      background: var(--surface);
+      cursor: pointer;
+      transition: transform .2s var(--ease), box-shadow .2s ease, border-color .2s ease;
+    }
+
+    .active-skill:hover, .skill-card:hover { transform: translateY(-2px); border-color: rgba(63,92,244,.28); box-shadow: 0 8px 24px rgba(23,25,29,.06); }
+
+    .progress-ring {
+      --value: 42;
+      position: relative;
+      display: grid;
+      place-items: center;
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+      background: conic-gradient(var(--blue) calc(var(--value) * 1%), var(--surface-soft) 0);
+    }
+
+    .progress-ring::after {
+      content: "";
+      position: absolute;
+      inset: 5px;
+      border-radius: 50%;
+      background: var(--surface);
+    }
+
+    .progress-ring span { position: relative; z-index: 1; font-size: 12px; font-weight: 850; }
+
+    .active-skill h3, .skill-card h3 {
+      margin: 0 0 4px;
+      letter-spacing: -.035em;
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .active-skill p, .skill-card p { margin: 0; color: var(--ink-faint); font-size: 11px; line-height: 1.4; }
+    .row-arrow { color: var(--ink-faint); font-size: 18px; }
+
+    .suggested-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .suggested-card {
+      min-height: 126px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      padding: 15px;
+      text-align: left;
+      background: var(--surface);
+      cursor: pointer;
+      transition: transform .2s var(--ease), box-shadow .2s ease, border-color .2s ease;
+    }
+
+    .suggested-card:nth-child(2) { background: #fbf7ef; }
+    .suggested-card:nth-child(3) { background: #f1f7f3; }
+    .suggested-card .skill-symbol { margin-bottom: 20px; }
+
+    .skill-symbol {
+      display: grid;
+      place-items: center;
+      width: 26px;
+      height: 26px;
+      border-radius: 9px;
+      color: var(--blue-deep);
+      background: var(--blue-soft);
+      font-size: 12px;
+      font-weight: 850;
+    }
+
+    .suggested-card:nth-child(2) .skill-symbol { color: var(--amber-deep); background: var(--amber); }
+    .suggested-card:nth-child(3) .skill-symbol { color: var(--mint-deep); background: var(--mint); }
+
+    .momentum-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 23px;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+      color: var(--ink-soft);
+      font-size: 11px;
+    }
+
+    .momentum-row strong { color: var(--ink); font-size: 12px; }
+    .momentum-dots { display: flex; gap: 4px; }
+    .momentum-dots span { width: 7px; height: 7px; border-radius: 50%; background: var(--surface-soft); }
+    .momentum-dots span.is-on { background: var(--blue); }
+
+    .bottom-nav {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      flex: 0 0 72px;
+      align-items: center;
+      border-top: 1px solid var(--line);
+      padding: 8px 11px 10px;
+      background: rgba(255,255,255,.88);
+      backdrop-filter: blur(16px);
+    }
+
+    .nav-button {
+      display: grid;
+      place-items: center;
+      gap: 4px;
+      min-height: 48px;
+      border: 0;
+      border-radius: 15px;
+      color: var(--ink-faint);
+      background: transparent;
+      cursor: pointer;
+      font-size: 10px;
+      font-weight: 750;
+    }
+
+    .nav-button .nav-icon { font-size: 20px; line-height: 1; }
+    .nav-button.is-active { color: var(--blue-deep); background: var(--blue-soft); }
+    .device-frame.android .bottom-nav { padding-bottom: 6px; }
+    .device-frame.android .nav-button { border-radius: 10px; }
+
+    .home-indicator {
+      display: block;
+      width: 104px;
+      height: 4px;
+      margin: 0 auto 5px;
+      border-radius: 99px;
+      background: var(--ink);
+      opacity: .85;
+    }
+
+    .android-gesture {
+      display: none;
+      width: 82px;
+      height: 4px;
+      margin: 0 auto 5px;
+      border-radius: 99px;
+      background: var(--ink);
+      opacity: .65;
+    }
+
+    .device-frame.android .home-indicator { display: none; }
+    .device-frame.android .android-gesture { display: block; }
+
+    .subscreen-head {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+
+    .subscreen-head h1 {
+      margin: 0;
+      letter-spacing: -.06em;
+      font-size: 28px;
+      line-height: 1;
+      font-weight: 780;
+    }
+
+    .subscreen-head p { margin: 5px 0 0; color: var(--ink-faint); font-size: 11px; }
+    .subscreen-head .head-copy { flex: 1; }
+
+    .primary-button, .secondary-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 46px;
+      border-radius: 14px;
+      padding: 0 16px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 800;
+      transition: transform .2s var(--ease), box-shadow .2s ease, background .2s ease;
+    }
+
+    .primary-button {
+      border: 1px solid var(--blue);
+      color: #fff;
+      background: var(--blue);
+      box-shadow: 0 7px 14px rgba(63,92,244,.19);
+    }
+
+    .primary-button:hover { transform: translateY(-1px); box-shadow: 0 10px 18px rgba(63,92,244,.26); }
+    .primary-button:disabled { cursor: not-allowed; opacity: .45; transform: none; box-shadow: none; }
+
+    .secondary-button {
+      border: 1px solid var(--line);
+      color: var(--ink);
+      background: var(--surface);
+    }
+
+    .secondary-button:hover { border-color: rgba(63,92,244,.3); background: var(--blue-soft); transform: translateY(-1px); }
+    .full-button { width: 100%; }
+
+    .search-field {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin-bottom: 22px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 0 13px;
+      background: var(--surface);
+    }
+
+    .search-field span { color: var(--ink-faint); font-size: 16px; }
+    .search-field input { width: 100%; min-height: 44px; border: 0; outline: 0; color: var(--ink); background: transparent; font-size: 13px; }
+
+    .skill-list { display: grid; gap: 10px; }
+
+    .skill-card {
+      display: grid;
+      grid-template-columns: 40px 1fr auto;
+      gap: 12px;
+      align-items: center;
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      padding: 13px;
+      text-align: left;
+      background: var(--surface);
+      cursor: pointer;
+      transition: transform .2s var(--ease), box-shadow .2s ease, border-color .2s ease;
+    }
+
+    .skill-card .skill-symbol { width: 40px; height: 40px; border-radius: 13px; font-size: 15px; }
+    .skill-card .skill-meta { color: var(--ink-faint); font-size: 10px; text-align: right; line-height: 1.45; }
+    .skill-card.is-muted { opacity: .72; }
+
+    .add-panel {
+      margin: 16px 0 0;
+      border-radius: var(--radius-md);
+      padding: 15px;
+      background: var(--ink);
+      color: #fff;
+    }
+
+    .add-panel[hidden] { display: none; }
+    .add-panel p { margin: 0 0 12px; color: #c7ccd1; font-size: 11px; line-height: 1.4; }
+    .subject-choices { display: flex; flex-wrap: wrap; gap: 7px; }
+
+    .subject-choice {
+      border: 1px solid rgba(255,255,255,.16);
+      border-radius: 99px;
+      padding: 8px 10px;
+      color: #fff;
+      background: rgba(255,255,255,.08);
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .subject-choice:hover, .subject-choice.is-selected { border-color: #9daaff; color: #fff; background: rgba(63,92,244,.65); }
+    .add-note { min-height: 16px; margin: 13px 0 0; color: #b6f1d7; font-size: 11px; }
+
+    .assessment-shell { padding-bottom: 15px; }
+
+    .assessment-progress { margin-bottom: 28px; }
+    .assessment-progress-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; color: var(--ink-faint); font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    .assessment-progress-bar { height: 5px; overflow: hidden; border-radius: 99px; background: var(--surface-soft); }
+    .assessment-progress-bar span { display: block; width: 33%; height: 100%; border-radius: inherit; background: var(--blue); transition: width .35s var(--ease); }
+
+    .assessment-step h1, .assessment-result h1 {
+      margin: 0 0 11px;
+      letter-spacing: -.07em;
+      font-size: 30px;
+      line-height: 1.02;
+      font-weight: 780;
+    }
+
+    .assessment-step > p, .assessment-result > p { margin: 0 0 24px; color: var(--ink-soft); font-size: 13px; line-height: 1.5; }
+    .option-list { display: grid; gap: 9px; }
+
+    .option-button {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      width: 100%;
+      min-height: 57px;
+      border: 1px solid var(--line);
+      border-radius: 15px;
+      padding: 12px 14px;
+      text-align: left;
+      color: var(--ink);
+      background: var(--surface);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 750;
+      transition: border-color .2s ease, background .2s ease, transform .2s var(--ease);
+    }
+
+    .option-button:hover { transform: translateY(-1px); border-color: rgba(63,92,244,.32); }
+    .option-button.is-selected { border-color: var(--blue); background: #f0f2ff; box-shadow: inset 0 0 0 1px var(--blue); }
+    .option-button .option-dot { display: grid; place-items: center; flex: 0 0 21px; width: 21px; height: 21px; border: 1px solid var(--line); border-radius: 50%; color: transparent; font-size: 11px; }
+    .option-button.is-selected .option-dot { border-color: var(--blue); color: #fff; background: var(--blue); }
+    .placement-code { margin: 0 0 14px; border-radius: 15px; padding: 14px 15px; color: #dfe4ff; background: #202531; font-family: "SFMono-Regular", Consolas, monospace; font-size: 11px; line-height: 1.55; white-space: pre-wrap; }
+    .placement-prompt { margin: 0 0 12px !important; color: var(--ink) !important; font-size: 13px !important; font-weight: 750; }
+    .placement-confidence { display: flex; justify-content: space-between; gap: 10px; margin-top: 12px; color: var(--ink-faint); font-size: 10px; line-height: 1.35; }
+    .placement-confidence span:first-child { color: var(--blue-deep); font-weight: 800; }
+    .placement-feedback { margin-top: 12px; border-radius: 12px; padding: 10px 12px; color: var(--mint-deep); background: var(--mint); font-size: 11px; line-height: 1.4; }
+    .assessment-actions { display: flex; gap: 8px; margin-top: 26px; }
+    .assessment-actions .primary-button { flex: 1; }
+    .assessment-actions .secondary-button { flex: 0 0 auto; }
+
+    .assessment-running { text-align: center; padding: 72px 15px 50px; }
+    .pulse-orb { width: 64px; height: 64px; margin: 0 auto 21px; border-radius: 50%; background: var(--blue); box-shadow: 0 0 0 0 rgba(63,92,244,.35); animation: pulse 1.6s ease-out infinite; }
+    @keyframes pulse { 70% { box-shadow: 0 0 0 18px rgba(63,92,244,0); } 100% { box-shadow: 0 0 0 0 rgba(63,92,244,0); } }
+    .assessment-running h2 { margin: 0 0 9px; letter-spacing: -.045em; font-size: 22px; }
+    .assessment-running p { margin: 0; color: var(--ink-faint); font-size: 12px; line-height: 1.5; }
+
+    .assessment-result[hidden], .assessment-running[hidden], .assess-step[hidden] { display: none; }
+    .result-banner { display: flex; align-items: center; gap: 12px; margin: 20px 0 18px; border-radius: var(--radius-md); padding: 15px; background: var(--mint); }
+    .result-check { display: grid; place-items: center; flex: 0 0 31px; width: 31px; height: 31px; border-radius: 50%; color: #fff; background: var(--mint-deep); font-size: 16px; font-weight: 800; }
+    .result-banner strong { display: block; margin-bottom: 3px; font-size: 12px; }
+    .result-banner span { color: var(--mint-deep); font-size: 11px; }
+    .gap-preview { display: grid; gap: 8px; margin: 0 0 24px; }
+    .gap-preview-row { display: flex; align-items: center; justify-content: space-between; gap: 9px; border-bottom: 1px solid var(--line); padding: 10px 0; font-size: 12px; }
+    .gap-preview-row span:last-child { color: var(--blue-deep); font-size: 10px; font-weight: 800; }
+
+    .map-intro { display: flex; align-items: center; gap: 15px; margin-bottom: 23px; }
+    .map-intro .progress-ring { flex: 0 0 74px; width: 74px; height: 74px; }
+    .map-intro .progress-ring::after { inset: 6px; }
+    .map-intro .progress-ring span { font-size: 15px; }
+    .map-intro h2 { margin: 0 0 6px; letter-spacing: -.045em; font-size: 20px; }
+    .map-intro p { margin: 0; color: var(--ink-faint); font-size: 11px; line-height: 1.4; }
+
+    .next-gap {
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 24px;
+      border-radius: var(--radius-lg);
+      padding: 18px;
+      color: #fff;
+      background: var(--ink);
+    }
+
+    .next-gap::after { content: ""; position: absolute; right: -42px; top: -55px; width: 145px; height: 145px; border: 21px solid rgba(139,154,255,.18); border-radius: 50%; }
+    .next-gap .eyebrow { color: #a9b6ff; }
+    .next-gap h2 { max-width: 245px; margin: 10px 0 7px; letter-spacing: -.05em; font-size: 22px; line-height: 1.05; }
+    .next-gap p { max-width: 255px; margin: 0; color: #bfc5cb; font-size: 12px; line-height: 1.45; }
+    .gap-eta { position: relative; z-index: 1; margin-top: 12px; color: #aeb8ff; font-size: 10px; font-weight: 800; letter-spacing: .02em; }
+    .next-gap .primary-button { position: relative; z-index: 1; margin-top: 18px; color: var(--ink); border-color: #fff; background: #fff; box-shadow: none; }
+    .next-gap .primary-button:hover { background: #eef1ff; }
+
+    .map-section-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .map-section-title h3 { margin: 0; letter-spacing: -.03em; font-size: 15px; }
+    .map-section-title span { color: var(--ink-faint); font-size: 10px; }
+    .gap-list { position: relative; display: grid; gap: 0; }
+    .gap-list::before { content: ""; position: absolute; top: 23px; bottom: 23px; left: 15px; width: 1px; background: var(--line); }
+    .gap-item { position: relative; display: grid; grid-template-columns: 31px 1fr auto; gap: 11px; align-items: center; width: 100%; border: 0; padding: 11px 0; text-align: left; background: transparent; cursor: pointer; }
+    .gap-marker { position: relative; z-index: 1; display: grid; place-items: center; width: 31px; height: 31px; border: 1px solid var(--line); border-radius: 50%; color: var(--ink-faint); background: var(--paper); font-size: 11px; font-weight: 850; }
+    .gap-item.is-complete .gap-marker { border-color: var(--mint-deep); color: #fff; background: var(--mint-deep); }
+    .gap-item.is-current .gap-marker { border: 4px solid var(--blue-soft); color: #fff; background: var(--blue); }
+    .gap-item h4 { margin: 0 0 3px; letter-spacing: -.025em; font-size: 12px; font-weight: 800; }
+    .gap-item p { margin: 0; color: var(--ink-faint); font-size: 10px; }
+    .gap-status { color: var(--ink-faint); font-size: 10px; font-weight: 750; }
+    .gap-item.is-current .gap-status { color: var(--blue-deep); }
+    .gap-item.is-complete .gap-status { color: var(--mint-deep); }
+
+    .lesson-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 23px; }
+    .lesson-top .lesson-progress { flex: 1; margin: 0 13px; }
+    .lesson-progress-bar { height: 4px; overflow: hidden; border-radius: 99px; background: var(--surface-soft); }
+    .lesson-progress-bar span { display: block; width: 50%; height: 100%; border-radius: inherit; background: var(--blue); }
+    .lesson-top small { color: var(--ink-faint); font-size: 10px; font-weight: 800; white-space: nowrap; }
+    .lesson-title { margin: 0; letter-spacing: -.07em; font-size: 33px; line-height: .99; font-weight: 780; }
+    .lesson-subtitle { margin: 10px 0 24px; color: var(--ink-soft); font-size: 13px; line-height: 1.5; }
+    .mode-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 17px; padding: 4px; border-radius: 14px; background: var(--surface-soft); }
+    .mode-button { min-height: 36px; border: 0; border-radius: 10px; color: var(--ink-faint); background: transparent; cursor: pointer; font-size: 11px; font-weight: 800; }
+    .mode-button.is-active { color: var(--ink); background: var(--surface); box-shadow: 0 2px 8px rgba(23,25,29,.06); }
+
+    .audio-card { border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 17px; background: var(--surface); }
+    .audio-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 17px; }
+    .audio-card-head strong { display: block; margin-bottom: 4px; font-size: 13px; }
+    .audio-card-head span { color: var(--ink-faint); font-size: 10px; }
+    .play-button { display: grid; place-items: center; flex: 0 0 42px; width: 42px; height: 42px; border: 0; border-radius: 50%; color: #fff; background: var(--blue); cursor: pointer; font-size: 14px; box-shadow: 0 6px 12px rgba(63,92,244,.2); }
+    .audio-wave { display: flex; align-items: center; gap: 3px; height: 30px; margin-bottom: 12px; }
+    .audio-wave span { flex: 1; min-width: 2px; max-width: 5px; height: calc(8px + var(--bar) * 1px); border-radius: 99px; background: #cfd5ff; }
+    .audio-wave span.is-played { background: var(--blue); }
+    .audio-time-row { display: flex; justify-content: space-between; color: var(--ink-faint); font-size: 10px; font-variant-numeric: tabular-nums; }
+    .theory-text { margin-top: 20px; color: var(--ink-soft); font-size: 13px; line-height: 1.62; }
+    .theory-text strong { color: var(--ink); }
+    .lesson-note { display: flex; gap: 10px; align-items: flex-start; margin-top: 17px; border-radius: var(--radius-md); padding: 13px; background: var(--amber); color: var(--amber-deep); font-size: 11px; line-height: 1.45; }
+    .lesson-note b { color: #704705; }
+    .lesson-footer { margin-top: 23px; }
+
+    .notebook-label { display: flex; align-items: center; justify-content: space-between; margin: 0 0 11px; color: var(--ink-faint); font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    .notebook-prompt { margin: 0 0 15px; letter-spacing: -.035em; font-size: 17px; line-height: 1.25; font-weight: 750; }
+    .code-editor { width: 100%; min-height: 154px; resize: vertical; border: 1px solid #2d3340; border-radius: 16px; padding: 15px; color: #e7ebff; background: #202531; font-family: "SFMono-Regular", Consolas, monospace; font-size: 12px; line-height: 1.58; tab-size: 2; }
+    .code-editor::selection { background: rgba(157,170,255,.45); }
+    .notebook-actions { display: flex; gap: 8px; margin-top: 11px; }
+    .notebook-actions button { flex: 1; }
+    .notebook-output { min-height: 55px; margin-top: 12px; border-radius: 13px; padding: 12px; color: #cbd0d9; background: #2a303d; font-family: "SFMono-Regular", Consolas, monospace; font-size: 12px; line-height: 1.45; }
+    .notebook-output strong { display: block; margin-bottom: 4px; color: #929aaa; font-family: Inter, ui-sans-serif, sans-serif; font-size: 9px; letter-spacing: .12em; text-transform: uppercase; }
+    .hint-box { margin-top: 12px; border-radius: 13px; padding: 12px; color: var(--blue-deep); background: var(--blue-soft); font-size: 11px; line-height: 1.45; }
+    .hint-box[hidden] { display: none; }
+    .proof-success { display: flex; align-items: flex-start; gap: 10px; margin-top: 14px; border-radius: 14px; padding: 13px; color: var(--mint-deep); background: var(--mint); font-size: 11px; line-height: 1.45; }
+    .proof-success[hidden] { display: none; }
+    .proof-success strong { display: block; margin-bottom: 3px; color: #225743; font-size: 12px; }
+
+    .progress-hero { display: flex; align-items: center; gap: 16px; margin: 3px 0 24px; }
+    .progress-hero .progress-ring { flex: 0 0 90px; width: 90px; height: 90px; }
+    .progress-hero .progress-ring::after { inset: 7px; }
+    .progress-hero .progress-ring span { font-size: 19px; }
+    .progress-hero h2 { margin: 0 0 6px; letter-spacing: -.05em; font-size: 22px; }
+    .progress-hero p { margin: 0; color: var(--ink-faint); font-size: 11px; line-height: 1.45; }
+    .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 26px; }
+    .stat { border-radius: 16px; padding: 13px 11px; background: var(--surface); }
+    .stat strong { display: block; margin-bottom: 4px; letter-spacing: -.05em; font-size: 20px; }
+    .stat span { color: var(--ink-faint); font-size: 10px; line-height: 1.3; }
+    .progress-message { margin-bottom: 25px; border-radius: var(--radius-md); padding: 15px; color: #4d5790; background: var(--blue-soft); font-size: 12px; line-height: 1.5; }
+    .proof-list { display: grid; gap: 0; }
+    .proof-row { display: grid; grid-template-columns: 32px 1fr auto; gap: 11px; align-items: center; border-bottom: 1px solid var(--line); padding: 13px 0; }
+    .proof-row:last-child { border-bottom: 0; }
+    .proof-icon { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 11px; color: var(--mint-deep); background: var(--mint); font-size: 13px; font-weight: 850; }
+    .proof-row strong { display: block; margin-bottom: 3px; font-size: 12px; }
+    .proof-row span { color: var(--ink-faint); font-size: 10px; }
+    .proof-row time { color: var(--ink-faint); font-size: 10px; }
+
+    .profile-hero { display: flex; align-items: center; gap: 14px; margin-bottom: 27px; }
+    .profile-avatar { display: grid; place-items: center; width: 58px; height: 58px; border-radius: 19px; color: var(--paper); background: var(--ink); font-size: 17px; font-weight: 800; }
+    .profile-hero h2 { margin: 0 0 5px; letter-spacing: -.045em; font-size: 20px; }
+    .profile-hero p { margin: 0; color: var(--ink-faint); font-size: 11px; }
+    .preference-list { display: grid; gap: 8px; }
+    .preference-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid var(--line); border-radius: 15px; padding: 13px; background: var(--surface); }
+    .preference-row strong { display: block; margin-bottom: 3px; font-size: 12px; }
+    .preference-row span { color: var(--ink-faint); font-size: 10px; line-height: 1.35; }
+    .switch { position: relative; display: inline-flex; flex: 0 0 auto; align-items: center; width: 38px; height: 23px; }
+    .switch input { position: absolute; opacity: 0; }
+    .switch-track { width: 38px; height: 23px; border-radius: 99px; background: #d9dddc; transition: background .2s ease; }
+    .switch-track::after { content: ""; display: block; width: 17px; height: 17px; margin: 3px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(23,25,29,.16); transition: transform .2s var(--ease); }
+    .switch input:checked + .switch-track { background: var(--blue); }
+    .switch input:checked + .switch-track::after { transform: translateX(15px); }
+    .profile-section { margin-top: 24px; }
+    .profile-section h3 { margin: 0 0 11px; letter-spacing: -.03em; font-size: 15px; }
+    .about-card { border-radius: var(--radius-md); padding: 15px; color: var(--ink-soft); background: var(--surface); font-size: 12px; line-height: 1.5; }
+
+    .toast {
+      position: absolute;
+      z-index: 4;
+      right: 16px;
+      bottom: 83px;
+      left: 16px;
+      transform: translateY(12px);
+      border-radius: 13px;
+      padding: 12px 14px;
+      color: #fff;
+      background: var(--ink);
+      box-shadow: 0 12px 24px rgba(23,25,29,.17);
+      opacity: 0;
+      pointer-events: none;
+      font-size: 11px;
+      line-height: 1.35;
+      transition: opacity .25s ease, transform .25s var(--ease);
+    }
+
+    .toast.is-visible { transform: translateY(0); opacity: 1; }
+    .toast strong { color: #cbd3ff; }
+
+    /* Dark mode keeps the hierarchy intact: paper becomes charcoal, cleared stays green, and blue remains the AI signal. */
+    html[data-theme="dark"] .wordmark-dot::after { background: #0d1014; }
+    html[data-theme="dark"] .stage-note { border-color: rgba(255,255,255,.12); }
+    html[data-theme="dark"] .continue-card p { color: #c0c8f2; }
+    html[data-theme="dark"] .continue-card::after { border-color: rgba(141,154,255,.16); }
+    html[data-theme="dark"] .continue-meta .progress-track { background: rgba(141,154,255,.19); }
+    html[data-theme="dark"] .progress-copy { color: #c0c8f2; }
+    html[data-theme="dark"] .suggested-card:nth-child(2) { background: #26231b; }
+    html[data-theme="dark"] .suggested-card:nth-child(3) { background: #1b2b25; }
+    html[data-theme="dark"] .add-panel { background: #0b0e12; }
+    html[data-theme="dark"] .option-button.is-selected { background: #252d59; }
+    html[data-theme="dark"] .next-gap { background: #0b0e12; }
+    html[data-theme="dark"] .next-gap::after { border-color: rgba(141,154,255,.18); }
+    html[data-theme="dark"] .next-gap .primary-button { color: #111419; }
+    html[data-theme="dark"] .progress-message { color: #c4ccf4; }
+    html[data-theme="dark"] .notebook-output { background: #171c24; }
+    html[data-theme="dark"] .toast { color: #111419; background: #f1f3f5; }
+    html[data-theme="dark"] .toast strong { color: #27339b; }
+    html[data-theme="dark"] .pulse-orb { background: #8d9aff; }
+    html[data-theme="dark"] .primary-button { color: #111419; }
+    html[data-theme="dark"] .play-button { color: #111419; }
+    html[data-theme="dark"] .option-button.is-selected .option-dot,
+    html[data-theme="dark"] .gap-item.is-current .gap-marker { color: #111419; }
+    html[data-theme="dark"] .result-check,
+    html[data-theme="dark"] .gap-item.is-complete .gap-marker { color: #102018; }
+    html[data-theme="dark"] .switch-track { background: #3a424c; }
+    html[data-theme="dark"] .skill-card .skill-symbol[style*="8a4760"] { color: #f3b1c9 !important; }
+
+    .gap-item.is-current .gap-marker { animation: gap-pulse 2.6s ease-out infinite; }
+    @keyframes gap-pulse {
+      0%, 68%, 100% { box-shadow: 0 0 0 0 rgba(63,92,244,.22); }
+      82% { box-shadow: 0 0 0 7px rgba(63,92,244,0); }
+    }
+
+    .audio-extra-controls { display: flex; align-items: center; justify-content: space-between; gap: 7px; margin-top: 14px; }
+    .audio-skip, .audio-rate {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 7px 8px;
+      color: var(--ink-soft);
+      background: var(--surface);
+      cursor: pointer;
+      font-size: 10px;
+      font-weight: 800;
+    }
+    .audio-skip:hover, .audio-rate:hover { color: var(--blue-deep); border-color: rgba(63,92,244,.3); }
+    .audio-rate-group { display: flex; gap: 4px; }
+    .audio-rate.is-active { color: var(--blue-deep); border-color: var(--blue); background: var(--blue-soft); }
+    .transcript-drawer { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 11px; }
+    .transcript-toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; border: 0; padding: 0; color: var(--ink-soft); background: transparent; cursor: pointer; font-size: 11px; font-weight: 800; }
+    .transcript-toggle:hover { color: var(--blue-deep); }
+    .transcript-copy { display: grid; gap: 8px; margin-top: 12px; color: var(--ink-faint); font-size: 11px; line-height: 1.45; }
+    .transcript-copy[hidden] { display: none; }
+    .transcript-copy p { margin: 0; }
+    .transcript-copy p.is-current { color: var(--ink); }
+
+    .theme-preference { margin-top: 8px; }
+
+    @media (max-width: 980px) {
+      .prototype-shell { width: min(100% - 32px, 640px); }
+      .demo-header { margin-bottom: 28px; }
+      .stage { display: block; }
+      .stage-copy { display: none; }
+      .device-wrap { align-items: center; }
+    }
+
+    @media (max-width: 540px) {
+      html, body { background: var(--paper); }
+      .prototype-shell { width: 100%; min-height: 100vh; padding: 0; }
+      .demo-header { display: none; }
+      .device-wrap { display: block; }
+      .device-frame { width: 100%; height: 100vh; min-height: 680px; padding: 0; border: 0; border-radius: 0; box-shadow: none; }
+      .device-frame::after { display: none; }
+      .device-screen { min-height: 680px; border-radius: 0; }
+      .device-status { flex-basis: 28px; padding: 0 22px 4px; }
+      .screen { padding-top: 19px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="prototype-shell">
+    <header class="demo-header">
+      <div class="header-left">
+        <button class="wordmark" type="button" data-action="go-home" aria-label="Go to Arc home"><span class="wordmark-dot" aria-hidden="true"></span>arc</button>
+        <p class="header-note">Adaptive learning by proof</p>
+      </div>
+      <div class="header-right">
+        <div class="platform-switch" aria-label="Preview platform">
+          <button class="platform-button is-active" type="button" data-platform="ios" aria-pressed="true">iOS</button>
+          <button class="platform-button" type="button" data-platform="android" aria-pressed="false">Android</button>
+        </div>
+        <button class="theme-toggle" id="theme-toggle" type="button" data-action="toggle-theme" aria-pressed="false"><span class="theme-toggle-icon" id="theme-toggle-icon" aria-hidden="true">☾</span><span id="theme-toggle-label">Dark</span></button>
+        <button class="reset-button" type="button" data-action="reset">Reset demo</button>
+      </div>
+    </header>
+
+    <section class="stage" aria-label="Arc mobile app prototype">
+      <div class="stage-copy">
+        <span class="kicker">A calmer way to get good</span>
+        <h1>Learn the gap.<br><em>Prove the skill.</em></h1>
+        <p>Arc turns a chosen subject into a living map: an AI calibration finds what matters, short theory makes it clear, and notebook proofs show when the gap is actually gone.</p>
+        <ol class="flow-list">
+          <li class="flow-item"><span class="flow-number">01</span><div><strong>Choose a direction</strong><span>Start from the skill you want, not a generic course.</span></div></li>
+          <li class="flow-item"><span class="flow-number">02</span><div><strong>Calibrate the gaps</strong><span>Arc tests goals, context and current ability.</span></div></li>
+          <li class="flow-item"><span class="flow-number">03</span><div><strong>Clear them by doing</strong><span>Listen, practise, demonstrate — then move on.</span></div></li>
+        </ol>
+        <div class="stage-note"><b>Designed for focus</b><span>minimal surface · rich learning underneath</span></div>
+      </div>
+
+      <div class="device-wrap">
+        <div class="device-frame" id="device-frame">
+          <div class="device-screen">
+            <div class="device-status">
+              <span class="ios-status">9:41</span>
+              <span class="android-status">16:42</span>
+              <div class="device-status-icons"><span>◐</span><span>▰</span><span>▮</span></div>
+            </div>
+
+            <div class="app">
+              <div class="screen-host" id="screen-host">
+                <section class="screen" data-screen="home">
+                  <div class="app-topbar">
+                    <button class="mini-wordmark" type="button" data-action="go-home">arc</button>
+                    <button class="icon-button" type="button" data-action="go-profile" aria-label="Open profile">•••</button>
+                  </div>
+
+                  <div class="home-greeting">
+                    <div><p class="eyebrow">Friday, August 30</p><h1>Good afternoon,<br><span>Matthew</span>.</h1></div>
+                    <button class="avatar-button" type="button" data-action="go-profile" aria-label="Open Matthew's profile">M</button>
+                  </div>
+
+                  <div class="daily-focus" aria-label="Daily learning focus"><div><p class="eyebrow">Today’s focus</p><strong>12 / 20 min</strong></div><div class="daily-focus-bar" aria-hidden="true"><span></span></div><small>one gap</small></div>
+
+                  <button class="continue-card" type="button" data-action="open-lesson" style="width:100%; border:0; text-align:left; cursor:pointer;">
+                    <p class="eyebrow" style="color:var(--blue-deep);">Continue · Python for data work</p>
+                    <h2>Make data speak.</h2>
+                    <p>Functions are your next gap. One focused proof is waiting.</p>
+                    <div class="continue-meta"><div class="progress-track"><span></span></div><span class="progress-copy" id="home-progress-copy">3 of 6</span></div>
+                    <span class="card-action">Resume lesson <span aria-hidden="true">→</span></span>
+                  </button>
+
+                  <div class="section-heading"><h2>Your map</h2><button class="text-button" type="button" data-action="go-map">Open map</button></div>
+                  <button class="active-skill" type="button" data-action="go-map">
+                    <div class="progress-ring" id="home-ring" style="--value:42"><span id="home-ring-value">42%</span></div>
+                    <div><h3>Python for data work</h3><p id="home-next-gap">Next · reusable functions</p></div><span class="row-arrow" aria-hidden="true">›</span>
+                  </button>
+
+                  <div class="section-heading"><h2>Keep exploring</h2><button class="text-button" type="button" data-action="go-skills">All skills</button></div>
+                  <div class="suggested-grid">
+                    <button class="suggested-card" type="button" data-action="go-assess" data-subject="SQL"><span class="skill-symbol">S</span><h3>SQL foundations</h3><p>New path</p></button>
+                    <button class="suggested-card" type="button" data-action="go-assess" data-subject="Korean"><span class="skill-symbol">한</span><h3>Conversational Korean</h3><p>New path</p></button>
+                  </div>
+
+                  <div class="momentum-row"><span><strong>4 days</strong> of momentum</span><span class="momentum-dots" aria-label="Four day momentum"><span class="is-on"></span><span class="is-on"></span><span class="is-on"></span><span class="is-on"></span><span></span><span></span><span></span></span></div>
+                </section>
+
+                <section class="screen" data-screen="skills" hidden>
+                  <div class="subscreen-head"><div class="head-copy"><p class="eyebrow">Library</p><h1>Skills</h1><p>Choose a direction. Every new skill starts with a 3-min AI check.</p></div><button class="icon-button" type="button" data-action="toggle-add-skill" aria-label="Add a skill">+</button></div>
+                  <label class="search-field"><span aria-hidden="true">⌕</span><input id="skill-search" type="search" placeholder="Search your skills" aria-label="Search your skills"></label>
+                  <div class="skill-list" id="skill-list">
+                    <button class="skill-card" type="button" data-action="go-map" data-search="python data work">
+                      <span class="skill-symbol">Py</span><span><h3>Python for data work</h3><p>6 gaps · 42% explored</p></span><span class="skill-meta">In progress<br>→</span>
+                    </button>
+                    <button class="skill-card is-muted" type="button" data-action="go-assess" data-subject="SQL" data-search="sql foundations">
+                      <span class="skill-symbol" style="color:var(--amber-deep);background:var(--amber);">S</span><span><h3>SQL foundations</h3><p>Build clean queries and data intuition</p></span><span class="skill-meta">Not started<br>+</span>
+                    </button>
+                    <button class="skill-card is-muted" type="button" data-action="go-assess" data-subject="Korean" data-search="conversational korean">
+                      <span class="skill-symbol" style="color:var(--mint-deep);background:var(--mint);">한</span><span><h3>Conversational Korean</h3><p>Build a practical speaking base</p></span><span class="skill-meta">Not started<br>+</span>
+                    </button>
+                    <button class="skill-card is-muted" type="button" data-action="go-assess" data-subject="Systems design" data-search="systems design architecture">
+                      <span class="skill-symbol" style="color:#8a4760;background:var(--coral);">↗</span><span><h3>Systems design</h3><p>Reason about reliable platforms</p></span><span class="skill-meta">Not started<br>+</span>
+                    </button>
+                  </div>
+                  <div class="add-panel" id="add-panel" hidden><p>What would you like to make progress on?</p><div class="subject-choices"><button class="subject-choice" type="button" data-action="choose-new-skill" data-subject="SQL">SQL</button><button class="subject-choice" type="button" data-action="choose-new-skill" data-subject="Korean">Korean</button><button class="subject-choice" type="button" data-action="choose-new-skill" data-subject="Systems design">Systems design</button></div><p class="add-note" id="add-note" aria-live="polite"></p><button class="primary-button full-button" type="button" data-action="start-new-assessment" style="margin-top:10px;">Start calibration <span>→</span></button></div>
+                </section>
+
+                <section class="screen" data-screen="assess" hidden>
+                  <div class="subscreen-head"><button class="icon-button" type="button" data-action="go-back" aria-label="Go back">←</button><div class="head-copy"><p class="eyebrow">AI calibration</p><h1>Find your route</h1></div></div>
+                  <div class="assessment-shell">
+                    <div class="assessment-progress"><div class="assessment-progress-head"><span id="assess-progress-label">Step 1 of 3</span><span>2 min</span></div><div class="assessment-progress-bar"><span id="assess-progress-fill"></span></div></div>
+                    <div class="assess-step" data-assess-step="1">
+                      <h1>What do you want to learn?</h1><p>Pick a direction. You can refine the destination after Arc understands the starting point.</p>
+                      <div class="option-list"><button class="option-button is-selected" type="button" data-option-group="subject" data-option-key="subject" data-option-value="Python for data work"><span>Python for data work</span><span class="option-dot">✓</span></button><button class="option-button" type="button" data-option-group="subject" data-option-key="subject" data-option-value="SQL foundations"><span>SQL foundations</span><span class="option-dot">✓</span></button><button class="option-button" type="button" data-option-group="subject" data-option-key="subject" data-option-value="Conversational Korean"><span>Conversational Korean</span><span class="option-dot">✓</span></button></div>
+                    </div>
+                    <div class="assess-step" data-assess-step="2" hidden>
+                      <h1>What would “useful” look like?</h1><p>Your goal changes which gaps matter first. Choose the outcome you care about today.</p>
+                      <div class="option-list"><button class="option-button is-selected" type="button" data-option-group="goal" data-option-key="goal" data-option-value="Build a project"><span>Build a project I can show</span><span class="option-dot">✓</span></button><button class="option-button" type="button" data-option-group="goal" data-option-key="goal" data-option-value="Get job-ready"><span>Become confident at work</span><span class="option-dot">✓</span></button><button class="option-button" type="button" data-option-group="goal" data-option-key="goal" data-option-value="Understand foundations"><span>Understand the foundations</span><span class="option-dot">✓</span></button></div>
+                    </div>
+                    <div class="assess-step" data-assess-step="3" hidden>
+                      <h1>Show me how you think.</h1><p>A quick check places you more accurately than a confidence label. A miss simply makes the next question easier.</p>
+                      <pre class="placement-code"><code>values = [2, 4, 6]
+total = 0
+for value in values:
+    total += value</code></pre>
+                      <p class="placement-prompt">What is <code>total</code> after the loop?</p>
+                      <div class="option-list"><button class="option-button" type="button" data-option-group="baseline" data-option-key="baseline" data-option-value="New to it"><span>2</span><span class="option-dot">✓</span></button><button class="option-button is-selected" type="button" data-option-group="baseline" data-option-key="baseline" data-option-value="Some practice"><span>12</span><span class="option-dot">✓</span></button><button class="option-button" type="button" data-option-group="baseline" data-option-key="baseline" data-option-value="New to it"><span>24</span><span class="option-dot">✓</span></button></div><div class="placement-feedback" id="placement-feedback" aria-live="polite">Correct — Arc will use this to raise your starting point.</div>
+                      <div class="placement-confidence"><span>AI check · 1 of 1</span><span>No score, just a better starting point</span></div>
+                    </div>
+                    <div class="assessment-running" id="assessment-running" hidden><div class="pulse-orb" aria-hidden="true"></div><h2>Mapping your route…</h2><p>Comparing your goal with what you already know.<br>Then we will put the next proof in reach.</p></div>
+                    <div class="assessment-result" id="assessment-result" hidden><p class="eyebrow">Your route is ready</p><h1>A focused path to<br>working knowledge.</h1><p>Arc found a short sequence of gaps that will unlock your goal without making you repeat what you already know.</p><div class="result-banner"><span class="result-check">✓</span><div><strong>6 gaps identified</strong><span>Start with the highest-leverage one.</span></div></div><div class="gap-preview"><div class="gap-preview-row"><span>Reusable functions</span><span>Next</span></div><div class="gap-preview-row"><span>Data structures</span><span>After</span></div><div class="gap-preview-row"><span>Files and APIs</span><span>Later</span></div></div><button class="primary-button full-button" type="button" data-action="go-map">Open my skill map <span>→</span></button></div>
+                    <div class="assessment-actions" id="assessment-actions"><button class="secondary-button" type="button" data-action="go-back">Back</button><button class="primary-button" id="assess-next" type="button" data-action="assess-next">Continue <span>→</span></button></div>
+                  </div>
+                </section>
+
+                <section class="screen" data-screen="map" hidden>
+                  <div class="subscreen-head"><button class="icon-button" type="button" data-action="go-home" aria-label="Go home">←</button><div class="head-copy"><p class="eyebrow">Skill map</p><h1>Python for data work</h1></div><button class="icon-button" type="button" data-action="show-map-info" aria-label="About this skill map">i</button></div>
+                  <div class="map-intro"><div class="progress-ring" id="map-ring" style="--value:42"><span id="map-ring-value">42%</span></div><div><h2>Make data speak.</h2><p>Clear the gaps in order, or jump to what you need now.</p></div></div>
+                  <div class="next-gap"><p class="eyebrow">Gap 3 · up next</p><h2>Make repetition disappear.</h2><p>Use small, reusable functions to turn a thought into a tool.</p><div class="gap-eta">12 min total · audio + notebook</div><button class="primary-button" type="button" data-action="open-lesson">Start the proof <span>→</span></button></div>
+                  <div class="map-section-title"><h3>Your sequence</h3><span id="map-cleared-count">2 cleared · 6 gaps</span></div>
+                  <div class="gap-list">
+                    <button class="gap-item is-complete" type="button" data-gap="values"><span class="gap-marker">✓</span><span><h4>Values and variables</h4><p>Read and shape simple data</p></span><span class="gap-status">Cleared</span></button>
+                    <button class="gap-item is-complete" type="button" data-gap="flow"><span class="gap-marker">✓</span><span><h4>Control flow</h4><p>Make decisions and repeat work</p></span><span class="gap-status">Cleared</span></button>
+                    <button class="gap-item is-current" id="map-functions" type="button" data-gap="functions"><span class="gap-marker">3</span><span><h4>Reusable functions</h4><p>12 min · audio + notebook proof</p></span><span class="gap-status" id="map-functions-status">Up next</span></button>
+                    <button class="gap-item" type="button" data-gap="structures"><span class="gap-marker">4</span><span><h4>Data structures</h4><p>15 min · ready after functions</p></span><span class="gap-status">Ready after</span></button>
+                    <button class="gap-item" type="button" data-gap="files"><span class="gap-marker">5</span><span><h4>Files and APIs</h4><p>Move information in and out</p></span><span class="gap-status">Later</span></button>
+                    <button class="gap-item" type="button" data-gap="project"><span class="gap-marker">6</span><span><h4>Mini project</h4><p>Put the pieces together</p></span><span class="gap-status">Final proof</span></button>
+                  </div>
+                </section>
+
+                <section class="screen" data-screen="lesson" hidden>
+                  <div class="lesson-top"><button class="icon-button" type="button" data-action="go-map" aria-label="Back to skill map">←</button><div class="lesson-progress"><div class="lesson-progress-bar"><span></span></div></div><small>3 / 6</small></div>
+                  <p class="eyebrow">Gap 3 · reusable functions</p><h1 class="lesson-title">Make repetition<br>disappear.</h1><p class="lesson-subtitle">First hear the idea. Then make it tangible in a notebook.</p>
+                  <div class="mode-toggle" role="tablist" aria-label="Lesson mode"><button class="mode-button is-active" type="button" data-action="show-theory" role="tab" aria-selected="true">Theory</button><button class="mode-button" type="button" data-action="show-notebook" role="tab" aria-selected="false">Notebook</button></div>
+                  <div id="theory-pane">
+                    <div class="audio-card"><div class="audio-card-head"><div><strong>Why functions matter</strong><span>3 min · Arc audio</span></div><button class="play-button" id="play-audio" type="button" data-action="toggle-audio" aria-label="Play theory audio">▶</button></div><div class="audio-wave" id="audio-wave" aria-hidden="true"><span style="--bar:7"></span><span style="--bar:13"></span><span style="--bar:21"></span><span style="--bar:10"></span><span style="--bar:17"></span><span style="--bar:25"></span><span style="--bar:13"></span><span style="--bar:8"></span><span style="--bar:21"></span><span style="--bar:16"></span><span style="--bar:26"></span><span style="--bar:12"></span><span style="--bar:8"></span><span style="--bar:19"></span><span style="--bar:25"></span><span style="--bar:14"></span><span style="--bar:8"></span><span style="--bar:20"></span><span style="--bar:15"></span><span style="--bar:24"></span><span style="--bar:10"></span><span style="--bar:18"></span><span style="--bar:7"></span><span style="--bar:14"></span><span style="--bar:22"></span><span style="--bar:11"></span><span style="--bar:18"></span><span style="--bar:7"></span></div><div class="audio-time-row"><span id="audio-time">0:00</span><span>3:00</span></div><div class="audio-extra-controls"><button class="audio-skip" type="button" data-action="audio-skip" data-seconds="-15" aria-label="Skip back 15 seconds">↶ 15</button><div class="audio-rate-group" aria-label="Playback speed"><button class="audio-rate is-active" type="button" data-action="audio-rate" data-rate="1" aria-pressed="true">1×</button><button class="audio-rate" type="button" data-action="audio-rate" data-rate="1.25" aria-pressed="false">1.25×</button><button class="audio-rate" type="button" data-action="audio-rate" data-rate="1.5" aria-pressed="false">1.5×</button></div><button class="audio-skip" type="button" data-action="audio-skip" data-seconds="15" aria-label="Skip forward 15 seconds">15 ↷</button></div><div class="transcript-drawer"><button class="transcript-toggle" type="button" data-action="toggle-transcript" aria-expanded="false"><span>Show transcript</span><span id="transcript-chevron" aria-hidden="true">⌄</span></button><div class="transcript-copy" id="transcript-copy" hidden><p class="is-current">A function is a named piece of thinking.</p><p>You give it an input, it does one job, and it gives you an output.</p><p>Make the decision reusable, testable and easy to explain.</p></div></div></div>
+                    <div class="theory-text"><strong>A function is a named piece of thinking.</strong> You give it an input, it does one job, and it gives you an output. The point is not saving keystrokes — it is making a decision easy to reuse, test and explain.</div>
+                    <div class="lesson-note"><span aria-hidden="true">✦</span><span><b>Listen for this:</b> if you can describe the job in one sentence, you are close to a good function.</span></div>
+                    <div class="lesson-footer"><button class="primary-button full-button" type="button" data-action="show-notebook">Make it tangible <span>→</span></button></div>
+                  </div>
+                  <div id="notebook-pane" hidden></div>
+                </section>
+
+                <section class="screen" data-screen="notebook" hidden>
+                  <div class="lesson-top"><button class="icon-button" type="button" data-action="go-lesson" aria-label="Back to theory">←</button><div class="lesson-progress"><div class="lesson-progress-bar"><span style="width:72%"></span></div></div><small>Proof 1 / 1</small></div>
+                  <p class="eyebrow">Notebook · demonstrate</p><h1 class="lesson-title">Can you make<br>it reusable?</h1><p class="lesson-subtitle">Write a function that doubles a number, then prove it works.</p>
+                  <div class="notebook-label"><span>Python cell</span><span>editable</span></div>
+                  <p class="notebook-prompt">Define <code>double(number)</code> and call it with <code>4</code>.</p>
+                  <textarea class="code-editor" id="code-editor" spellcheck="false" aria-label="Python notebook code">def double(number):
+    return number * 2
+
+double(4)</textarea>
+                  <div class="notebook-actions"><button class="secondary-button" type="button" data-action="show-hint">Need a hint</button><button class="primary-button" type="button" data-action="run-code">Run cell <span>▶</span></button></div>
+                  <div class="notebook-output" id="notebook-output"><strong>Output</strong>Run the cell to see what your function returns.</div>
+                  <div class="hint-box" id="hint-box" hidden><b>Hint:</b> the function needs one line that returns <code>number * 2</code>. Then call it with <code>double(4)</code>.</div>
+                  <div class="proof-success" id="proof-success" hidden><span aria-hidden="true">✓</span><div><strong>Gap cleared.</strong>You demonstrated the idea, not just recognised it. That is enough to move forward.</div></div>
+                  <button class="primary-button full-button" id="submit-proof" type="button" data-action="submit-proof" disabled style="margin-top:15px;">Submit proof <span>→</span></button>
+                  <button class="text-button" type="button" data-action="go-map" style="display:block; margin:17px auto 0;">Return to map</button>
+                </section>
+
+                <section class="screen" data-screen="progress" hidden>
+                  <div class="subscreen-head"><div class="head-copy"><p class="eyebrow">Your evidence</p><h1>Progress</h1><p>What you can demonstrate keeps growing.</p></div><button class="icon-button" type="button" data-action="go-profile" aria-label="Open profile">•••</button></div>
+                  <div class="progress-hero"><div class="progress-ring" id="progress-ring" style="--value:42"><span id="progress-ring-value">42%</span></div><div><h2>Steady, useful progress.</h2><p>Three clear proofs are worth more than a hundred passive lessons.</p></div></div>
+                  <div class="stats-grid"><div class="stat"><strong id="stat-proofs">3</strong><span>gaps cleared</span></div><div class="stat"><strong>46m</strong><span>focused this week</span></div><div class="stat"><strong>4</strong><span>days in motion</span></div></div>
+                  <div class="progress-message">Progress is counted in gaps cleared, with a proof behind each one. Arc keeps the next decision visible.</div>
+                  <div class="section-heading"><h2>Recent proofs</h2><span class="text-button">Python</span></div>
+                  <div class="proof-list"><div class="proof-row"><span class="proof-icon">✓</span><div><strong>Control flow</strong><span>Explain a loop and choose when to use it</span></div><time>Today</time></div><div class="proof-row"><span class="proof-icon">✓</span><div><strong>Values and variables</strong><span>Transform a value without losing the thread</span></div><time>Wed</time></div><div class="proof-row"><span class="proof-icon">✓</span><div><strong>Reading data</strong><span>Inspect a small table and ask a better question</span></div><time>Mon</time></div></div>
+                </section>
+
+                <section class="screen" data-screen="profile" hidden>
+                  <div class="subscreen-head"><button class="icon-button" type="button" data-action="go-home" aria-label="Go home">←</button><div class="head-copy"><p class="eyebrow">Settings</p><h1>Profile</h1></div></div>
+                  <div class="profile-hero"><div class="profile-avatar">M</div><div><h2>Matthew</h2><p>Learning to build with more clarity.</p></div></div>
+                  <div class="profile-section"><h3>Learning preferences</h3><div class="preference-list"><label class="preference-row"><span><strong>Audio theory</strong><span>Make every explanation listenable</span></span><span class="switch"><input type="checkbox" checked><span class="switch-track"></span></span></label><label class="preference-row"><span><strong>Gentle hints</strong><span>Reveal a nudge before showing an answer</span></span><span class="switch"><input type="checkbox" checked><span class="switch-track"></span></span></label><label class="preference-row theme-preference"><span><strong>Dark mode</strong><span>Use a lower-light learning surface</span></span><span class="switch"><input id="dark-mode-toggle" type="checkbox"><span class="switch-track"></span></span></label><label class="preference-row"><span><strong>Spaced review</strong><span>Bring cleared gaps back when useful</span></span><span class="switch"><input type="checkbox"><span class="switch-track"></span></span></label></div></div>
+                  <div class="profile-section"><h3>About Arc</h3><div class="about-card">Arc is built around a simple promise: the path adapts to your actual goal, and progress is earned through evidence you can demonstrate.</div></div>
+                </section>
+              </div>
+
+              <nav class="bottom-nav" aria-label="Main navigation">
+                <button class="nav-button is-active" type="button" data-nav="home"><span class="nav-icon">⌂</span><span>Today</span></button>
+                <button class="nav-button" type="button" data-nav="skills"><span class="nav-icon">⌁</span><span>Skills</span></button>
+                <button class="nav-button" type="button" data-nav="progress"><span class="nav-icon">↗</span><span>Progress</span></button>
+                <button class="nav-button" type="button" data-nav="profile"><span class="nav-icon">○</span><span>Profile</span></button>
+              </nav>
+              <span class="home-indicator" aria-hidden="true"></span><span class="android-gesture" aria-hidden="true"></span>
+            </div>
+            <div class="toast" id="toast" role="status" aria-live="polite"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (() => {
+      const state = {
+        screen: "home",
+        previousScreen: "home",
+        platform: "ios",
+        assessStep: 1,
+        subject: "Python for data work",
+        goal: "Build a project",
+        baseline: "Some practice",
+        newSkill: "",
+        audioSeconds: 0,
+        audioRate: 1,
+        audioTimer: null,
+        notebookPassed: false,
+        gapCleared: false,
+        toastTimer: null
+      };
+
+      const device = document.getElementById("device-frame");
+      const host = document.getElementById("screen-host");
+      const toast = document.getElementById("toast");
+
+      function showToast(message) {
+        clearTimeout(state.toastTimer);
+        toast.innerHTML = message;
+        toast.classList.add("is-visible");
+        state.toastTimer = setTimeout(() => toast.classList.remove("is-visible"), 3000);
+      }
+
+      function setScreen(screen) {
+        if (!document.querySelector(`[data-screen="${screen}"]`)) return;
+        state.previousScreen = state.screen;
+        state.screen = screen;
+        document.querySelectorAll("[data-screen]").forEach((panel) => {
+          panel.hidden = panel.dataset.screen !== screen;
+        });
+        document.querySelectorAll("[data-nav]").forEach((button) => {
+          button.classList.toggle("is-active", button.dataset.nav === screen);
+        });
+        host.scrollTop = 0;
+      }
+
+      function setPlatform(platform) {
+        state.platform = platform;
+        device.classList.toggle("android", platform === "android");
+        document.querySelectorAll("[data-platform]").forEach((button) => {
+          const active = button.dataset.platform === platform;
+          button.classList.toggle("is-active", active);
+          button.setAttribute("aria-pressed", String(active));
+        });
+      }
+
+      function setTheme(theme) {
+        const dark = theme === "dark";
+        document.documentElement.dataset.theme = dark ? "dark" : "light";
+        try { localStorage.setItem("arc-theme", dark ? "dark" : "light"); } catch (error) { /* local preview may block storage */ }
+        const toggle = document.getElementById("theme-toggle");
+        const icon = document.getElementById("theme-toggle-icon");
+        const label = document.getElementById("theme-toggle-label");
+        if (toggle) toggle.setAttribute("aria-pressed", String(dark));
+        if (icon) icon.textContent = dark ? "☀" : "☾";
+        if (label) label.textContent = dark ? "Light" : "Dark";
+        const profileToggle = document.getElementById("dark-mode-toggle");
+        if (profileToggle) profileToggle.checked = dark;
+      }
+
+      function updateProgress() {
+        const value = state.gapCleared ? 58 : 42;
+        ["home-ring", "map-ring", "progress-ring"].forEach((id) => {
+          const ring = document.getElementById(id);
+          if (ring) ring.style.setProperty("--value", value);
+        });
+        ["home-ring-value", "map-ring-value", "progress-ring-value"].forEach((id) => {
+          const label = document.getElementById(id);
+          if (label) label.textContent = `${value}%`;
+        });
+        const copy = document.getElementById("home-progress-copy");
+        const next = document.getElementById("home-next-gap");
+        if (copy) copy.textContent = state.gapCleared ? "4 of 6" : "3 of 6";
+        if (next) next.textContent = state.gapCleared ? "Next · data structures" : "Next · reusable functions";
+        const stat = document.getElementById("stat-proofs");
+        if (stat) stat.textContent = state.gapCleared ? "4" : "3";
+        const mapCleared = document.getElementById("map-cleared-count");
+        if (mapCleared) mapCleared.textContent = state.gapCleared ? "3 cleared · 6 gaps" : "2 cleared · 6 gaps";
+        const functionGap = document.getElementById("map-functions");
+        const functionStatus = document.getElementById("map-functions-status");
+        if (functionGap) functionGap.classList.toggle("is-complete", state.gapCleared);
+        if (functionGap) functionGap.classList.toggle("is-current", !state.gapCleared);
+        if (functionStatus) functionStatus.textContent = state.gapCleared ? "Cleared" : "Up next";
+        const marker = functionGap?.querySelector(".gap-marker");
+        if (marker) marker.textContent = state.gapCleared ? "✓" : "3";
+      }
+
+      function renderAssessStep() {
+        document.querySelectorAll(".assess-step").forEach((step) => {
+          step.hidden = Number(step.dataset.assessStep) !== state.assessStep;
+        });
+        const label = document.getElementById("assess-progress-label");
+        const fill = document.getElementById("assess-progress-fill");
+        const next = document.getElementById("assess-next");
+        if (label) label.textContent = `Step ${state.assessStep} of 3`;
+        if (fill) fill.style.width = `${state.assessStep * 33.333}%`;
+        if (next) next.innerHTML = state.assessStep === 3 ? "Run my calibration <span>→</span>" : "Continue <span>→</span>";
+      }
+
+      function startAssessment() {
+        document.querySelectorAll(".assess-step").forEach((step) => { step.hidden = true; });
+        document.getElementById("assessment-actions").hidden = true;
+        document.getElementById("assessment-running").hidden = false;
+        setTimeout(() => {
+          document.getElementById("assessment-running").hidden = true;
+          document.getElementById("assessment-result").hidden = false;
+        }, 1050);
+      }
+
+      function renderAudio() {
+        const time = document.getElementById("audio-time");
+        const bars = Array.from(document.querySelectorAll("#audio-wave span"));
+        const minutes = Math.floor(state.audioSeconds / 60);
+        const seconds = String(state.audioSeconds % 60).padStart(2, "0");
+        time.textContent = `${minutes}:${seconds}`;
+        const played = Math.round((state.audioSeconds / 180) * bars.length);
+        bars.forEach((bar, index) => bar.classList.toggle("is-played", index < played));
+        document.querySelectorAll("[data-action='audio-rate']").forEach((rateButton) => {
+          const active = Number(rateButton.dataset.rate) === state.audioRate;
+          rateButton.classList.toggle("is-active", active);
+          rateButton.setAttribute("aria-pressed", String(active));
+        });
+      }
+
+      function toggleAudio() {
+        const button = document.getElementById("play-audio");
+        if (state.audioTimer) {
+          clearInterval(state.audioTimer);
+          state.audioTimer = null;
+          button.textContent = "▶";
+          return;
+        }
+        button.textContent = "Ⅱ";
+        state.audioTimer = setInterval(() => {
+          state.audioSeconds = Math.min(180, state.audioSeconds + state.audioRate);
+          renderAudio();
+          if (state.audioSeconds >= 180) {
+            clearInterval(state.audioTimer);
+            state.audioTimer = null;
+            button.textContent = "▶";
+          }
+        }, 1000);
+      }
+
+      function skipAudio(seconds) {
+        state.audioSeconds = Math.max(0, Math.min(180, state.audioSeconds + seconds));
+        renderAudio();
+      }
+
+      function setAudioRate(rate) {
+        state.audioRate = rate;
+        renderAudio();
+        showToast(`Playback speed set to ${rate}×.`);
+      }
+
+      function toggleTranscript() {
+        const copy = document.getElementById("transcript-copy");
+        const button = document.querySelector("[data-action='toggle-transcript']");
+        const open = copy.hidden;
+        copy.hidden = !open;
+        button.setAttribute("aria-expanded", String(open));
+        document.getElementById("transcript-chevron").textContent = open ? "⌃" : "⌄";
+      }
+
+      function runCode() {
+        const code = document.getElementById("code-editor").value;
+        const output = document.getElementById("notebook-output");
+        const correct = /def\s+double\s*\(/.test(code) && /return\s+number\s*\*\s*2/.test(code) && /double\s*\(\s*4\s*\)/.test(code);
+        state.notebookPassed = correct;
+        output.innerHTML = correct ? "<strong>Output</strong>8" : "<strong>Output</strong>Arc could not find a working <code>double(4)</code> yet. Keep the function small and check the return line.";
+        document.getElementById("submit-proof").disabled = !correct;
+        showToast(correct ? "Cell passed. You can submit this as evidence." : "Not quite — the output is your clue.");
+      }
+
+      function submitProof() {
+        if (!state.notebookPassed) return;
+        state.gapCleared = true;
+        document.getElementById("proof-success").hidden = false;
+        document.getElementById("submit-proof").disabled = true;
+        updateProgress();
+        showToast("<strong>Gap cleared.</strong> Your map has been updated.");
+      }
+
+      function chooseNewSkill(button) {
+        state.newSkill = button.dataset.subject;
+        document.querySelectorAll(".subject-choice").forEach((choice) => choice.classList.toggle("is-selected", choice === button));
+        document.getElementById("add-note").textContent = `${state.newSkill} is ready for calibration.`;
+      }
+
+      document.addEventListener("click", (event) => {
+        const platformButton = event.target.closest("[data-platform]");
+        if (platformButton) {
+          setPlatform(platformButton.dataset.platform);
+          return;
+        }
+
+        const navButton = event.target.closest("[data-nav]");
+        if (navButton) {
+          setScreen(navButton.dataset.nav);
+          return;
+        }
+
+        const option = event.target.closest("[data-option-group]");
+        if (option) {
+          const group = option.dataset.optionGroup;
+          document.querySelectorAll(`[data-option-group="${group}"]`).forEach((choice) => choice.classList.remove("is-selected"));
+          option.classList.add("is-selected");
+          state[option.dataset.optionKey] = option.dataset.optionValue;
+          if (group === "baseline") {
+            const feedback = document.getElementById("placement-feedback");
+            const answer = option.querySelector("span")?.textContent.trim();
+            if (feedback) feedback.textContent = answer === "12" ? "Correct — Arc will use this to raise your starting point." : "No problem — Arc would lower the next question and keep the tone supportive.";
+          }
+          return;
+        }
+
+        const subjectChoice = event.target.closest('[data-action="choose-new-skill"]');
+        if (subjectChoice) {
+          chooseNewSkill(subjectChoice);
+          return;
+        }
+
+        const actionElement = event.target.closest("[data-action]");
+        if (!actionElement) return;
+        const action = actionElement.dataset.action;
+        if (action === "go-home") setScreen("home");
+        if (action === "toggle-theme") setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+        if (action === "go-skills") setScreen("skills");
+        if (action === "go-profile") setScreen("profile");
+        if (action === "go-map") { updateProgress(); setScreen("map"); }
+        if (action === "go-lesson" || action === "open-lesson") setScreen("lesson");
+        if (action === "go-assess") {
+          if (actionElement.dataset.subject) state.subject = actionElement.dataset.subject;
+          state.assessStep = 1;
+          document.getElementById("assessment-result").hidden = true;
+          document.getElementById("assessment-running").hidden = true;
+          document.getElementById("assessment-actions").hidden = false;
+          renderAssessStep();
+          setScreen("assess");
+        }
+        if (action === "go-back") {
+          if (state.screen === "assess" && state.assessStep > 1) { state.assessStep -= 1; renderAssessStep(); }
+          else setScreen(state.screen === "assess" ? "skills" : "home");
+        }
+        if (action === "assess-next") {
+          if (state.assessStep < 3) { state.assessStep += 1; renderAssessStep(); }
+          else startAssessment();
+        }
+        if (action === "start-new-assessment") {
+          if (!state.newSkill) { showToast("Choose a subject first."); return; }
+          state.subject = state.newSkill;
+          state.assessStep = 1;
+          document.getElementById("assessment-result").hidden = true;
+          document.getElementById("assessment-running").hidden = true;
+          document.getElementById("assessment-actions").hidden = false;
+          renderAssessStep();
+          setScreen("assess");
+        }
+        if (action === "toggle-add-skill") {
+          const panel = document.getElementById("add-panel");
+          panel.hidden = !panel.hidden;
+        }
+        if (action === "show-map-info") showToast("This map is ordered by the gaps most likely to unlock your chosen goal.");
+        if (action === "toggle-audio") toggleAudio();
+        if (action === "audio-skip") skipAudio(Number(actionElement.dataset.seconds));
+        if (action === "audio-rate") setAudioRate(Number(actionElement.dataset.rate));
+        if (action === "toggle-transcript") toggleTranscript();
+        if (action === "show-theory") {
+          document.querySelector("[data-action='show-theory']").classList.add("is-active");
+          document.querySelector("[data-action='show-notebook']").classList.remove("is-active");
+          setScreen("lesson");
+        }
+        if (action === "show-notebook") {
+          document.querySelectorAll(".mode-button").forEach((button) => button.classList.toggle("is-active", button.dataset.action === "show-notebook"));
+          setScreen("notebook");
+        }
+        if (action === "run-code") runCode();
+        if (action === "show-hint") document.getElementById("hint-box").hidden = !document.getElementById("hint-box").hidden;
+        if (action === "submit-proof") submitProof();
+        if (action === "reset") window.location.reload();
+      });
+
+      document.querySelectorAll("[data-gap]").forEach((gap) => gap.addEventListener("click", () => {
+        if (gap.dataset.gap === "functions") setScreen(state.gapCleared ? "map" : "lesson");
+        else showToast("This gap will open when the previous proof is cleared.");
+      }));
+
+      document.getElementById("skill-search").addEventListener("input", (event) => {
+        const query = event.target.value.toLowerCase().trim();
+        document.querySelectorAll("#skill-list .skill-card").forEach((card) => {
+          card.hidden = query && !card.dataset.search.includes(query);
+        });
+      });
+
+      document.getElementById("dark-mode-toggle").addEventListener("change", (event) => {
+        setTheme(event.target.checked ? "dark" : "light");
+      });
+
+      updateProgress();
+      renderAssessStep();
+      setPlatform("ios");
+      let savedTheme = "light";
+      try { savedTheme = localStorage.getItem("arc-theme") || "light"; } catch (error) { /* local preview may block storage */ }
+      setTheme(savedTheme);
+    })();
+  </script>
+</body>
+</html>

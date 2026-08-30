@@ -112,6 +112,11 @@ epics:
     priority: P2
     dependencies: [E13]
     evidence: A reviewer can approve or repair artefacts
+  - id: E21
+    title: Arc consumer UI
+    priority: P0
+    dependencies: [E15]
+    evidence: The GapOS engine is usable as the Arc app (calibration, map, audio, proofs)
 
 tasks:
   - id: E20
@@ -595,7 +600,7 @@ tasks:
     title: HTTP API over the service layer
     epic: E20
     priority: P0
-    status: ready
+    status: done
     goal: Every capability of the engine is reachable over HTTP.
     scope:
       - Next.js route handlers over the existing services (no second HTTP server)
@@ -614,7 +619,7 @@ tasks:
     title: Web application and offline PWA (E14)
     epic: E14
     priority: P1
-    status: ready
+    status: done
     goal: A learner can run the whole loop in a browser.
     scope:
       - Next.js app router pages — gap list, gap detail with source upload and compile, curriculum,
@@ -632,7 +637,7 @@ tasks:
     title: Live speech-to-text and a real live-mode factory
     epic: E20
     priority: P0
-    status: ready
+    status: done
     goal: Live mode boots through the standard factory instead of throwing.
     scope:
       - an OpenAI-compatible /audio/transcriptions backend over plain fetch
@@ -649,7 +654,7 @@ tasks:
     title: Real S3 smoke test in CI
     epic: E11
     priority: P0
-    status: ready
+    status: done
     goal: The SigV4 client is proven against a real S3 endpoint, not just the mock.
     scope:
       - a MinIO service in the CI workflow
@@ -663,7 +668,7 @@ tasks:
     title: Command-line study client
     epic: E20
     priority: P1
-    status: ready
+    status: done
     goal: The whole loop is usable from a terminal.
     scope:
       - a `gapos` bin — gap new, source add (file or stdin), compile, plan, study (lesson + attempt),
@@ -694,7 +699,7 @@ tasks:
     title: Knowledge map (E15)
     epic: E15
     priority: P1
-    status: ready
+    status: done
     goal: The prerequisite graph is navigable.
     scope:
       - a knowledge endpoint: nodes (gaps, capabilities) and edges from mastery and curricula
@@ -710,7 +715,7 @@ tasks:
     title: Voice gap capture (E16)
     epic: E16
     priority: P1
-    status: ready
+    status: done
     goal: Dictation creates an editable draft gap.
     scope:
       - POST audio to a voice endpoint that transcribes (provider STT) and drafts a gap
@@ -724,7 +729,7 @@ tasks:
     title: Provider routing by policy (E17)
     epic: E17
     priority: P2
-    status: ready
+    status: done
     goal: Call purpose selects the model.
     scope:
       - per-purpose model routing in the live language model (classification/planning/teaching/
@@ -740,7 +745,7 @@ tasks:
     title: Local-model execution preset (E18)
     epic: E18
     priority: P2
-    status: ready
+    status: done
     goal: One qualified local model runs the pipeline.
     scope:
       - a local preset (Ollama/llama.cpp OpenAI-compatible endpoint, default localhost:11434)
@@ -756,7 +761,7 @@ tasks:
     title: Educator review queue (E19)
     epic: E19
     priority: P2
-    status: ready
+    status: done
     goal: A reviewer can approve or repair artefacts.
     scope:
       - review state on lessons/artefacts flagged by audit findings or low verification confidence
@@ -769,3 +774,30 @@ tasks:
     acceptance:
       - a flagged lesson appears in the queue, is rejected with a note, and the note is visible on
         the lesson
+  - id: GAP-032
+    title: "Arc UI — adaptive learning app surface (founder spec)"
+    epic: E21
+    priority: P0
+    status: ready
+    goal: "The GapOS engine becomes the Arc app: calibration, gap map, audio theory and notebook proofs with verified practice as the spine."
+    scope:
+      - "All screens from docs/ARC-UI.md in apps/web (Next.js, responsive, prototype design language)"
+      - "Real server-side code execution for notebook proofs, validated by the independent verifier (GAP-010)"
+      - "Real synthesized audio playback from the compile pipeline (GAP-011)"
+      - "Real 3-step calibration via provider adapters, mapped to knowledge-map gaps (E15, GAP-029)"
+      - "Attempt + mastery evidence recorded on proof (GAP-012); proofs ledger reads mastery records"
+      - "Spaced-review toggle wired to real review scheduling (GAP-012/GAP-013)"
+    out_of_scope:
+      - "No new backend services; no new paid providers; demo JS from the prototype must not survive"
+    dependencies: [GAP-021, GAP-022, GAP-023, GAP-027, GAP-029]
+    acceptance:
+      - "All screens implemented; vertical slice (AGENTS.md §1) keeps working"
+      - "Run cell executes server-side; correct proof records an attempt and advances gap state; wrong answer is state-neutral"
+      - "Audio player plays the real compiled lesson TTS URL; controls work"
+      - "Calibration persists selections and maps to real gaps"
+      - "Map/progress reflect real DB state"
+      - "pnpm verify green; no weakened tests; tests cover real execution, state transitions and persistence round-trips"
+    verification:
+      - pnpm verify
+    risk: medium
+    human_gate: false

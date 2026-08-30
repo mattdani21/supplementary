@@ -1,6 +1,6 @@
 {
  "schemaVersion": 1,
- "updatedAt": "2026-08-14T10:44:00.000Z",
+ "updatedAt": "2026-08-30T20:15:00.000Z",
  "controller": "gapos-controller",
  "tasks": {
   "GAP-000": {
@@ -464,7 +464,7 @@
   },
   "GAP-027": {
    "status": "done",
-   "notes": "The knowledge map (E15). knowledgeMap handler builds nodes (the gap + every capability its curriculum teaches + their prerequisites + knowledge-graph edges) and edges (teaches / prerequisite_of / extends / related), owner-scoped. A /gaps/[gapId]/map page renders it as a deterministic BFS-ring SVG with no new dependencies; gap nodes are links, capability nodes carry tooltips. API tests cover the map contents and owner isolation; next build compiles the page. Re-verification (2026-08-14): added the spec-acceptance check — after mastering two linked gaps the map shows the prerequisite_of edge and both capability nodes — plus a test that extends/related edges from the knowledge store render with their endpoint nodes; documented GET /gaps/{gapId}/knowledge in specs/openapi.yaml. pnpm verify passes (404 passed | 27 skipped); web build compiles the map page.",
+   "notes": "The knowledge map (E15). knowledgeMap handler builds nodes (the gap + every capability its curriculum teaches + their prerequisites + knowledge-graph edges) and edges (teaches / prerequisite_of / extends / related), owner-scoped. A /gaps/[gapId]/map page renders it as a deterministic BFS-ring SVG with no new dependencies; gap nodes are links, capability nodes carry tooltips. API tests cover the map contents and owner isolation; next build compiles the page. Re-verification (2026-08-14): added the spec-acceptance check \u2014 after mastering two linked gaps the map shows the prerequisite_of edge and both capability nodes \u2014 plus a test that extends/related edges from the knowledge store render with their endpoint nodes; documented GET /gaps/{gapId}/knowledge in specs/openapi.yaml. pnpm verify passes (404 passed | 27 skipped); web build compiles the map page.",
    "completedAt": "2026-08-03T15:29:52.000Z",
    "evidence": [
     {
@@ -556,6 +556,12 @@
      "note": "Full quality gate on wt/gap-031: format:check, lint, typecheck and 402 tests passed (27 skipped loudly: Postgres block and live-provider pack). The E19 review suite (flagged lesson appears in the queue -> rejected with a note -> note visible on the lesson, plus owner isolation) is green without re-implementation, confirming GAP-031 was already met by commit cc54c55."
     }
    ]
+  },
+  "GAP-032": {
+   "status": "ready",
+   "startedAt": null,
+   "evidence": [],
+   "notes": "Arc UI founder spec 2026-08-30: docs/ARC-UI.md + docs/prototypes/arc-skill-learning-prototype.html"
   }
  },
  "GAP-014b": {
