@@ -1,7 +1,9 @@
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import { knowledgeMap, type KnowledgeEdgeView, type KnowledgeNode } from '../../../../server/api';
 import { getServerContext } from '../../../../server/bootstrap';
 import { viewerOwner } from '../../../../lib/viewer';
+import { isNotFoundError } from '../error-guards';
 
 export const dynamic = 'force-dynamic';
 
@@ -52,7 +54,14 @@ export default async function KnowledgeMapPage({ params }: { params: Promise<{ g
   const { gapId } = await params;
   const owner = await viewerOwner();
   const context = await getServerContext();
-  const { nodes, edges } = await knowledgeMap(context, owner, gapId);
+  let nodes: KnowledgeNode[];
+  let edges: KnowledgeEdgeView[];
+  try {
+    ({ nodes, edges } = await knowledgeMap(context, owner, gapId));
+  } catch (error) {
+    if (isNotFoundError(error)) notFound();
+    throw error;
+  }
 
   const positions = layout(nodes, edges, gapId);
   const gapNode = nodes.find((node) => node.id === gapId);

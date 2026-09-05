@@ -1,10 +1,22 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 /** Sets the learner owner cookie (single-learner deployments stay on the default). */
 export function OwnerSwitcher() {
   const router = useRouter();
+  const [current, setCurrent] = useState('');
+
+  // Reflect the learner already stored in the cookie so the field is not confusingly blank on
+  // every navigation. Read after mount to avoid a server/client hydration mismatch.
+  useEffect(() => {
+    const owner = document.cookie
+      .split('; ')
+      .find((part) => part.startsWith('gapos_owner='))
+      ?.split('=')[1];
+    if (owner) setCurrent(decodeURIComponent(owner));
+  }, []);
 
   const apply = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -16,7 +28,13 @@ export function OwnerSwitcher() {
   return (
     <form onSubmit={apply} className="owner">
       <label htmlFor="owner">Learner</label>
-      <input id="owner" name="owner" placeholder="learner id" defaultValue="" />
+      <input
+        id="owner"
+        name="owner"
+        placeholder="learner id"
+        value={current}
+        onChange={(event) => setCurrent(event.target.value)}
+      />
       <button type="submit">Switch</button>
     </form>
   );

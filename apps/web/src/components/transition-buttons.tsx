@@ -27,10 +27,23 @@ export function TransitionButtons({
     setBusy(type);
     setError(null);
     try {
-      await apiFetch(`/api/gaps/${gapId}/transition`, {
-        method: 'POST',
-        body: JSON.stringify({ type }),
-      });
+      // Compiling is not a bare status flip: it runs the generation pipeline. The button must
+      // hit the compile endpoint (which drives ready/failed → compiling → active|failed), or the
+      // gap would sit in `compiling` forever with no lessons.
+      if (type === 'compile' || type === 'retry_compilation') {
+        await apiFetch(`/api/gaps/${gapId}/compile`, {
+          method: 'POST',
+          body: JSON.stringify({
+            idempotencyKey: `web-compile-${gapId}-${Date.now()}`,
+            audioEnabled: true,
+          }),
+        });
+      } else {
+        await apiFetch(`/api/gaps/${gapId}/transition`, {
+          method: 'POST',
+          body: JSON.stringify({ type }),
+        });
+      }
       router.refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));

@@ -15,7 +15,10 @@ export function SourceForm({ gapId }: { gapId: string }) {
     setBusy(true);
     setError(null);
     setMessage(null);
-    const form = new FormData(event.currentTarget);
+    // Capture the element now: after the `await` below, React has nulled `event.currentTarget`,
+    // so reading `.elements` off it later throws "Cannot read properties of null".
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const filename = String(form.get('filename') || 'note.txt');
     try {
       const result = (await apiFetch(`/api/gaps/${gapId}/sources`, {
@@ -41,7 +44,7 @@ export function SourceForm({ gapId }: { gapId: string }) {
         setMessage(
           result.registration.deduplicated ? 'Already uploaded — reused.' : 'Source added.',
         );
-        (event.currentTarget.elements.namedItem('text') as HTMLTextAreaElement).value = '';
+        (formElement.elements.namedItem('text') as HTMLTextAreaElement).value = '';
         router.refresh();
       } else {
         setError(result.registration.message ?? `Rejected (${result.registration.code}).`);

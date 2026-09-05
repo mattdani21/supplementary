@@ -20,11 +20,31 @@ export interface CreateGapInput {
   readonly sourcePolicy?: Gap['sourcePolicy'];
 }
 
+/**
+ * Ensure a `users` row exists for this owner before anything foreign-keys to it.
+ *
+ * The web UI has no signup flow — the OwnerSwitcher only sets a cookie — so a brand-new learner
+ * reaches `createGap` without a `users` row, and `gaps.owner_id` is a foreign key to `users.id`.
+ * This get-or-create provisions the owner idempotently: it is safe to call repeatedly for the
+ * same owner and never throws on a second call.
+ */
+const ensureOwnerProvisioned = async (context: ServerContext, owner: OwnerId): Promise<void> => {
+  const existing = await context.uow.users.find(owner);
+  if (existing) return;
+  await context.uow.users.create({
+    id: owner,
+    email: `${owner}@local.gapos`,
+    locale: 'en',
+    timezone: 'UTC',
+  });
+};
+
 export const createGap = async (
   context: ServerContext,
   owner: OwnerId,
   input: CreateGapInput,
 ): Promise<Gap> => {
+  await ensureOwnerProvisioned(context, owner);
   const at = context.now();
   return context.uow.gaps.create(owner, {
     id: context.newId('gap'),
