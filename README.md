@@ -90,3 +90,7 @@ CLI immediately.
 - [`docs/SECURITY.md`](docs/SECURITY.md) — controls, AI-specific threats, data handling
 - [`docs/OPERATIONS.md`](docs/OPERATIONS.md) — deployment, telemetry, cost, recovery
 - [`AGENTS.md`](AGENTS.md) — the build rules every coding agent follows
+
+## Agent delivery documentation
+
+See [the execution package](docs/execution/README.md) for reviewed intent, architecture context, the dependency roadmap, exact technical contracts and bounded developer/test tickets.
