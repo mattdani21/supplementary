@@ -131,3 +131,7 @@ They must never be the only coverage for a behaviour.
 - Errors are typed domain errors, not thrown strings.
 - Prefer pure functions and explicit dependency injection over module-level singletons.
 - Name things the way the domain model in `docs/PRODUCT.md` names them.
+
+## Execution package (reviewed 2026-09-05)
+
+For the requested intent, roadmap, technical contracts and developer/test work packets, start at [docs/execution/README.md](docs/execution/README.md). Repository-scoped delivery and verification skills are under `.agents/skills/`. Existing instructions and domain constraints above remain in force.

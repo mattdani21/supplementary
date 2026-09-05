@@ -1,5 +1,12 @@
 # State
 
+## Review checkpoint — 2026-09-05
+
+Dockerfile, railway.json and audio proxy code now exist; the earlier missing-file claims below are obsolete. Source inspection also confirms untrusted demo identity and a web bootstrap queue-wiring gap. See [CONTEXT](docs/execution/CONTEXT.md). Existing task-status evidence remains the completion record; code presence alone does not establish successful production operation.
+
+The following sections are historical status notes; use the checkpoint above and the linked source map for current code presence.
+
+
 _Under active construction (README.md "Status"). Core engine done; not yet deployable._
 
 ## Current state
