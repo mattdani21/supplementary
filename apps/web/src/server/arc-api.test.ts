@@ -17,14 +17,17 @@ import { createServerContext, type ServerContext } from './context.js';
 import {
   arcCalibrateHandler,
   arcCalibrationKitHandler,
+  arcCapabilitiesHandler,
   arcLessonHandler,
   arcMapHandler,
   arcPreferencesHandler,
   arcProgressHandler,
   arcRunCellHandler,
+  arcReviewsHandler,
   arcSetPreferencesHandler,
   arcSkillsHandler,
   arcSubmitProofHandler,
+  arcSubmitReviewHandler,
   arcTodayHandler,
   audioUrl,
   compile,
@@ -378,6 +381,11 @@ describe('Arc notebook proofs', () => {
     expect(progress.progress.clearedGaps).toBe(1);
     expect(progress.progress.proofs.length).toBeGreaterThan(0);
     expect(progress.progress.momentumDays).toBeGreaterThanOrEqual(1);
+
+    const capabilities = await arcCapabilitiesHandler(context, OWNER);
+    expect(capabilities.capabilities).toEqual(
+      expect.arrayContaining([expect.objectContaining({ gapId, title: expect.any(String) })]),
+    );
   });
 });
 
@@ -444,6 +452,51 @@ describe('Arc preferences and spaced review', () => {
     const shown = await arcTodayHandler(context, OWNER);
     expect(shown.today.dueReviews.length).toBeGreaterThan(0);
     expect(shown.today.dueReviews[0]!.gapId).toBe(gapId);
+  });
+
+  it('makes preferences alter the lesson and grades review responses on the server', async () => {
+    const { context } = buildContext();
+    const gapId = await seedCompiledGap(context);
+
+    await arcSetPreferencesHandler(context, OWNER, {
+      audioTheory: false,
+      gentleHints: false,
+      darkMode: false,
+      spacedReview: true,
+    });
+    const lesson = await arcLessonHandler(context, OWNER, gapId);
+    expect(lesson.lesson.defaultMode).toBe('practice');
+    expect(lesson.lesson.notebook?.hint).toBeUndefined();
+    expect(lesson.lesson.practice.length).toBeGreaterThan(0);
+    expect(lesson.lesson.practice.every((question) => question.hint === undefined)).toBe(true);
+
+    const curriculum = await context.uow.curricula.getCurrentForGap(OWNER, gapId);
+    const dayOne = (await context.uow.curricula.listLessons(OWNER, curriculum!.id)).find(
+      (entry) => entry.day === 1,
+    )!;
+    const question = (await context.uow.curricula.listQuestions(OWNER, dayOne.id)).find(
+      (entry) => entry.payload.type !== 'code_proof',
+    )!;
+    await submitAttempt(context, OWNER, gapId, {
+      questionId: question.id,
+      sessionId: 'review_seed',
+      response: 'incorrect',
+      idempotencyKey: 'review_seed_wrong',
+    });
+
+    const queue = await arcReviewsHandler(context, OWNER);
+    expect(queue.reviews.length).toBeGreaterThan(0);
+    expect(JSON.stringify(queue)).not.toContain(question.payload.answer);
+    const review = queue.reviews.find((entry) => entry.questionId === question.id)!;
+
+    const submitted = await arcSubmitReviewHandler(context, OWNER, review.reviewId, {
+      response: question.payload.answer,
+      confidence: 'medium',
+      idempotencyKey: `review:${review.reviewId}`,
+    });
+    expect(submitted.review.correct).toBe(true);
+    expect(submitted.review.feedback.answer).toBe(question.payload.answer);
+    expect(submitted.review.nextReview).toBeDefined();
   });
 });
 
