@@ -444,10 +444,15 @@ describe('Arc notebook proofs', () => {
     expect(progress.progress.proofs.length).toBeGreaterThan(0);
     expect(progress.progress.momentumDays).toBeGreaterThanOrEqual(1);
 
-    const capabilities = await arcCapabilitiesHandler(context, OWNER);
+    const capabilities = await arcCapabilitiesHandler(context, OWNER, 'relations');
     expect(capabilities.capabilities).toEqual(
       expect.arrayContaining([expect.objectContaining({ gapId, title: expect.any(String) })]),
     );
+    expect(context.metrics.sum('arc_capability_search_total', { hasQuery: 'true' })).toBe(1);
+    const searchMetric = context.metrics.points.find(
+      (point) => point.name === 'arc_capability_search_total',
+    );
+    expect(searchMetric?.labels).toEqual({ hasQuery: 'true' });
   });
 });
 
