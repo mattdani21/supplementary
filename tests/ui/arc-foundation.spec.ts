@@ -7,8 +7,7 @@ const openAsNewLearner = async (page: Page, testInfo: TestInfo, path = '/arc') =
     {
       name: 'gapos_owner',
       value: owner,
-      domain: '127.0.0.1',
-      path: '/',
+      url: 'http://127.0.0.1:3100',
       sameSite: 'Lax',
     },
   ]);
