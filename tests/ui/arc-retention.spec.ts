@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext, type TestInfo } from '@playwright/test';
+import { expect, test, type APIRequestContext } from '@playwright/test';
 import { REFERENCE_GAP_STATEMENT, SET_THEORY_SOURCE } from '@gapos/test-fixtures';
 
 interface QuestionView {
