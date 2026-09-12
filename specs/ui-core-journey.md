@@ -39,7 +39,8 @@ correctness, compilation success, practice correctness, mastery, or a gap status
   the browser and registered through the existing source boundary; pasted text is also supported.
 - `general_knowledge_allowed` may compile with no upload only after explicit confirmation.
 - Starting compilation first applies the `define` domain transition, then calls the idempotent
-  compile boundary with a stable key for that gap and compilation version.
+  compile boundary. An ambiguous network retry reuses its attempt key; a deliberately retried
+  terminal failure receives a new attempt key so the failed run is not merely replayed.
 - The page represents real statuses: draft, ready, compiling, active, failed, and archived. It
   never fabricates generation-step completion.
 - A successful run routes to the skill map as soon as a published lesson is available. A failed

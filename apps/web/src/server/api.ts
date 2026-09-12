@@ -158,6 +158,9 @@ const calibrationSchema = z
     subject: z.string().min(1),
     goal: z.string().min(1),
     baselineAnswer: z.string().min(1),
+    dailyMinutes: z.number().int().min(5).max(480).optional(),
+    deadline: z.iso.date().optional(),
+    sourcePolicy: z.enum(['general_knowledge_allowed', 'sources_only']).optional(),
   })
   .strict();
 

@@ -868,7 +868,7 @@ tasks:
     acceptance:
       - 'Calibration persists the learner-confirmed gap constraints'
       - 'A source-backed and a general-knowledge path both reach a published Arc lesson'
-      - 'Compile retries reuse an idempotency key and recoverable failures remain actionable'
+      - 'Ambiguous compile retries reuse their attempt key and terminal failures remain actionable'
     verification:
       - pnpm test apps/web/src/server
       - pnpm test:ui

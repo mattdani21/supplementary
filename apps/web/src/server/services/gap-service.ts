@@ -25,6 +25,19 @@ export const createGap = async (
   owner: OwnerId,
   input: CreateGapInput,
 ): Promise<Gap> => {
+  const existingUser = await context.uow.users.find(owner);
+  if (!existingUser) {
+    const emailPrefix = String(owner)
+      .toLowerCase()
+      .replace(/[^a-z0-9._-]+/g, '-');
+    await context.uow.users.create({
+      id: owner,
+      email: `${emailPrefix || 'learner'}@local.gapos`,
+      locale: 'en',
+      timezone: 'UTC',
+    });
+  }
+
   const at = context.now();
   return context.uow.gaps.create(owner, {
     id: context.newId('gap'),

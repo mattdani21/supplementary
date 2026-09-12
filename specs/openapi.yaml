@@ -409,12 +409,13 @@ paths:
     post:
       tags: [arc]
       operationId: arcCalibrate
-      summary: Run the 3-step calibration
+      summary: Run the calibration with confirmed learning constraints
       description: |
         Grades the baseline answer server-side, creates the real gap the route leads to,
         interprets the diagnostic through the provider adapter (a correct baseline raises the
-        starting point), persists the selections, and reports the gaps identified with a
-        next/after/later preview plus any existing gaps matching the subject.
+        starting point), persists the selections and confirmed time/source constraints, and
+        reports the gaps identified with a next/after/later preview plus any existing gaps
+        matching the subject.
       requestBody:
         required: true
         content:
@@ -1032,6 +1033,12 @@ components:
         subject: { type: string, minLength: 1 }
         goal: { type: string, minLength: 1 }
         baselineAnswer: { type: string, minLength: 1 }
+        dailyMinutes: { type: integer, minimum: 5, maximum: 480, default: 35 }
+        deadline: { type: string, format: date }
+        sourcePolicy:
+          type: string
+          enum: [general_knowledge_allowed, sources_only]
+          default: general_knowledge_allowed
 
     ArcCalibrationResult:
       type: object

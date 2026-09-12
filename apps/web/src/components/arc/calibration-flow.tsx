@@ -10,6 +10,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
+import { Field } from '@gapos/ui';
 import { arcFetch } from './arc-client';
 
 const SUBJECTS = [
@@ -42,6 +43,11 @@ export function CalibrationFlow({ initialSubject }: { initialSubject: string }) 
   const [subject, setSubject] = useState(initialSubject);
   const [kit, setKit] = useState<Kit | null>(null);
   const [goal, setGoal] = useState<string | null>(null);
+  const [dailyMinutes, setDailyMinutes] = useState(35);
+  const [deadline, setDeadline] = useState('');
+  const [sourcePolicy, setSourcePolicy] = useState<'general_knowledge_allowed' | 'sources_only'>(
+    'general_knowledge_allowed',
+  );
   const [baseline, setBaseline] = useState<string | null>(null);
   const [baselineFeedback, setBaselineFeedback] = useState<string | null>(null);
   const [step, setStep] = useState<Step>(1);
@@ -73,12 +79,7 @@ export function CalibrationFlow({ initialSubject }: { initialSubject: string }) 
 
   const chooseBaseline = (option: string) => {
     setBaseline(option);
-    // Supportive live feedback, mirroring the prototype; the real verdict comes from the server.
-    setBaselineFeedback(
-      option === (kit?.baselineQuestion.options[1] ?? '')
-        ? 'Looks right — Arc will use this to place you.'
-        : 'No problem — Arc would lower the next question and keep the tone supportive.',
-    );
+    setBaselineFeedback('Answer selected. Arc will grade it privately when you submit.');
   };
 
   const next = () => {
@@ -93,7 +94,14 @@ export function CalibrationFlow({ initialSubject }: { initialSubject: string }) 
     try {
       const body = (await arcFetch('/api/arc/calibration', {
         method: 'POST',
-        body: JSON.stringify({ subject, goal, baselineAnswer: baseline }),
+        body: JSON.stringify({
+          subject,
+          goal,
+          baselineAnswer: baseline,
+          dailyMinutes,
+          ...(deadline ? { deadline } : {}),
+          sourcePolicy,
+        }),
       })) as { calibration: CalibrationResult };
       setResult(body.calibration);
       setStep('result');
@@ -136,6 +144,54 @@ export function CalibrationFlow({ initialSubject }: { initialSubject: string }) 
                 <span className="arc-option-dot">✓</span>
               </button>
             ))}
+          </div>
+          <div className="arc-calibration-settings">
+            <Field label="Daily focus" hint="Choose a pace you can repeat.">
+              <select
+                value={dailyMinutes}
+                onChange={(event) => setDailyMinutes(Number(event.target.value))}
+              >
+                {[15, 25, 35, 45, 60].map((minutes) => (
+                  <option key={minutes} value={minutes}>
+                    {minutes} minutes per day
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Deadline" hint="Optional. Arc will fit the route to the time available.">
+              <input
+                type="date"
+                value={deadline}
+                onChange={(event) => setDeadline(event.target.value)}
+              />
+            </Field>
+            <fieldset className="arc-source-policy">
+              <legend>Source boundary</legend>
+              <label>
+                <input
+                  type="radio"
+                  name="source-policy"
+                  checked={sourcePolicy === 'general_knowledge_allowed'}
+                  onChange={() => setSourcePolicy('general_knowledge_allowed')}
+                />
+                <span>
+                  <strong>My sources + general knowledge</strong>
+                  <small>You can continue without an upload.</small>
+                </span>
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="source-policy"
+                  checked={sourcePolicy === 'sources_only'}
+                  onChange={() => setSourcePolicy('sources_only')}
+                />
+                <span>
+                  <strong>Only sources I provide</strong>
+                  <small>At least one source is required before compile.</small>
+                </span>
+              </label>
+            </fieldset>
           </div>
         </div>
       )}
@@ -250,8 +306,8 @@ export function CalibrationFlow({ initialSubject }: { initialSubject: string }) 
               </div>
             ))}
           </div>
-          <Link className="arc-primary arc-full" href={`/arc/skills/${result.gapId}`}>
-            Open my skill map →
+          <Link className="arc-primary arc-full" href={`/arc/skills/${result.gapId}/setup`}>
+            Review sources and compile →
           </Link>
         </div>
       )}

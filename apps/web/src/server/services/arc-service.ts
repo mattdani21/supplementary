@@ -104,6 +104,9 @@ export interface CalibrationInput {
   readonly subject: string;
   readonly goal: string;
   readonly baselineAnswer: string;
+  readonly dailyMinutes?: number;
+  readonly deadline?: string;
+  readonly sourcePolicy?: 'general_knowledge_allowed' | 'sources_only';
 }
 
 export interface CalibrationResult {
@@ -139,7 +142,9 @@ export const runCalibration = async (
     rawStatement:
       `I want to ${input.goal} in ${input.subject}. ` +
       `Arc calibration baseline: ${baselineCorrect ? 'correct' : 'needs support'}.`,
-    dailyMinutes: 35,
+    dailyMinutes: input.dailyMinutes ?? 35,
+    ...(input.deadline ? { deadline: input.deadline } : {}),
+    sourcePolicy: input.sourcePolicy ?? 'general_knowledge_allowed',
   });
 
   const diagnostic = (

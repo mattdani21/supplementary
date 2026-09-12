@@ -3,6 +3,7 @@ import { arcMapHandler } from '../../../../server/api';
 import { getServerContext } from '../../../../server/bootstrap';
 import { viewerOwner } from '../../../../lib/viewer';
 import { ProgressRing } from '../../../../components/arc/progress-ring';
+import { EmptyState } from '@gapos/ui';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,97 +46,127 @@ export default async function ArcSkillMapPage({ params }: { params: Promise<{ ga
         </div>
       </div>
 
-      <div className="arc-map-intro">
-        <ProgressRing percent={map.progress.percent} label="Skill map" size="large" />
-        <div>
-          <h2>Clear the gaps in order.</h2>
-          <p>
-            {map.progress.cleared} of {map.progress.total} objectives cleared — progress is earned
-            by proof, never by listening alone.
-          </p>
-        </div>
-      </div>
-
-      {map.hero && (
-        <div className="arc-next-gap">
-          <p className="arc-eyebrow">
-            {map.hero.lessonDay ? `Gap ${map.hero.lessonDay} · up next` : 'Up next'}
-          </p>
-          <h2>{map.hero.capabilityStatement}</h2>
-          <p>Hear the idea, then make it tangible in a notebook proof.</p>
-          <div className="arc-gap-eta">{map.hero.etaMinutes} min total · audio + notebook</div>
-          <Link
-            className="arc-primary"
-            href={
-              map.hero.lessonId ? `/arc/skills/${map.gap.id}/lesson` : `/arc/skills/${map.gap.id}`
-            }
-          >
-            Start the proof →
-          </Link>
-        </div>
+      {map.sequence.length === 0 && (
+        <EmptyState
+          eyebrow={map.gap.status === 'compiling' ? 'Compilation in progress' : 'Route setup'}
+          title={
+            map.gap.status === 'compiling'
+              ? 'Arc is building the first verified lesson.'
+              : 'This skill needs sources before the map can open.'
+          }
+          action={
+            <Link className="arc-primary" href={`/arc/skills/${map.gap.id}/setup`}>
+              {map.gap.status === 'compiling'
+                ? 'Check compile status'
+                : 'Review sources and compile'}
+            </Link>
+          }
+        >
+          {map.gap.status === 'compiling'
+            ? 'The map appears as soon as Day 1 passes validation.'
+            : 'Confirm the learning brief, choose the evidence boundary, and compile the route.'}
+        </EmptyState>
       )}
 
-      <div className="arc-map-title">
-        <h3>Your sequence</h3>
-        <span>
-          {map.progress.cleared} cleared · {map.progress.total} gaps
-        </span>
-      </div>
-
-      <div className="arc-gap-list">
-        {map.sequence.map((item, index) => {
-          const contents = (
-            <>
-              <span className="arc-gap-marker">{item.state === 'cleared' ? '✓' : index + 1}</span>
-              <span>
-                <h4>{item.capabilityStatement}</h4>
-                <p>
-                  {item.state === 'cleared'
-                    ? 'Demonstrated with a proof'
-                    : item.state === 'current'
-                      ? 'Audio + notebook proof'
-                      : 'Ready after the gap above'}
-                </p>
-              </span>
-              <span className="arc-gap-status">
-                {item.state === 'cleared'
-                  ? 'Cleared'
-                  : item.state === 'current'
-                    ? currentIndex === index
-                      ? 'Up next'
-                      : 'In progress'
-                    : 'Later'}
-              </span>
-            </>
-          );
-
-          return item.state === 'later' ? (
-            <div
-              key={item.objectiveId}
-              className={`arc-gap-item is-${item.state}`}
-              aria-label={`${item.capabilityStatement}. Available after the previous objective.`}
-            >
-              {contents}
+      {map.sequence.length > 0 && (
+        <>
+          <div className="arc-map-intro">
+            <ProgressRing percent={map.progress.percent} label="Skill map" size="large" />
+            <div>
+              <h2>Clear the gaps in order.</h2>
+              <p>
+                {map.progress.cleared} of {map.progress.total} objectives cleared — progress is
+                earned by proof, never by listening alone.
+              </p>
             </div>
-          ) : (
-            <Link
-              key={item.objectiveId}
-              className={`arc-gap-item is-${item.state}`}
-              href={`/arc/skills/${map.gap.id}/lesson`}
-              aria-label={`${item.capabilityStatement}. ${
-                item.state === 'cleared' ? 'Review lesson' : 'Start proof'
-              }.`}
-            >
-              {contents}
-            </Link>
-          );
-        })}
-      </div>
+          </div>
 
-      {current === undefined && map.sequence.length > 0 && (
-        <p className="arc-theory-text" style={{ marginTop: 18 }}>
-          Every objective is cleared. Your proof ledger says it all — this skill is done.
-        </p>
+          {map.hero && (
+            <div className="arc-next-gap">
+              <p className="arc-eyebrow">
+                {map.hero.lessonDay ? `Gap ${map.hero.lessonDay} · up next` : 'Up next'}
+              </p>
+              <h2>{map.hero.capabilityStatement}</h2>
+              <p>Hear the idea, then make it tangible in a notebook proof.</p>
+              <div className="arc-gap-eta">{map.hero.etaMinutes} min total · audio + notebook</div>
+              <Link
+                className="arc-primary"
+                href={
+                  map.hero.lessonId
+                    ? `/arc/skills/${map.gap.id}/lesson`
+                    : `/arc/skills/${map.gap.id}`
+                }
+              >
+                Start the proof →
+              </Link>
+            </div>
+          )}
+
+          <div className="arc-map-title">
+            <h3>Your sequence</h3>
+            <span>
+              {map.progress.cleared} cleared · {map.progress.total} gaps
+            </span>
+          </div>
+
+          <div className="arc-gap-list">
+            {map.sequence.map((item, index) => {
+              const contents = (
+                <>
+                  <span className="arc-gap-marker">
+                    {item.state === 'cleared' ? '✓' : index + 1}
+                  </span>
+                  <span>
+                    <h4>{item.capabilityStatement}</h4>
+                    <p>
+                      {item.state === 'cleared'
+                        ? 'Demonstrated with a proof'
+                        : item.state === 'current'
+                          ? 'Audio + notebook proof'
+                          : 'Ready after the gap above'}
+                    </p>
+                  </span>
+                  <span className="arc-gap-status">
+                    {item.state === 'cleared'
+                      ? 'Cleared'
+                      : item.state === 'current'
+                        ? currentIndex === index
+                          ? 'Up next'
+                          : 'In progress'
+                        : 'Later'}
+                  </span>
+                </>
+              );
+
+              return item.state === 'later' ? (
+                <div
+                  key={item.objectiveId}
+                  className={`arc-gap-item is-${item.state}`}
+                  aria-label={`${item.capabilityStatement}. Available after the previous objective.`}
+                >
+                  {contents}
+                </div>
+              ) : (
+                <Link
+                  key={item.objectiveId}
+                  className={`arc-gap-item is-${item.state}`}
+                  href={`/arc/skills/${map.gap.id}/lesson`}
+                  aria-label={`${item.capabilityStatement}. ${
+                    item.state === 'cleared' ? 'Review lesson' : 'Start proof'
+                  }.`}
+                >
+                  {contents}
+                </Link>
+              );
+            })}
+          </div>
+
+          {current === undefined && map.sequence.length > 0 && (
+            <p className="arc-theory-text" style={{ marginTop: 18 }}>
+              Every objective is cleared. Your proof ledger says it all — this skill is done.
+            </p>
+          )}
+        </>
       )}
     </>
   );

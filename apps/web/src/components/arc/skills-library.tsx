@@ -68,11 +68,7 @@ export function SkillsLibrary({ skills }: { skills: SkillView[] }) {
           <Link
             key={skill.gapId}
             className={`arc-skill-card${skill.started ? '' : ' is-muted'}`}
-            href={
-              skill.started
-                ? `/arc/skills/${skill.gapId}`
-                : `/arc/calibrate?subject=${encodeURIComponent(skill.title)}`
-            }
+            href={skill.started ? `/arc/skills/${skill.gapId}` : `/arc/skills/${skill.gapId}/setup`}
           >
             <span className="arc-symbol arc-symbol-large">{symbolFor(skill.title)}</span>
             <span>
@@ -80,12 +76,12 @@ export function SkillsLibrary({ skills }: { skills: SkillView[] }) {
               <p>
                 {skill.objectivesTotal > 0
                   ? `${skill.objectivesTotal} objectives · ${skill.percent}% explored`
-                  : 'Start with a 3-min AI check'}
+                  : skill.status === 'compiling'
+                    ? 'Compiling your first lesson'
+                    : 'Review sources and compile'}
               </p>
             </span>
-            <span className="arc-skill-meta">
-              {skill.started ? 'In progress\n→' : 'Not started\n+'}
-            </span>
+            <span className="arc-skill-meta">{skill.started ? 'In progress\n→' : 'Set up\n→'}</span>
           </Link>
         ))}
         {filtered.length === 0 && (
