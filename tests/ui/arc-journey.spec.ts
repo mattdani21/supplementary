@@ -14,7 +14,9 @@ const openAsNewLearner = async (page: Page, testInfo: TestInfo) => {
   await page.goto('/arc/calibrate?subject=Python%20for%20data%20work');
 };
 
-test('calibration, source setup and compilation stay inside Arc', async ({ page }, testInfo) => {
+test('the Arc journey reaches practice, correction and server-graded review', async ({
+  page,
+}, testInfo) => {
   test.setTimeout(90_000);
   await openAsNewLearner(page, testInfo);
 
@@ -44,4 +46,32 @@ test('calibration, source setup and compilation stay inside Arc', async ({ page 
   await expect(page).toHaveURL(/\/arc\/skills\/[^/]+$/, { timeout: 60_000 });
   await expect(page.getByRole('heading', { name: 'Clear the gaps in order.' })).toBeVisible();
   await expect(page.getByRole('link', { name: /start the proof/i })).toBeVisible();
+
+  await page.getByRole('link', { name: /start the proof/i }).click();
+  await expect(page.getByRole('button', { name: 'Play theory audio' })).toBeVisible();
+  const theoryTab = page.getByRole('tab', { name: 'Theory' });
+  await theoryTab.focus();
+  await theoryTab.press('ArrowRight');
+  await expect(page.getByRole('tab', { name: 'Practice' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+
+  await page.getByLabel('A and B share no elements').check();
+  await page.getByLabel('How certain was this answer?').selectOption('low');
+  await page.getByRole('button', { name: 'Submit answer' }).click();
+  await expect(page.getByText(/not yet.*use the correction/i)).toBeVisible();
+  await expect(page.getByText(/next retrieval/i)).toBeVisible();
+
+  await page.getByRole('link', { name: 'Profile' }).click();
+  await page.getByRole('checkbox', { name: /spaced review/i }).check();
+  await expect(page.getByRole('checkbox', { name: /spaced review/i })).toBeChecked();
+  await page.getByRole('link', { name: 'Today' }).click();
+  await page.getByRole('link', { name: /ready/i }).click();
+
+  await expect(page.getByRole('heading', { name: 'Due reviews' })).toBeVisible();
+  await page.getByLabel('every element of A is an element of B').check();
+  await page.getByRole('button', { name: 'Submit review' }).click();
+  await expect(page.getByText('Review complete.')).toBeVisible();
+  await expect(page.getByText(/next retrieval/i)).toBeVisible();
 });
