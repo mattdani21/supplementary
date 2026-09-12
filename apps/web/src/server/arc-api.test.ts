@@ -147,6 +147,28 @@ describe('Arc calibration', () => {
     expect(await context.uow.calibrations.listForOwner(OWNER)).toHaveLength(1);
   });
 
+  it('persists learner-confirmed time, deadline and source policy on the draft gap', async () => {
+    const { context } = buildContext();
+
+    const result = await arcCalibrateHandler(context, OWNER, {
+      subject: 'Python for data work',
+      goal: 'Build a project I can show',
+      baselineAnswer: '12',
+      dailyMinutes: 25,
+      deadline: '2026-10-03',
+      sourcePolicy: 'sources_only',
+    });
+
+    const gap = (await getGap(context, OWNER, result.calibration.gapId)) as { gap: Gap };
+    expect(gap.gap).toMatchObject({
+      dailyMinutes: 25,
+      deadline: '2026-10-03',
+      sourcePolicy: 'sources_only',
+      status: 'draft',
+    });
+    expect(await context.uow.users.find(OWNER)).toBeDefined();
+  });
+
   it('adapts the placement on a wrong baseline through the provider adapter', async () => {
     const { context } = buildContext();
     await seedUser(context);
