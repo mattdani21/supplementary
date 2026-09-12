@@ -36,7 +36,7 @@ describe('the offline service worker (E14)', () => {
 
   it('serves cached content first and refreshes in the background', () => {
     expect(sw).toContain('if (cached)');
-    expect(sw).toContain('cache.put(request, response.clone())');
+    expect(sw).toContain('cache.put(cacheKey, response.clone())');
   });
 
   it('returns a safe Arc document when an uncached navigation is offline', () => {
