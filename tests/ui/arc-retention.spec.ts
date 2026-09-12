@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { expect, test, type APIRequestContext } from '@playwright/test';
 import { REFERENCE_GAP_STATEMENT, SET_THEORY_SOURCE } from '@gapos/test-fixtures';
 
@@ -25,7 +26,7 @@ const post = async (
 
 test('a filled gap is findable as a retained capability', async ({ context, page }, testInfo) => {
   test.setTimeout(90_000);
-  const owner = `retention-${testInfo.project.name}-${testInfo.workerIndex}`;
+  const owner = `retention-${testInfo.project.name}-${testInfo.workerIndex}-${randomUUID()}`;
   await context.addCookies([
     {
       name: 'gapos_owner',
