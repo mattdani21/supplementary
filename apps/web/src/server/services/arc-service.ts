@@ -17,6 +17,7 @@ import type { ServerContext } from '../context.js';
 import { createGap } from './gap-service.js';
 import {
   assessMastery,
+  completeReview,
   getToday,
   searchCapabilities,
   submitAttempt,
@@ -53,6 +54,7 @@ export const setPreferences = async (
 /* --------------------------------------------------------------- calibration */
 
 export interface CalibrationKitView {
+  readonly kitId: string;
   readonly subject: string;
   readonly goalOptions: readonly string[];
   readonly baselineQuestion: {
@@ -88,7 +90,8 @@ const fetchCalibrationKit = async (
     })
   ).value;
 
-export const toCalibrationKitView = (kit: Calibration): CalibrationKitView => ({
+export const toCalibrationKitView = (kitId: string, kit: Calibration): CalibrationKitView => ({
+  kitId,
   subject: kit.subject,
   goalOptions: kit.goalOptions,
   baselineQuestion: {
@@ -103,10 +106,13 @@ export const calibrationKit = async (
   context: ServerContext,
   owner: OwnerId,
   subject: string,
-): Promise<CalibrationKitView> =>
-  toCalibrationKitView(await fetchCalibrationKit(context, owner, subject));
+): Promise<CalibrationKitView> => {
+  const kit = await fetchCalibrationKit(context, owner, subject);
+  return toCalibrationKitView(context.calibrationKits.issue(owner, subject, kit), kit);
+};
 
 export interface CalibrationInput {
+  readonly kitId: string;
   readonly subject: string;
   readonly goal: string;
   readonly baselineAnswer: string;
@@ -128,6 +134,13 @@ export interface CalibrationResult {
   readonly relatedGapIds: readonly string[];
 }
 
+export class CalibrationKitUnavailableError extends Error {
+  constructor() {
+    super('This calibration check expired or belongs to another learner. Load a fresh check.');
+    this.name = 'CalibrationKitUnavailableError';
+  }
+}
+
 /**
  * Run the 3-step calibration: grade the baseline answer (exact option match, server-side),
  * create the real gap the route leads to, and interpret the diagnostic through the provider
@@ -140,7 +153,8 @@ export const runCalibration = async (
   owner: OwnerId,
   input: CalibrationInput,
 ): Promise<CalibrationResult> => {
-  const kit = await fetchCalibrationKit(context, owner, input.subject);
+  const kit = context.calibrationKits.get(owner, input.kitId, input.subject);
+  if (!kit) throw new CalibrationKitUnavailableError();
   const baselineCorrect = kit.baselineQuestion.answer === input.baselineAnswer;
 
   const gap = await createGap(context, owner, {
@@ -535,11 +549,18 @@ export interface ArcProofView {
 
 export interface ArcProgressView {
   readonly percent: number;
-  readonly clearedGaps: number;
+  readonly filledGaps: number;
   readonly totalGaps: number;
   readonly weeklyMinutes: number;
   readonly momentumDays: number;
   readonly proofs: readonly ArcProofView[];
+  readonly needs: readonly {
+    gapId: string;
+    gapTitle: string;
+    objectiveId: string;
+    capabilityStatement: string;
+    missing: readonly string[];
+  }[];
 }
 
 const momentumDays = (evidenceDates: readonly Date[], now: Date): number => {
@@ -554,7 +575,7 @@ const momentumDays = (evidenceDates: readonly Date[], now: Date): number => {
 };
 
 /**
- * The Progress screen: cleared gaps and the proofs ledger from real mastery evidence, weekly
+ * The Progress screen: filled gaps and the proofs ledger from real mastery evidence, weekly
  * focused minutes from the lessons the learner actually practised, and momentum from the
  * consecutive days with evidence.
  */
@@ -566,6 +587,13 @@ export const arcProgress = async (
   const activeGaps = gaps.filter((g) => g.status !== 'archived' && g.status !== 'failed');
 
   const proofs: ArcProofView[] = [];
+  const needs: {
+    gapId: string;
+    gapTitle: string;
+    objectiveId: string;
+    capabilityStatement: string;
+    missing: readonly string[];
+  }[] = [];
   const evidenceDates: Date[] = [];
   let weeklyMinutes = 0;
 
@@ -591,6 +619,22 @@ export const arcProgress = async (
       evidenceDates.push(record.recordedAt);
     }
 
+    if (gap.status !== 'filled') {
+      const mastery = await assessMastery(context, owner, gap.id);
+      for (const assessment of mastery.assessments.filter((item) => !item.mastered)) {
+        const objective = curriculum.plan.objectives.find(
+          (item) => item.id === assessment.objectiveId,
+        );
+        needs.push({
+          gapId: gap.id,
+          gapTitle: gap.title,
+          objectiveId: assessment.objectiveId,
+          capabilityStatement: objective?.capabilityStatement ?? assessment.objectiveId,
+          missing: assessment.missing,
+        });
+      }
+    }
+
     for (const lesson of lessons) {
       const questions = await context.uow.curricula.listQuestions(owner, lesson.id);
       // Weekly minutes are real practice time: the lesson's estimate, but only for lessons
@@ -601,16 +645,17 @@ export const arcProgress = async (
     }
   }
 
-  const clearedGaps = activeGaps.filter((g) => g.status === 'filled').length;
-  const percent = activeGaps.length === 0 ? 0 : Math.round((clearedGaps / activeGaps.length) * 100);
+  const filledGaps = activeGaps.filter((g) => g.status === 'filled').length;
+  const percent = activeGaps.length === 0 ? 0 : Math.round((filledGaps / activeGaps.length) * 100);
 
   return {
     percent,
-    clearedGaps,
+    filledGaps,
     totalGaps: activeGaps.length,
     weeklyMinutes,
     momentumDays: momentumDays(evidenceDates, context.now()),
     proofs: proofs.sort((a, b) => b.recordedAt.getTime() - a.recordedAt.getTime()).slice(0, 20),
+    needs,
   };
 };
 
@@ -939,15 +984,13 @@ export const submitArcReview = async (
     ...(input.confidence ? { confidence: input.confidence } : {}),
     idempotencyKey: input.idempotencyKey,
     evidenceType: 'retrieval',
+    scheduleReviews: false,
   });
-  await context.uow.mastery.completeReview(owner, review.id);
+  const nextReview = await completeReview(context, owner, review.id, result.correct);
   context.metrics.increment('arc_review_completed_total', {
     correct: String(result.correct),
   });
 
-  const nextReview = [...result.scheduledReviews].sort(
-    (a, b) => a.dueAt.getTime() - b.dueAt.getTime(),
-  )[0];
   return {
     correct: result.correct,
     feedback: result.feedback,
@@ -966,7 +1009,7 @@ export interface ArcProfileView {
   readonly name: string;
   readonly email: string;
   readonly preferences: LearnerPreferences;
-  readonly stats: { clearedGaps: number; totalGaps: number };
+  readonly stats: { filledGaps: number; totalGaps: number };
 }
 
 export const arcProfile = async (
@@ -984,7 +1027,7 @@ export const arcProfile = async (
     email: user?.email ?? '',
     preferences,
     stats: {
-      clearedGaps: active.filter((g) => g.status === 'filled').length,
+      filledGaps: active.filter((g) => g.status === 'filled').length,
       totalGaps: active.length,
     },
   };

@@ -32,11 +32,12 @@ test('the Arc journey reaches practice, correction and server-graded review', as
   await page.getByLabel('Daily focus').selectOption('25');
   await page.getByLabel('Only sources I provide').check();
   await page.getByRole('button', { name: /continue/i }).click();
-  await expect(
-    page.getByRole('heading', { name: /what would .*useful.* look like/i }),
-  ).toBeVisible();
+  const goalHeading = page.getByRole('heading', { name: /what would .*useful.* look like/i });
+  await expect(goalHeading).toBeVisible();
+  await expect(goalHeading).toBeFocused();
   await page.getByRole('button', { name: 'Build a project I can show' }).click();
   await page.getByRole('button', { name: /continue/i }).click();
+  await expect(page.getByRole('heading', { name: /show me how you think/i })).toBeFocused();
 
   await page.getByRole('button', { name: '12' }).click();
   await expect(page.getByText(/grade it privately/i)).toBeVisible();
@@ -60,6 +61,15 @@ test('the Arc journey reaches practice, correction and server-graded review', as
 
   await page.getByRole('link', { name: /start the proof/i }).click();
   await expect(page.getByRole('button', { name: 'Play theory audio' })).toBeVisible();
+  const lessonTargets = page.locator(
+    '.arc-mode-button, .arc-play, .arc-audio-skip, .arc-audio-rate, .arc-transcript-toggle',
+  );
+  for (let index = 0; index < (await lessonTargets.count()); index += 1) {
+    const box = await lessonTargets.nth(index).boundingBox();
+    expect(box, `lesson target ${index} has a rendered box`).not.toBeNull();
+    expect(box!.width, `lesson target ${index} width`).toBeGreaterThanOrEqual(44);
+    expect(box!.height, `lesson target ${index} height`).toBeGreaterThanOrEqual(44);
+  }
   const theoryTab = page.getByRole('tab', { name: 'Theory' });
   await theoryTab.focus();
   await theoryTab.press('ArrowRight');

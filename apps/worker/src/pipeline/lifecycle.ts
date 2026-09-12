@@ -43,10 +43,18 @@ export const finishCompilation = async (
   gapId: string,
   outcome: CompileOutcome,
 ): Promise<void> => {
-  if (outcome.deduplicated) return;
-
   const current = await uow.gaps.get(owner, gapId);
   if (current?.status !== 'compiling') return;
+
+  if (
+    outcome.status !== 'complete' &&
+    outcome.status !== 'partial' &&
+    outcome.status !== 'failed'
+  ) {
+    // A duplicate request may observe the original run while it is still in flight. The gap
+    // correctly remains compiling until that original caller or worker records a terminal state.
+    return;
+  }
 
   const transition: GapTransition =
     outcome.status === 'failed'

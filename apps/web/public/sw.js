@@ -1,13 +1,44 @@
-/* global self, caches, URL, fetch, Response */
+/* global self, caches, URL, Request, fetch, Response, decodeURIComponent */
 /**
  * Arc service worker (E14 — offline polish).
  *
- * Strategy: stale-while-revalidate for same-origin GETs. A visited Arc page and its textual
- * lesson response remain available when the network is cut. Writes always go to the network
- * and fail normally while offline. Cross-origin signed audio is deliberately never cached.
+ * Strategy: stale-while-revalidate for Arc documents and static assets only. Private Arc
+ * documents use an owner-scoped cache key; API responses are never cached. Writes and
+ * cross-origin signed audio always use the network.
  */
 
-const CACHE = 'gapos-arc-v2';
+const CACHE = 'gapos-arc-v3';
+const OWNER_KEY = '__gapos_owner';
+
+const ownerFromRequest = async (request) => {
+  const explicit = request.headers.get('x-owner-id');
+  if (explicit) return explicit;
+
+  const cookieHeader = request.headers.get('cookie') ?? '';
+  const encodedCookie = cookieHeader
+    .split(';')
+    .map((entry) => entry.trim())
+    .find((entry) => entry.startsWith('gapos_owner='))
+    ?.slice('gapos_owner='.length);
+  if (encodedCookie) return decodeURIComponent(encodedCookie);
+
+  // Modern Chromium exposes first-party cookies to service workers through Cookie Store.
+  // If neither source is available, private content is deliberately left uncached.
+  try {
+    const cookie = await self.cookieStore?.get('gapos_owner');
+    return cookie?.value;
+  } catch {
+    return undefined;
+  }
+};
+
+const scopedArcRequest = async (request) => {
+  const owner = await ownerFromRequest(request);
+  if (!owner) return undefined;
+  const scopedUrl = new URL(request.url);
+  scopedUrl.searchParams.set(OWNER_KEY, owner);
+  return new Request(scopedUrl, request);
+};
 
 const offlineDocument = () =>
   new Response(
@@ -74,14 +105,32 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return; // external (e.g. signed S3 audio) never cached
+  if (url.pathname.startsWith('/api/')) return; // owner-specific API data is network-only
+
+  const isArcPage = url.pathname === '/arc' || url.pathname.startsWith('/arc/');
+  const isStaticAsset =
+    url.pathname.startsWith('/_next/static/') ||
+    url.pathname === '/icon.svg' ||
+    url.pathname === '/manifest.webmanifest';
+  if (!isArcPage && !isStaticAsset) return;
 
   event.respondWith(
     (async () => {
+      const cacheKey = isArcPage ? await scopedArcRequest(request) : request;
+      if (!cacheKey) {
+        try {
+          return await fetch(request);
+        } catch {
+          if (request.mode === 'navigate') return offlineDocument();
+          return Response.error();
+        }
+      }
+
       const cache = await caches.open(CACHE);
-      const cached = await cache.match(request, { ignoreSearch: false });
+      const cached = await cache.match(cacheKey, { ignoreSearch: false });
       const network = fetch(request).then(async (response) => {
         if (response.ok && response.type === 'basic') {
-          await cache.put(request, response.clone());
+          await cache.put(cacheKey, response.clone());
         }
         return response;
       });

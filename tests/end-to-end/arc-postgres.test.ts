@@ -28,7 +28,11 @@ import {
   registerSource,
 } from '../../apps/web/src/server/services/gap-service.js';
 import { submitAttempt, submitProof } from '../../apps/web/src/server/services/learning-service.js';
-import { runCalibration, setPreferences } from '../../apps/web/src/server/services/arc-service.js';
+import {
+  calibrationKit,
+  runCalibration,
+  setPreferences,
+} from '../../apps/web/src/server/services/arc-service.js';
 
 const LEARNER: OwnerId = 'user_arc_pg_learner';
 const OTHER: OwnerId = 'user_arc_pg_other';
@@ -83,7 +87,9 @@ describeIfPostgres('the Arc surface on Postgres', () => {
   });
 
   it('round-trips calibration selections and preferences through SQL', async () => {
+    const kit = await calibrationKit(context, LEARNER, 'Python for data work');
     const calibration = await runCalibration(context, LEARNER, {
+      kitId: kit.kitId,
       subject: 'Python for data work',
       goal: 'Build a project I can show',
       baselineAnswer: '12',

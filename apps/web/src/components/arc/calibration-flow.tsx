@@ -9,9 +9,9 @@
  */
 
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
-import { Field } from '@gapos/ui';
-import { arcFetch } from './arc-client';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Field, StatusMessage } from '@gapos/ui';
+import { ArcFetchError, arcFetch } from './arc-client';
 
 const SUBJECTS = [
   'Python for data work',
@@ -21,6 +21,7 @@ const SUBJECTS = [
 ] as const;
 
 interface Kit {
+  kitId: string;
   subject: string;
   goalOptions: readonly string[];
   baselineQuestion: { id: string; prompt: string; code: string; options: readonly string[] };
@@ -40,6 +41,7 @@ interface CalibrationResult {
 type Step = 1 | 2 | 3 | 'running' | 'result';
 
 export function CalibrationFlow({ initialSubject }: { initialSubject: string }) {
+  const headingRef = useRef<HTMLHeadingElement>(null);
   const [subject, setSubject] = useState(initialSubject);
   const [kit, setKit] = useState<Kit | null>(null);
   const [goal, setGoal] = useState<string | null>(null);
@@ -72,6 +74,10 @@ export function CalibrationFlow({ initialSubject }: { initialSubject: string }) 
     void loadKit(subject);
   }, [subject, loadKit]);
 
+  useEffect(() => {
+    headingRef.current?.focus();
+  }, [kit, step]);
+
   const pickSubject = (next: string) => {
     setSubject(next);
     setStep(1);
@@ -88,13 +94,15 @@ export function CalibrationFlow({ initialSubject }: { initialSubject: string }) 
   };
 
   const run = async () => {
-    if (!subject || !goal || !baseline) return;
+    if (!subject || !goal || !baseline || !kit) return;
+    setError(null);
     setStep('running');
     setRunningNote('Comparing your goal with what you already know.');
     try {
       const body = (await arcFetch('/api/arc/calibration', {
         method: 'POST',
         body: JSON.stringify({
+          kitId: kit.kitId,
           subject,
           goal,
           baselineAnswer: baseline,
@@ -107,6 +115,10 @@ export function CalibrationFlow({ initialSubject }: { initialSubject: string }) 
       setStep('result');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
+      if (cause instanceof ArcFetchError && cause.code === 'calibration_kit_expired') {
+        setKit(null);
+        setBaseline(null);
+      }
       setStep(3);
     }
   };
@@ -126,11 +138,32 @@ export function CalibrationFlow({ initialSubject }: { initialSubject: string }) 
         </div>
       </div>
 
-      {error && <p className="arc-theory-text">{error}</p>}
+      {error && (
+        <StatusMessage
+          tone="error"
+          title="Calibration needs another try."
+          action={
+            <button
+              className="arc-secondary"
+              type="button"
+              onClick={() => {
+                if (kit && baseline && goal) void run();
+                else void loadKit(subject);
+              }}
+            >
+              Retry calibration
+            </button>
+          }
+        >
+          {error}
+        </StatusMessage>
+      )}
 
       {step === 1 && (
         <div className="arc-assess-step">
-          <h1>What do you want to learn?</h1>
+          <h1 ref={headingRef} tabIndex={-1}>
+            What do you want to learn?
+          </h1>
           <p>Pick a direction. You can refine the destination after Arc understands the start.</p>
           <div className="arc-option-list">
             {SUBJECTS.map((candidate) => (
@@ -198,7 +231,9 @@ export function CalibrationFlow({ initialSubject }: { initialSubject: string }) 
 
       {step === 2 && kit && (
         <div className="arc-assess-step">
-          <h1>What would “useful” look like?</h1>
+          <h1 ref={headingRef} tabIndex={-1}>
+            What would “useful” look like?
+          </h1>
           <p>Your goal changes which gaps matter first. Choose the outcome you care about today.</p>
           <div className="arc-option-list">
             {kit.goalOptions.map((candidate) => (
@@ -218,7 +253,9 @@ export function CalibrationFlow({ initialSubject }: { initialSubject: string }) 
 
       {step === 3 && kit && (
         <div className="arc-assess-step">
-          <h1>Show me how you think.</h1>
+          <h1 ref={headingRef} tabIndex={-1}>
+            Show me how you think.
+          </h1>
           <p>
             A quick check places you more accurately than a confidence label. A miss simply makes
             the next question easier.
@@ -255,7 +292,9 @@ export function CalibrationFlow({ initialSubject }: { initialSubject: string }) 
       {step === 'running' && (
         <div className="arc-running" aria-live="polite">
           <div className="arc-orb" aria-hidden="true" />
-          <h2>Mapping your route…</h2>
+          <h2 ref={headingRef} tabIndex={-1}>
+            Mapping your route…
+          </h2>
           <p>
             {runningNote}
             <br />
@@ -267,7 +306,7 @@ export function CalibrationFlow({ initialSubject }: { initialSubject: string }) 
       {step === 'result' && result && (
         <div className="arc-assess-result">
           <p className="arc-eyebrow">Your route is ready</p>
-          <h1>
+          <h1 ref={headingRef} tabIndex={-1}>
             A focused path to
             <br />
             working knowledge.

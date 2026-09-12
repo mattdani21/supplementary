@@ -15,12 +15,23 @@ const sw = readFileSync(join(PUBLIC, 'sw.js'), 'utf8');
 
 describe('the offline service worker (E14)', () => {
   it('is shipped', () => {
-    expect(sw).toContain("const CACHE = 'gapos-arc-v2'");
+    expect(sw).toContain("const CACHE = 'gapos-arc-v3'");
   });
 
-  it('only intercepts same-origin GETs — writes and signed audio go to the network', () => {
+  it('only caches Arc/static GETs — writes, APIs, and signed audio use the network', () => {
     expect(sw).toContain("if (request.method !== 'GET') return;");
     expect(sw).toContain('if (url.origin !== self.location.origin) return;');
+    expect(sw).toContain("if (url.pathname.startsWith('/api/')) return;");
+    expect(sw).toContain('if (!isArcPage && !isStaticAsset) return;');
+  });
+
+  it('partitions private Arc documents by owner without dropping request headers', () => {
+    expect(sw).toContain("request.headers.get('x-owner-id')");
+    expect(sw).toContain("request.headers.get('cookie')");
+    expect(sw).toContain("self.cookieStore?.get('gapos_owner')");
+    expect(sw).toContain('scopedUrl.searchParams.set(OWNER_KEY, owner)');
+    expect(sw).toContain('new Request(scopedUrl, request)');
+    expect(sw).toContain('if (!cacheKey)');
   });
 
   it('serves cached content first and refreshes in the background', () => {

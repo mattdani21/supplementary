@@ -150,10 +150,10 @@ export function Notebook({ gapId, sessionId, question }: NotebookProps) {
         <div className="arc-proof-success" role="status">
           <span aria-hidden="true">✓</span>
           <div>
-            <strong>{state.filled ? 'Gap cleared.' : 'Proof recorded.'}</strong>
+            <strong>{state.filled ? 'Gap filled.' : 'Proof recorded.'}</strong>
             {state.filled
               ? 'You demonstrated the idea, not just recognised it. The gap is filled.'
-              : 'Your proof was recorded as evidence. Keep clearing the sequence to fill the gap.'}
+              : 'Your proof was recorded as evidence. Keep proving the sequence to fill the gap.'}
           </div>
         </div>
       )}

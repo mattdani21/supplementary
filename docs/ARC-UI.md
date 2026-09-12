@@ -26,7 +26,7 @@ earned through demonstrated evidence, never passive consumption.
 5. **Lesson** — theory tab (audio player: play/pause, waveform, ±15s skip, 1×/1.25×/1.5×,
    transcript drawer; short theory text; listen-for note) + notebook tab (editable
    code cell, hint, run cell → output, submit proof).
-6. **Progress** — proofs ledger (gaps cleared with dates), weekly focus stat,
+6. **Progress** — proofs ledger (gaps filled with dates), weekly focus stat,
    momentum.
 7. **Profile** — learning preferences: audio theory, gentle hints, dark mode,
    spaced review.
@@ -48,7 +48,7 @@ the app itself must be responsive without it.
 3. **Calibration = REAL adaptive placement** — subject → goal → baseline question from
    the evaluation pack, routed through provider adapters (GAP-029); result comes from
    the knowledge map (E15) + curriculum planning.
-4. **Gap cleared / proofs ledger = real attempt + mastery evidence** (GAP-012), and the
+4. **Gap filled / proofs ledger = real attempt + mastery evidence** (GAP-012), and the
    proof list reads mastery records.
 5. **Spaced review toggle = real review scheduling** (GAP-012/GAP-013), not a dead switch.
 6. **Continue card, progress ring, momentum = real domain data** from the API.

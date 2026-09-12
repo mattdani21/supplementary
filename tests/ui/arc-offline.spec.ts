@@ -38,6 +38,19 @@ const seedPublishedLesson = async (page: Page, owner: string): Promise<string> =
   return gapId;
 };
 
+const activateServiceWorker = async (page: Page) => {
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+    if (!navigator.serviceWorker.controller) {
+      await new Promise<void>((resolve) => {
+        navigator.serviceWorker.addEventListener('controllerchange', () => resolve(), {
+          once: true,
+        });
+      });
+    }
+  });
+};
+
 test('a visited Arc lesson keeps its text and explains offline limits', async ({
   context,
   page,
@@ -55,16 +68,7 @@ test('a visited Arc lesson keeps its text and explains offline limits', async ({
     },
   ]);
   await page.goto('/arc');
-  await page.evaluate(async () => {
-    await navigator.serviceWorker.ready;
-    if (!navigator.serviceWorker.controller) {
-      await new Promise<void>((resolve) => {
-        navigator.serviceWorker.addEventListener('controllerchange', () => resolve(), {
-          once: true,
-        });
-      });
-    }
-  });
+  await activateServiceWorker(page);
 
   const gapId = await seedPublishedLesson(page, owner);
   const lessonPath = `/arc/skills/${gapId}/lesson`;
@@ -93,4 +97,54 @@ test('a visited Arc lesson keeps its text and explains offline limits', async ({
   await page.goto('/arc/not-visited-while-offline', { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { name: 'Arc is offline.' })).toBeVisible();
   await expect(page.getByText(/signed audio need a network connection/i)).toBeVisible();
+});
+
+test('offline Arc documents never cross learner cache boundaries', async ({
+  context,
+  page,
+}, testInfo: TestInfo) => {
+  test.skip(testInfo.project.name !== 'mobile', 'The offline contract targets the mobile PWA.');
+  test.setTimeout(90_000);
+
+  const ownerA = `offline-owner-a-${testInfo.workerIndex}`;
+  const ownerB = `offline-owner-b-${testInfo.workerIndex}`;
+  await context.addCookies([
+    {
+      name: 'gapos_owner',
+      value: ownerA,
+      url: 'http://127.0.0.1:3100',
+      sameSite: 'Lax',
+    },
+  ]);
+  await page.goto('/arc');
+  await activateServiceWorker(page);
+  const gapId = await seedPublishedLesson(page, ownerA);
+  await page.goto(`/arc/skills/${gapId}/lesson`);
+  await expect(page.getByText('Offline set theory')).toBeVisible();
+
+  const cacheUrls = await page.evaluate(async () => {
+    const urls: string[] = [];
+    for (const cacheName of await caches.keys()) {
+      const cache = await caches.open(cacheName);
+      urls.push(...(await cache.keys()).map((request) => request.url));
+    }
+    return urls;
+  });
+  expect(cacheUrls.some((url) => url.includes('/api/'))).toBe(false);
+  expect(cacheUrls.some((url) => new URL(url).searchParams.get('__gapos_owner') === ownerA)).toBe(
+    true,
+  );
+
+  await context.addCookies([
+    {
+      name: 'gapos_owner',
+      value: ownerB,
+      url: 'http://127.0.0.1:3100',
+      sameSite: 'Lax',
+    },
+  ]);
+  await context.setOffline(true);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.getByRole('heading', { name: 'Arc is offline.' })).toBeVisible();
+  await expect(page.getByText('Offline set theory')).toHaveCount(0);
 });

@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 interface ProgressView {
   percent: number;
-  clearedGaps: number;
+  filledGaps: number;
   totalGaps: number;
   weeklyMinutes: number;
   momentumDays: number;
@@ -18,6 +18,13 @@ interface ProgressView {
     gapId: string;
     gapTitle: string;
     recordedAt: Date;
+  }[];
+  needs: {
+    gapId: string;
+    gapTitle: string;
+    objectiveId: string;
+    capabilityStatement: string;
+    missing: string[];
   }[];
 }
 
@@ -54,14 +61,14 @@ export default async function ArcProgressPage() {
         <ProgressRing percent={progress.percent} label="Overall" size="hero" />
         <div>
           <h2>Steady, useful progress.</h2>
-          <p>Clear proofs are worth more than a hundred passive lessons.</p>
+          <p>Demonstrated proofs are worth more than a hundred passive lessons.</p>
         </div>
       </div>
 
       <div className="arc-stats">
         <div className="arc-stat">
-          <strong>{progress.clearedGaps}</strong>
-          <span>gap{progress.clearedGaps === 1 ? '' : 's'} cleared</span>
+          <strong>{progress.filledGaps}</strong>
+          <span>gap{progress.filledGaps === 1 ? '' : 's'} filled</span>
         </div>
         <div className="arc-stat">
           <strong>{progress.weeklyMinutes}m</strong>
@@ -74,9 +81,38 @@ export default async function ArcProgressPage() {
       </div>
 
       <div className="arc-progress-message">
-        Progress is counted in gaps cleared, with a proof behind each one. Arc keeps the next
+        Progress is counted in gaps filled, with a proof behind each one. Arc keeps the next
         decision visible.
       </div>
+
+      {progress.needs.length > 0 && (
+        <section className="arc-progress-needs" aria-labelledby="arc-progress-needs-title">
+          <div className="arc-section-heading">
+            <h2 id="arc-progress-needs-title">Evidence still needed</h2>
+            <span>next actions</span>
+          </div>
+          <div className="arc-proof-list">
+            {progress.needs.map((need) => (
+              <Link
+                key={`${need.gapId}-${need.objectiveId}`}
+                className="arc-proof-row"
+                href={`/arc/skills/${need.gapId}`}
+              >
+                <span className="arc-proof-icon" aria-hidden="true">
+                  →
+                </span>
+                <span>
+                  <strong>{need.capabilityStatement}</strong>
+                  <span>
+                    {need.gapTitle}: {need.missing.join(' ')}
+                  </span>
+                </span>
+                <span>Open map</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       <div className="arc-section-heading">
         <h2>Recent proofs</h2>
@@ -100,7 +136,7 @@ export default async function ArcProgressPage() {
         ))}
         {progress.proofs.length === 0 && (
           <p className="arc-theory-text">
-            No proofs yet. Calibrate a skill and clear your first gap — the ledger starts there.
+            No proofs yet. Calibrate a skill and fill your first gap — the ledger starts there.
           </p>
         )}
       </div>

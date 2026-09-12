@@ -147,6 +147,10 @@ export function SkillSetup({
         body: JSON.stringify({
           idempotencyKey,
           audioEnabled: true,
+          generalKnowledgeConfirmed:
+            sources.length === 0 &&
+            gap.sourcePolicy === 'general_knowledge_allowed' &&
+            generalKnowledgeConfirmed,
           surface: 'arc_setup',
           retry,
         }),

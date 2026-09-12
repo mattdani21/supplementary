@@ -267,6 +267,41 @@ html[data-theme='dark'] .arc .arc-primary {
   padding-top: 22px;
 }
 
+.arc-mode-button,
+.arc-audio-skip,
+.arc-audio-rate,
+.arc-transcript-toggle,
+.arc-transcript-copy > summary {
+  min-height: 44px;
+}
+
+.arc-play {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  flex-basis: 44px;
+}
+
+.arc-audio-skip,
+.arc-audio-rate {
+  min-width: 44px;
+}
+
+.arc-transcript-copy > summary {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.arc-switch {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  justify-content: center;
+}
+
 .arc-review-meta {
   display: flex;
   justify-content: space-between;

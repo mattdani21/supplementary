@@ -22,6 +22,7 @@ import type { ServerContext } from './context.js';
 import {
   applyTransition,
   compile as compileGap,
+  CompileSetupError,
   createGap as createGapUseCase,
   registerSource,
   type RegisterSourceInput,
@@ -36,6 +37,7 @@ import {
   arcSkills,
   arcToday,
   calibrationKit,
+  CalibrationKitUnavailableError,
   getPreferences,
   runCalibration,
   setPreferences,
@@ -45,6 +47,7 @@ import {
 import {
   assessMastery,
   getToday,
+  QuestionNotInGapError,
   runProofCell,
   submitAttempt,
   submitProof,
@@ -68,6 +71,12 @@ export class ApiError extends Error {
 export const toHttpError = (error: unknown): { status: number; code: string; message: string } => {
   if (error instanceof ApiError)
     return { status: error.status, code: error.code, message: error.message };
+  if (error instanceof CalibrationKitUnavailableError)
+    return { status: 409, code: 'calibration_kit_expired', message: error.message };
+  if (error instanceof CompileSetupError)
+    return { status: 409, code: error.code, message: error.message };
+  if (error instanceof QuestionNotInGapError)
+    return { status: 409, code: 'question_not_in_gap', message: error.message };
   if (error instanceof NotFoundError)
     return { status: 404, code: 'not_found', message: error.message };
   if (error instanceof ConcurrentModificationError)
@@ -127,6 +136,7 @@ const compileSchema = z.object({
   idempotencyKey: z.string().min(1),
   audioEnabled: z.boolean().optional(),
   concurrency: z.number().int().min(1).max(8).optional(),
+  generalKnowledgeConfirmed: z.boolean().optional(),
   surface: z.literal('arc_setup').optional(),
   retry: z.boolean().optional(),
 });
@@ -160,6 +170,7 @@ const preferencesSchema = z
 
 const calibrationSchema = z
   .object({
+    kitId: z.string().min(1),
     subject: z.string().min(1),
     goal: z.string().min(1),
     baselineAnswer: z.string().min(1),
@@ -274,6 +285,7 @@ export const compile = async (
       run: {
         runId: outcome.runId,
         status: outcome.status,
+        deduplicated: outcome.deduplicated ?? false,
         ...(outcome.error === undefined ? {} : { error: outcome.error }),
       },
     };

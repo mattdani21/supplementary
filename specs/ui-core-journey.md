@@ -26,7 +26,8 @@ correctness, compilation success, practice correctness, mastery, or a gap status
 ### `/arc/calibrate`
 
 - Capture subject, useful outcome, daily minutes, optional deadline, and source policy.
-- The server supplies and grades the baseline question.
+- The server supplies the baseline question with an opaque, expiring kit identifier and grades
+  the answer against that exact server-held kit.
 - The client must not infer or reveal the correct baseline answer.
 - Back navigation preserves completed choices. Provider failure keeps those choices and offers
   retry.
@@ -108,8 +109,9 @@ compiling, partial, failed, offline, and all-cleared states. Each state offers a
 ## Offline contract
 
 The visited Arc shell and textual lesson fallback remain navigable after the network is removed.
-Writes require a network and explain that requirement. Cross-origin signed audio is not promised
-offline; the transcript remains the accessible fallback.
+Private documents are cached under an owner-scoped key; API responses are never cached, and a
+missing owner disables private caching. Writes require a network and explain that requirement.
+Cross-origin signed audio is not promised offline; the transcript remains the accessible fallback.
 
 ## Operational behavior
 
