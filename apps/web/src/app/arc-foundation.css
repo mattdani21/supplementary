@@ -133,6 +133,7 @@ html[data-theme='dark'] .arc .arc-primary {
 }
 
 .ui-field__label {
+  color: var(--ink);
   font-weight: 750;
 }
 
