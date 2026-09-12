@@ -20,7 +20,9 @@ test('calibration, source setup and compilation stay inside Arc', async ({ page 
   await openAsNewLearner(page, testInfo);
 
   await page.getByRole('button', { name: /continue/i }).click();
-  await expect(page.getByRole('heading', { name: /what would useful look like/i })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: /what would .*useful.* look like/i }),
+  ).toBeVisible();
   await page.getByRole('button', { name: 'Build a project I can show' }).click();
   await page.getByLabel('Daily focus').selectOption('25');
   await page.getByLabel('Only sources I provide').check();
