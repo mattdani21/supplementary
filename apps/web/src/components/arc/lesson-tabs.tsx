@@ -7,7 +7,7 @@
  */
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useId, useRef, useState, type KeyboardEvent } from 'react';
 import { ArcAudioPlayer } from './arc-audio-player';
 import { Notebook } from './notebook';
 
@@ -38,6 +38,20 @@ interface LessonTabsProps {
 export function LessonTabs(props: LessonTabsProps) {
   const { gapId, sessionId, gapTitle, lesson, audio, transcript, notebook, backHref } = props;
   const [tab, setTab] = useState<'theory' | 'notebook'>('theory');
+  const id = useId();
+  const theoryTab = useRef<HTMLButtonElement>(null);
+  const notebookTab = useRef<HTMLButtonElement>(null);
+
+  const selectFromKeyboard = (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const next =
+      event.key === 'ArrowLeft' || event.key === 'Home'
+        ? { name: 'theory' as const, ref: theoryTab }
+        : { name: 'notebook' as const, ref: notebookTab };
+    setTab(next.name);
+    next.ref.current?.focus();
+  };
 
   return (
     <>
@@ -65,19 +79,29 @@ export function LessonTabs(props: LessonTabsProps) {
 
       <div className="arc-mode-toggle" role="tablist" aria-label="Lesson mode">
         <button
+          ref={theoryTab}
+          id={`${id}-theory-tab`}
           className={`arc-mode-button${tab === 'theory' ? ' is-active' : ''}`}
           type="button"
           role="tab"
           aria-selected={tab === 'theory'}
+          aria-controls={`${id}-theory-panel`}
+          tabIndex={tab === 'theory' ? 0 : -1}
+          onKeyDown={selectFromKeyboard}
           onClick={() => setTab('theory')}
         >
           Theory
         </button>
         <button
+          ref={notebookTab}
+          id={`${id}-notebook-tab`}
           className={`arc-mode-button${tab === 'notebook' ? ' is-active' : ''}`}
           type="button"
           role="tab"
           aria-selected={tab === 'notebook'}
+          aria-controls={`${id}-notebook-panel`}
+          tabIndex={tab === 'notebook' ? 0 : -1}
+          onKeyDown={selectFromKeyboard}
           onClick={() => setTab('notebook')}
         >
           Notebook
@@ -85,7 +109,12 @@ export function LessonTabs(props: LessonTabsProps) {
       </div>
 
       {tab === 'theory' && (
-        <div>
+        <div
+          id={`${id}-theory-panel`}
+          role="tabpanel"
+          aria-labelledby={`${id}-theory-tab`}
+          tabIndex={0}
+        >
           {audio && (
             <ArcAudioPlayer
               gapId={gapId}
@@ -124,7 +153,12 @@ export function LessonTabs(props: LessonTabsProps) {
       )}
 
       {tab === 'notebook' && (
-        <div>
+        <div
+          id={`${id}-notebook-panel`}
+          role="tabpanel"
+          aria-labelledby={`${id}-notebook-tab`}
+          tabIndex={0}
+        >
           <p className="arc-eyebrow">Notebook · demonstrate</p>
           <h1 className="arc-lesson-title">Show the proof.</h1>
           <p className="arc-lesson-subtitle">

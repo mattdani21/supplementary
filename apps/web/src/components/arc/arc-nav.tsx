@@ -15,7 +15,10 @@ export function ArcNav() {
   return (
     <nav className="arc-nav" aria-label="Main navigation">
       {TABS.map((tab) => {
-        const active = pathname === tab.href || pathname.startsWith(`${tab.href}/`);
+        const active =
+          tab.href === '/arc'
+            ? pathname === tab.href
+            : pathname === tab.href || pathname.startsWith(`${tab.href}/`);
         return (
           <Link
             key={tab.href}

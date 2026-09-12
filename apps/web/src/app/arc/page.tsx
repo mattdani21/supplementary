@@ -3,6 +3,7 @@ import { arcTodayHandler } from '../../server/api';
 import { getServerContext } from '../../server/bootstrap';
 import { viewerOwner } from '../../lib/viewer';
 import { ProgressRing } from '../../components/arc/progress-ring';
+import { EmptyState } from '@gapos/ui';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,11 +38,13 @@ export default async function ArcTodayPage() {
       ? Math.min(100, Math.round((today.focus.completedMinutes / today.focus.plannedMinutes) * 100))
       : 0;
   const momentumDots = Array.from({ length: 7 }, (_, index) => index < today.momentumDays);
+  const isFirstRun =
+    !today.continueGap && today.mapProgress.total === 0 && today.suggestions.length === 0;
 
   return (
     <>
       <div className="arc-topbar">
-        <Link className="arc-wordmark" href="/arc">
+        <Link className="arc-wordmark" href="/arc" aria-label="Go to Arc home">
           arc
         </Link>
         <Link className="arc-icon-button" href="/arc/profile" aria-label="Open profile">
@@ -79,6 +82,21 @@ export default async function ArcTodayPage() {
         </div>
         <small>{today.focus.itemsLabel}</small>
       </div>
+
+      {isFirstRun && (
+        <EmptyState
+          eyebrow="Your first skill"
+          title="Turn a gap into a route you can prove."
+          action={
+            <Link className="arc-primary" href="/arc/calibrate">
+              Start calibration →
+            </Link>
+          }
+        >
+          Tell Arc what useful looks like. A short baseline check will place the first lesson
+          without asking you to rate your own confidence.
+        </EmptyState>
+      )}
 
       {today.continueGap && (
         <Link
@@ -123,24 +141,28 @@ export default async function ArcTodayPage() {
         </div>
       )}
 
-      <div className="arc-section-heading">
-        <h2>Your map</h2>
-        <Link className="arc-text-button" href="/arc/skills">
-          Open skills
-        </Link>
-      </div>
-      <Link className="arc-active-skill" href="/arc/skills">
-        <ProgressRing percent={today.mapProgress.percent} label="Overall map" size="large" />
-        <div>
-          <h3>All your skills</h3>
-          <p>
-            {today.mapProgress.cleared} of {today.mapProgress.total} objectives cleared
-          </p>
-        </div>
-        <span className="arc-row-arrow" aria-hidden="true">
-          ›
-        </span>
-      </Link>
+      {!isFirstRun && (
+        <>
+          <div className="arc-section-heading">
+            <h2>Your map</h2>
+            <Link className="arc-text-button" href="/arc/skills">
+              Open skills
+            </Link>
+          </div>
+          <Link className="arc-active-skill" href="/arc/skills">
+            <ProgressRing percent={today.mapProgress.percent} label="Overall map" size="large" />
+            <div>
+              <h3>All your skills</h3>
+              <p>
+                {today.mapProgress.cleared} of {today.mapProgress.total} objectives cleared
+              </p>
+            </div>
+            <span className="arc-row-arrow" aria-hidden="true">
+              ›
+            </span>
+          </Link>
+        </>
+      )}
 
       {today.suggestions.length > 0 && (
         <>

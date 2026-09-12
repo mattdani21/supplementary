@@ -1,0 +1,231 @@
+/*
+ * Arc foundations shared by every learner route. Route-specific compositions remain in arc.css.
+ * These rules deliberately override the original founder-prototype shell while preserving its
+ * paper, blue-AI and mint-proof language.
+ */
+
+:root {
+  --ink-faint: #626a74;
+  --focus-ring: rgba(63, 92, 244, 0.48);
+  --shell-max: 1180px;
+  --content-max: 760px;
+}
+
+html[data-theme='dark'] {
+  --ink-faint: #a9b1bb;
+  --focus-ring: rgba(141, 154, 255, 0.62);
+}
+
+.arc :is(a, button, input, select, textarea):focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+.arc-shell {
+  width: min(100%, var(--shell-max));
+  box-shadow: 0 24px 80px rgba(23, 25, 29, 0.08);
+}
+
+.arc-screen {
+  width: 100%;
+  max-width: var(--content-max);
+  margin-inline: auto;
+  padding-bottom: calc(32px + env(safe-area-inset-bottom));
+}
+
+.arc-icon-button,
+.arc-avatar {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+}
+
+.arc-nav {
+  position: sticky;
+  z-index: 3;
+  bottom: 0;
+  flex-basis: calc(72px + env(safe-area-inset-bottom));
+  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+}
+
+.arc-nav-link {
+  min-width: 44px;
+  min-height: 48px;
+}
+
+.ui-empty-state,
+.ui-status {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: clamp(20px, 5vw, 32px);
+  background: var(--surface);
+}
+
+.ui-empty-state {
+  display: grid;
+  gap: 12px;
+  text-align: left;
+}
+
+.ui-empty-state__eyebrow {
+  margin: 0;
+  color: var(--blue-deep);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.ui-empty-state h2,
+.ui-empty-state__copy,
+.ui-status__copy {
+  margin: 0;
+}
+
+.ui-empty-state h2 {
+  letter-spacing: -0.045em;
+  font-size: clamp(24px, 7vw, 34px);
+  line-height: 1.05;
+}
+
+.ui-empty-state__copy,
+.ui-status__copy {
+  color: var(--ink-soft);
+  line-height: 1.55;
+}
+
+.ui-empty-state__action,
+.ui-status__action {
+  margin-top: 6px;
+}
+
+.ui-status {
+  border-radius: var(--radius-md);
+}
+
+.ui-status--success {
+  border-color: var(--mint-deep);
+  background: var(--mint);
+}
+
+.ui-status--warning {
+  border-color: var(--amber-deep);
+  background: var(--amber);
+}
+
+.ui-status--error {
+  border-color: #a74040;
+  background: color-mix(in srgb, #a74040 12%, var(--surface));
+}
+
+.ui-field {
+  display: grid;
+  gap: 7px;
+}
+
+.ui-field__label {
+  font-weight: 750;
+}
+
+.ui-field__hint,
+.ui-field__error {
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.ui-field__error {
+  color: #9d3030;
+}
+
+.arc-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.arc-route-state {
+  display: grid;
+  min-height: 55dvh;
+  place-content: center;
+  justify-items: center;
+  text-align: center;
+}
+
+.arc-route-state h1 {
+  margin: 12px 0;
+  letter-spacing: -0.05em;
+}
+
+.arc-route-state__orb {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 20px;
+  border-radius: 50%;
+  background: var(--blue-soft);
+  box-shadow: inset 0 0 0 12px var(--blue);
+  animation: arc-route-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes arc-route-pulse {
+  50% {
+    transform: scale(0.92);
+    opacity: 0.72;
+  }
+}
+
+@media (min-width: 900px) {
+  .arc {
+    padding: 28px;
+  }
+
+  .arc-shell {
+    display: grid;
+    grid-template-columns: 210px minmax(0, 1fr);
+    min-height: calc(100dvh - 56px);
+    overflow: clip;
+    border: 1px solid var(--line);
+    border-radius: 32px;
+  }
+
+  .arc-screen {
+    grid-column: 2;
+    grid-row: 1;
+    max-width: 860px;
+    padding: 40px clamp(36px, 6vw, 72px) 56px;
+  }
+
+  .arc-nav {
+    position: static;
+    grid-column: 1;
+    grid-row: 1;
+    grid-template-columns: 1fr;
+    grid-template-rows: repeat(4, min-content);
+    align-content: center;
+    gap: 8px;
+    border-top: 0;
+    border-right: 1px solid var(--line);
+    padding: 24px;
+  }
+
+  .arc-nav-link {
+    grid-template-columns: 30px 1fr;
+    justify-items: start;
+    gap: 12px;
+    padding-inline: 14px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 359px) {
+  .arc-screen {
+    padding-inline: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arc {
+    scroll-behavior: auto;
+  }
+}

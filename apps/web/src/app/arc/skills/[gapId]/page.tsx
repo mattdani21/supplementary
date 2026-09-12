@@ -83,40 +83,53 @@ export default async function ArcSkillMapPage({ params }: { params: Promise<{ ga
       </div>
 
       <div className="arc-gap-list">
-        {map.sequence.map((item, index) => (
-          <button
-            key={item.objectiveId}
-            type="button"
-            className={`arc-gap-item is-${item.state}`}
-            onClick={() => {
-              if (item.state === 'cleared' || item.state === 'current') {
-                window.location.href = `/arc/skills/${map.gap.id}/lesson`;
-              }
-            }}
-            disabled={item.state === 'later'}
-          >
-            <span className="arc-gap-marker">{item.state === 'cleared' ? '✓' : index + 1}</span>
-            <span>
-              <h4>{item.capabilityStatement}</h4>
-              <p>
+        {map.sequence.map((item, index) => {
+          const contents = (
+            <>
+              <span className="arc-gap-marker">{item.state === 'cleared' ? '✓' : index + 1}</span>
+              <span>
+                <h4>{item.capabilityStatement}</h4>
+                <p>
+                  {item.state === 'cleared'
+                    ? 'Demonstrated with a proof'
+                    : item.state === 'current'
+                      ? 'Audio + notebook proof'
+                      : 'Ready after the gap above'}
+                </p>
+              </span>
+              <span className="arc-gap-status">
                 {item.state === 'cleared'
-                  ? 'Demonstrated with a proof'
+                  ? 'Cleared'
                   : item.state === 'current'
-                    ? 'Audio + notebook proof'
-                    : 'Ready after the gap above'}
-              </p>
-            </span>
-            <span className="arc-gap-status">
-              {item.state === 'cleared'
-                ? 'Cleared'
-                : item.state === 'current'
-                  ? currentIndex === index
-                    ? 'Up next'
-                    : 'In progress'
-                  : 'Later'}
-            </span>
-          </button>
-        ))}
+                    ? currentIndex === index
+                      ? 'Up next'
+                      : 'In progress'
+                    : 'Later'}
+              </span>
+            </>
+          );
+
+          return item.state === 'later' ? (
+            <div
+              key={item.objectiveId}
+              className={`arc-gap-item is-${item.state}`}
+              aria-label={`${item.capabilityStatement}. Available after the previous objective.`}
+            >
+              {contents}
+            </div>
+          ) : (
+            <Link
+              key={item.objectiveId}
+              className={`arc-gap-item is-${item.state}`}
+              href={`/arc/skills/${map.gap.id}/lesson`}
+              aria-label={`${item.capabilityStatement}. ${
+                item.state === 'cleared' ? 'Review lesson' : 'Start proof'
+              }.`}
+            >
+              {contents}
+            </Link>
+          );
+        })}
       </div>
 
       {current === undefined && map.sequence.length > 0 && (

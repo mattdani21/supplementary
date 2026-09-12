@@ -7,6 +7,7 @@
 
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
+import { EmptyState } from '@gapos/ui';
 
 interface SkillView {
   gapId: string;
@@ -48,6 +49,20 @@ export function SkillsLibrary({ skills }: { skills: SkillView[] }) {
         />
       </label>
 
+      {skills.length === 0 && (
+        <EmptyState
+          eyebrow="Skills library"
+          title="Your first route starts with one useful outcome."
+          action={
+            <a className="arc-primary" href="#add-skill">
+              Choose a direction
+            </a>
+          }
+        >
+          Add a skill and Arc will find the smallest sequence of gaps worth proving.
+        </EmptyState>
+      )}
+
       <div className="arc-skill-list">
         {filtered.map((skill) => (
           <Link
@@ -78,7 +93,7 @@ export function SkillsLibrary({ skills }: { skills: SkillView[] }) {
         )}
       </div>
 
-      <div className="arc-add-panel">
+      <div className="arc-add-panel" id="add-skill">
         <p>What would you like to make progress on?</p>
         <div className="arc-choices">
           {NEW_SUBJECTS.map((subject) => (
