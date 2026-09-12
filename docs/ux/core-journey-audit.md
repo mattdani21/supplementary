@@ -70,4 +70,3 @@ is updated after each browser pass.
   network-dependent.
 - The Next.js development tools portal can overlap mobile controls in development only. Keyboard
   activation is used for the required navigation check; the production build has no dev portal.
-

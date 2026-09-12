@@ -127,4 +127,3 @@ categories and never source text, answers, code, lesson content, or learner-ente
    provide a recovery action.
 4. The journey passes with deterministic providers at the mobile and desktop viewports, with
    keyboard-only interaction and the accessibility contract above.
-
