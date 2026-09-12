@@ -806,7 +806,7 @@ tasks:
     title: 'Specify and test the Arc core learner journey'
     epic: E21
     priority: P0
-    status: in_progress
+    status: done
     goal: 'Turn observed learner friction into an explicit, browser-testable UX contract.'
     scope:
       - 'Core-journey UI specification and a durable UX audit log'
@@ -830,7 +830,7 @@ tasks:
     title: 'Build the accessible responsive Arc foundation'
     epic: E21
     priority: P0
-    status: blocked
+    status: done
     goal: 'Make Arc usable and coherent from phone through desktop before adding journey screens.'
     scope:
       - 'Accessible shared UI primitives and Arc design tokens'
@@ -855,7 +855,7 @@ tasks:
     title: 'Unify Arc calibration, sources and compilation'
     epic: E21
     priority: P0
-    status: blocked
+    status: done
     goal: 'Carry a learner from a calibrated goal to a real published Day 1 without leaving Arc.'
     scope:
       - 'Learner-confirmed duration, deadline and source policy'
@@ -880,7 +880,7 @@ tasks:
     title: 'Complete Arc practice, reviews, mastery and retention'
     epic: E21
     priority: P0
-    status: blocked
+    status: done
     goal: 'Make correction, mastery evidence and retained capabilities visible and actionable.'
     scope:
       - 'Retrieval/application practice with hidden answers, confidence and corrections'
@@ -905,7 +905,7 @@ tasks:
     title: 'Harden and verify the Arc core journey'
     epic: E21
     priority: P0
-    status: blocked
+    status: done
     goal: 'Ship the unified learner journey with explicit edge states, offline behavior and evidence.'
     scope:
       - 'Route loading/error boundaries and complete empty/failure recovery states'

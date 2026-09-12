@@ -1,6 +1,6 @@
 {
  "schemaVersion": 1,
- "updatedAt": "2026-08-30T20:49:22.176152Z",
+ "updatedAt": "2026-09-12T20:13:00.000Z",
  "controller": "gapos-controller",
  "tasks": {
   "GAP-000": {
@@ -601,16 +601,99 @@
    "notes": "Arc UI founder spec implemented. Notebook proofs run REAL server-side sandboxed code (apps/worker/src/notebook/executor.ts: fresh node:vm realm with no host objects, timeouts, length/output caps) validated by the independent verifier at generation time (cellRuns: a code_proof whose reference solution fails its own checks blocks publication). Correctness is decided by executing the learner's code and its check expressions - no regex on source text, no fake audio timer; the prototype's demo JS does not survive. Audio is the compiled lesson's real TTS artefact driven through a real <audio> element (play/pause, +-15s, 1x/1.25x/1.5x, transcript drawer). Calibration is a real 3-step flow through the provider adapters (arc_calibration contract + adaptive diagnostic on the baseline outcome), persisted in arc_calibrations, creating the real gap and mapping to existing gaps. Proofs record attempt + mastery evidence (GAP-012) and advance the gap state machine; wrong answers are state-neutral. The spaced-review preference gates the real due-review queue in Today without cancelling scheduling. All seven screens (Today, Skills, AI calibration, Skill map, Lesson theory+notebook, Progress, Profile) implemented in apps/web in the prototype design language (paper/surface/line tokens, blue AI signal, mint cleared, dark+light themes, focus rings, prefers-reduced-motion, aria labels). Migration 006 (forward-only) extends the questions type CHECK with code_proof and adds learner_preferences + arc_calibrations; rollback of the CHECK change would require a new forward-only migration. Specs: openapi.yaml documents the /arc/* surface; generation schemas regenerated. Telemetry: arc_calibration_total, arc_cell_run_total, arc_proof_submit_total, arc_preferences_updated_total. NOTE: the environment sandbox denies git index writes (no approval channel available), so the commit step of the controller loop could not be executed by the agent; the change set is in the working tree and ready for a human \"git add -A && git commit\"."
   },
   "GAP-033": {
-   "status": "in_progress",
+   "status": "done",
    "startedAt": "2026-09-12T19:17:00.000Z",
+   "completedAt": "2026-09-12T20:13:00.000Z",
    "evidence": [
     {
+     "command": "pnpm test:ui",
+     "result": "pass",
+     "note": "13 passed, 1 intentional skip: mobile and desktop navigation, touch targets, axe, dark/reduced-motion, source-to-review journey, retained capability search; the offline scenario runs once at its specified 375x812 viewport."
+    },
+    {
      "command": "pnpm verify",
-     "result": "blocked",
-     "note": "Initial baseline could not start because the environment snapshot had no node_modules (prettier: not found). Restoring the frozen lockfile before rerunning; this is an environment setup failure, not a test failure."
+     "result": "pass",
+     "note": "440 passed, 29 loud environment-gated skips; formatting, lint, typecheck, architecture, domain, worker, evaluation and application suites are green."
     }
    ],
-   "notes": "Scope: specify the unified Arc learner journey, preserve real provider/audio/proof boundaries, create a browser and accessibility acceptance harness, and maintain a route-by-route UX audit. No migrations; no live providers; no generated visual binaries in source control."
+   "notes": "The route/state, responsive, keyboard, screen-reader and offline contract is in specs/ui-core-journey.md. Playwright uses deterministic fake providers at 375x812 and 1440x900 with axe; generated traces/screenshots remain ignored. The running audit records every initial blocker and its disposition."
+  },
+  "GAP-034": {
+   "status": "done",
+   "startedAt": "2026-09-12T19:30:00.000Z",
+   "completedAt": "2026-09-12T20:13:00.000Z",
+   "evidence": [
+    {
+     "command": "pnpm test:ui",
+     "result": "pass",
+     "note": "Exactly one active navigation item, >=44px primary/icon targets, complete lesson tab semantics and zero serious/critical axe findings at mobile and desktop."
+    },
+    {
+     "command": "pnpm --filter @gapos/web build",
+     "result": "pass",
+     "note": "Optimized Next.js production build compiled, typechecked and generated all Arc routes."
+    }
+   ],
+   "notes": "Added accessible UI primitives, adaptive shell/tokens, safe-area handling, packaged Inter, theme-aligned manifest, focus/reduced-motion rules, semantic map links and Arc loading/error/not-found/empty boundaries. Accessibility fixes found during the pass raised field, answer-option and source-policy label contrast. No migration."
+  },
+  "GAP-035": {
+   "status": "done",
+   "startedAt": "2026-09-12T19:40:00.000Z",
+   "completedAt": "2026-09-12T20:13:00.000Z",
+   "evidence": [
+    {
+     "command": "pnpm vitest run apps/web/src/server/arc-api.test.ts tests/end-to-end/pwa.test.ts",
+     "result": "pass",
+     "note": "24 targeted tests: confirmed calibration constraints, source-backed and explicit general-knowledge publication, server grading, setup/compile/retry telemetry and offline policy."
+    },
+    {
+     "command": "pnpm test:ui",
+     "result": "pass",
+     "note": "The browser confirms 25-minute/source-only calibration, source attachment, state-machine definition, compile and published Day 1 without leaving Arc."
+    }
+   ],
+   "notes": "Arc setup supports pasted or text/Markdown/HTML file sources and explicit general knowledge. Ambiguous request retry keeps its session key; failed/partial terminal results clear it for a fresh deliberate attempt. Setup, compiling, partial, failed and archived states preserve recovery. No schema migration; compile request telemetry fields are documented in OpenAPI."
+  },
+  "GAP-036": {
+   "status": "done",
+   "startedAt": "2026-09-12T19:50:00.000Z",
+   "completedAt": "2026-09-12T20:13:00.000Z",
+   "evidence": [
+    {
+     "command": "pnpm vitest run apps/web/src/server/arc-api.test.ts",
+     "result": "pass",
+     "note": "18 tests cover conventional practice, confidence, correction scheduling, server-graded reviews, preferences, objective evidence, fill transition and content-free capability telemetry."
+    },
+    {
+     "command": "pnpm test:ui",
+     "result": "pass",
+     "note": "Browser journeys show hidden answers, supportive correction/next retrieval, actionable due review, two-session fill and retained capability discovery through search."
+    }
+   ],
+   "notes": "Added conventional retrieval/application practice alongside notebook proofs, stale/empty review recovery, mastery-needs explanations and server-backed retained capability search. audioTheory, gentleHints and spacedReview now alter visible behavior. Mastery thresholds and review ladder are unchanged; no migration."
+  },
+  "GAP-037": {
+   "status": "done",
+   "startedAt": "2026-09-12T20:00:00.000Z",
+   "completedAt": "2026-09-12T20:13:00.000Z",
+   "evidence": [
+    {
+     "command": "pnpm test:ui",
+     "result": "pass",
+     "note": "13 passed, 1 viewport-specific skip. Mobile/desktop journey, axe, dark/reduced motion, offline reload/write refusal and capability retention all pass."
+    },
+    {
+     "command": "pnpm --filter @gapos/web build",
+     "result": "pass",
+     "note": "Standalone production build passes without sharing .next with the Playwright dev server."
+    },
+    {
+     "command": "pnpm verify",
+     "result": "pass",
+     "note": "Final code gate: 440 passed, 29 explicit skips for Postgres/S3/live-provider suites without their environment variables."
+    }
+   ],
+   "notes": "Service worker v2 safely falls back for uncached navigation, keeps visited Arc text, never caches cross-origin signed audio, and leaves writes network-only. Text-only/no-audio, no-practice, all-cleared, compiling, partial, failed, archived and stale-review states have recovery actions. Metrics cover setup, compile result/retry, review completion and capability search without learner content. Manual live-app mobile/desktop/light/dark inspection and automated exact-viewport/keyboard/reduced-motion/offline evidence are recorded in docs/ux/core-journey-audit.md. No migration; uncached signed audio remains intentionally network-dependent."
   }
  },
  "GAP-014b": {
