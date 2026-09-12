@@ -137,7 +137,9 @@ export default async function ArcTodayPage() {
       {today.dueReviews.length > 0 && (
         <div className="arc-section-heading">
           <h2>Due for review</h2>
-          <span className="arc-text-button">{today.dueReviews.length} ready</span>
+          <Link className="arc-text-button" href="/arc/reviews">
+            {today.dueReviews.length} ready →
+          </Link>
         </div>
       )}
 

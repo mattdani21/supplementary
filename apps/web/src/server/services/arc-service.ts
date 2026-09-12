@@ -12,10 +12,16 @@ import {
   DiagnosticInterpretationContract,
   type Calibration,
 } from '@gapos/ai-contracts';
-import type { LearnerPreferences, OwnerId } from '@gapos/database';
+import type { LearnerPreferences, OwnerId, ReviewItem, StoredQuestion } from '@gapos/database';
 import type { ServerContext } from '../context.js';
 import { createGap } from './gap-service.js';
-import { assessMastery, getToday } from './learning-service.js';
+import {
+  assessMastery,
+  getToday,
+  searchCapabilities,
+  submitAttempt,
+  type AttemptResult,
+} from './learning-service.js';
 
 /* --------------------------------------------------------------- preferences */
 
@@ -280,6 +286,7 @@ export interface ArcMapItem {
   readonly capabilityStatement: string;
   readonly state: 'cleared' | 'current' | 'later';
   readonly lessonDay?: number;
+  readonly missing: readonly string[];
 }
 
 export interface ArcMapView {
@@ -359,6 +366,8 @@ export const arcMap = async (
       objectiveId: objective.id,
       capabilityStatement: objective.capabilityStatement,
       state: cleared ? 'cleared' : current ? 'current' : 'later',
+      missing:
+        mastery.assessments.find((entry) => entry.objectiveId === objective.id)?.missing ?? [],
       ...(lessonForObjective.get(objective.id)?.day === undefined
         ? {}
         : { lessonDay: lessonForObjective.get(objective.id)!.day }),
@@ -401,6 +410,15 @@ export interface ArcNotebookView {
   readonly hint?: string;
 }
 
+export interface ArcPracticeView {
+  readonly questionId: string;
+  readonly prompt: string;
+  readonly type: 'multiple_choice' | 'short_answer' | 'worked_problem';
+  readonly role: 'retrieval' | 'application' | 'transfer';
+  readonly options?: readonly string[];
+  readonly hint?: string;
+}
+
 export interface ArcLessonView {
   readonly gap: { id: string; title: string };
   readonly lesson: {
@@ -415,6 +433,8 @@ export interface ArcLessonView {
   readonly audio?: { artefactId: string; durationSeconds: number };
   readonly transcript: string;
   readonly notebook?: ArcNotebookView;
+  readonly practice: readonly ArcPracticeView[];
+  readonly defaultMode: 'theory' | 'practice';
 }
 
 /**
@@ -427,7 +447,10 @@ export const arcLesson = async (
   owner: OwnerId,
   gapId: string,
 ): Promise<ArcLessonView | undefined> => {
-  const gap = await context.uow.gaps.get(owner, gapId);
+  const [gap, preferences] = await Promise.all([
+    context.uow.gaps.get(owner, gapId),
+    getPreferences(context, owner),
+  ]);
   if (!gap) return undefined;
   const curriculum = await context.uow.curricula.getCurrentForGap(owner, gapId);
   if (!curriculum) return undefined;
@@ -452,6 +475,23 @@ export const arcLesson = async (
   const totalAudioSeconds = audioArtefacts.reduce((sum, a) => sum + (a.durationSeconds ?? 0), 0);
 
   const notebookQuestion = questions.find((q) => q.payload.type === 'code_proof');
+  const practice: ArcPracticeView[] = questions.flatMap((question) => {
+    if (question.payload.type === 'code_proof') return [];
+    return [
+      {
+        questionId: question.id,
+        prompt: question.payload.prompt,
+        type: question.payload.type,
+        role: question.payload.role,
+        ...(question.payload.type === 'multiple_choice'
+          ? { options: question.payload.options }
+          : {}),
+        ...(preferences.gentleHints && question.payload.hint
+          ? { hint: question.payload.hint }
+          : {}),
+      },
+    ];
+  });
 
   return {
     gap: { id: gap.id, title: gap.title },
@@ -474,10 +514,14 @@ export const arcLesson = async (
             questionId: notebookQuestion.id,
             prompt: notebookQuestion.payload.prompt,
             starterCode: notebookQuestion.payload.starterCode ?? '',
-            ...(notebookQuestion.payload.hint ? { hint: notebookQuestion.payload.hint } : {}),
+            ...(preferences.gentleHints && notebookQuestion.payload.hint
+              ? { hint: notebookQuestion.payload.hint }
+              : {}),
           },
         }
       : {}),
+    practice,
+    defaultMode: preferences.audioTheory ? 'theory' : 'practice',
   };
 };
 
@@ -741,6 +785,156 @@ const anyQuestionAttemptedToday = async (
     }
   }
   return false;
+};
+
+/* ------------------------------------------------------------ reviews/retention */
+
+interface ResolvedReview {
+  readonly review: ReviewItem;
+  readonly question: StoredQuestion;
+  readonly gapId: string;
+  readonly gapTitle: string;
+  readonly capabilityStatement: string;
+}
+
+const resolveReview = async (
+  context: ServerContext,
+  owner: OwnerId,
+  review: ReviewItem,
+): Promise<ResolvedReview | undefined> => {
+  const curriculum = await context.uow.curricula.get(owner, review.curriculumId);
+  if (!curriculum) return undefined;
+  const gap = await context.uow.gaps.get(owner, curriculum.gapId);
+  if (!gap) return undefined;
+
+  let question = review.questionId
+    ? await context.uow.curricula.getQuestion(owner, review.questionId)
+    : undefined;
+  if (!question) {
+    const lessons = await context.uow.curricula.listLessons(owner, curriculum.id);
+    const candidates: StoredQuestion[] = [];
+    for (const lesson of lessons) {
+      candidates.push(...(await context.uow.curricula.listQuestions(owner, lesson.id)));
+    }
+    question =
+      candidates.find(
+        (candidate) =>
+          candidate.objectiveId === review.objectiveId && candidate.payload.role === 'retrieval',
+      ) ?? candidates.find((candidate) => candidate.objectiveId === review.objectiveId);
+  }
+  if (!question) return undefined;
+
+  const objective = curriculum.plan.objectives.find((entry) => entry.id === review.objectiveId);
+  return {
+    review,
+    question,
+    gapId: gap.id,
+    gapTitle: gap.title,
+    capabilityStatement: objective?.capabilityStatement ?? review.objectiveId,
+  };
+};
+
+export interface ArcReviewView {
+  readonly reviewId: string;
+  readonly questionId: string;
+  readonly gapId: string;
+  readonly gapTitle: string;
+  readonly objectiveId: string;
+  readonly capabilityStatement: string;
+  readonly dueAt: Date;
+  readonly reason: ReviewItem['reason'];
+  readonly prompt: string;
+  readonly type: StoredQuestion['payload']['type'];
+  readonly options?: readonly string[];
+  readonly hint?: string;
+}
+
+export const arcReviews = async (
+  context: ServerContext,
+  owner: OwnerId,
+): Promise<ArcReviewView[]> => {
+  const [due, preferences] = await Promise.all([
+    context.uow.mastery.listDueReviews(owner, context.now()),
+    getPreferences(context, owner),
+  ]);
+  const resolved = await Promise.all(due.map((review) => resolveReview(context, owner, review)));
+  return resolved.flatMap((entry) => {
+    if (!entry) return [];
+    const { review, question } = entry;
+    return [
+      {
+        reviewId: review.id,
+        questionId: question.id,
+        gapId: entry.gapId,
+        gapTitle: entry.gapTitle,
+        objectiveId: review.objectiveId,
+        capabilityStatement: entry.capabilityStatement,
+        dueAt: review.dueAt,
+        reason: review.reason,
+        prompt: question.payload.prompt,
+        type: question.payload.type,
+        ...(question.payload.type === 'multiple_choice'
+          ? { options: question.payload.options }
+          : {}),
+        ...(preferences.gentleHints && question.payload.hint
+          ? { hint: question.payload.hint }
+          : {}),
+      },
+    ];
+  });
+};
+
+export interface ArcReviewSubmission {
+  readonly correct: boolean;
+  readonly feedback: AttemptResult['feedback'];
+  readonly nextReview?: ReviewItem;
+}
+
+export const submitArcReview = async (
+  context: ServerContext,
+  owner: OwnerId,
+  reviewId: string,
+  input: {
+    readonly response: string;
+    readonly confidence?: 'low' | 'medium' | 'high';
+    readonly idempotencyKey: string;
+  },
+): Promise<ArcReviewSubmission> => {
+  const review = (await context.uow.mastery.listDueReviews(owner, context.now())).find(
+    (candidate) => candidate.id === reviewId,
+  );
+  if (!review) throw new Error(`Review ${reviewId} was not found in due reviews for this owner.`);
+  const resolved = await resolveReview(context, owner, review);
+  if (!resolved) throw new Error(`Review ${reviewId} has no available practice question.`);
+
+  const result = await submitAttempt(context, owner, resolved.gapId, {
+    questionId: resolved.question.id,
+    sessionId: `review:${review.id}`,
+    response: input.response,
+    ...(input.confidence ? { confidence: input.confidence } : {}),
+    idempotencyKey: input.idempotencyKey,
+    evidenceType: 'retrieval',
+  });
+  await context.uow.mastery.completeReview(owner, review.id);
+  context.metrics.increment('arc_review_completed_total', {
+    correct: String(result.correct),
+  });
+
+  const nextReview = [...result.scheduledReviews].sort(
+    (a, b) => a.dueAt.getTime() - b.dueAt.getTime(),
+  )[0];
+  return {
+    correct: result.correct,
+    feedback: result.feedback,
+    ...(nextReview ? { nextReview } : {}),
+  };
+};
+
+export const arcCapabilities = async (context: ServerContext, owner: OwnerId, query = '') => {
+  context.metrics.increment('arc_capability_search_total', {
+    hasQuery: String(query.trim().length > 0),
+  });
+  return searchCapabilities(context, owner, query);
 };
 
 export interface ArcProfileView {

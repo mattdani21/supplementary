@@ -17,7 +17,7 @@ export function ArcNav() {
       {TABS.map((tab) => {
         const active =
           tab.href === '/arc'
-            ? pathname === tab.href
+            ? pathname === tab.href || pathname.startsWith('/arc/reviews')
             : pathname === tab.href || pathname.startsWith(`${tab.href}/`);
         return (
           <Link

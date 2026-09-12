@@ -19,6 +19,14 @@ interface SkillView {
   started: boolean;
 }
 
+interface CapabilityView {
+  gapId: string;
+  title: string;
+  targetCapability?: string;
+  objectiveIds: readonly string[];
+  filledAt: string;
+}
+
 const NEW_SUBJECTS = ['SQL foundations', 'Conversational Korean', 'Systems design'] as const;
 
 const symbolFor = (title: string): string => {
@@ -26,15 +34,31 @@ const symbolFor = (title: string): string => {
   return (words[0] ?? 'S').slice(0, 2);
 };
 
-export function SkillsLibrary({ skills }: { skills: SkillView[] }) {
+export function SkillsLibrary({
+  skills,
+  capabilities,
+}: {
+  skills: SkillView[];
+  capabilities: CapabilityView[];
+}) {
   const [query, setQuery] = useState('');
   const [chosen, setChosen] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     const terms = query.toLowerCase().trim();
-    if (!terms) return skills;
-    return skills.filter((skill) => skill.title.toLowerCase().includes(terms));
-  }, [skills, query]);
+    const active = skills.filter((skill) => skill.status !== 'filled');
+    if (!terms) return { active, capabilities };
+    const matches = (values: readonly string[]) =>
+      values.some((value) => value.toLowerCase().includes(terms));
+    return {
+      active: active.filter((skill) => matches([skill.title])),
+      capabilities: capabilities.filter((capability) =>
+        matches([capability.title, capability.targetCapability ?? '', ...capability.objectiveIds]),
+      ),
+    };
+  }, [skills, capabilities, query]);
+
+  const totalResults = filtered.active.length + filtered.capabilities.length;
 
   return (
     <>
@@ -49,7 +73,7 @@ export function SkillsLibrary({ skills }: { skills: SkillView[] }) {
         />
       </label>
 
-      {skills.length === 0 && (
+      {skills.length === 0 && capabilities.length === 0 && (
         <EmptyState
           eyebrow="Skills library"
           title="Your first route starts with one useful outcome."
@@ -64,7 +88,7 @@ export function SkillsLibrary({ skills }: { skills: SkillView[] }) {
       )}
 
       <div className="arc-skill-list">
-        {filtered.map((skill) => (
+        {filtered.active.map((skill) => (
           <Link
             key={skill.gapId}
             className={`arc-skill-card${skill.started ? '' : ' is-muted'}`}
@@ -84,10 +108,53 @@ export function SkillsLibrary({ skills }: { skills: SkillView[] }) {
             <span className="arc-skill-meta">{skill.started ? 'In progress\n→' : 'Set up\n→'}</span>
           </Link>
         ))}
-        {filtered.length === 0 && (
-          <p className="arc-theory-text">Nothing matches “{query}”. Start a new skill below.</p>
+        {totalResults === 0 && (
+          <EmptyState
+            eyebrow="No match"
+            title={`Nothing matches “${query}”.`}
+            action={
+              <a className="arc-secondary" href="#add-skill">
+                Start a new skill
+              </a>
+            }
+          >
+            Try a broader capability, objective, or skill title.
+          </EmptyState>
         )}
       </div>
+
+      {filtered.capabilities.length > 0 && (
+        <section className="arc-capability-section" aria-labelledby="retained-capabilities">
+          <div className="arc-section-heading">
+            <div>
+              <p className="arc-eyebrow">Retained</p>
+              <h2 id="retained-capabilities">Capabilities</h2>
+            </div>
+            <span>{filtered.capabilities.length} filled</span>
+          </div>
+          <div className="arc-capability-list">
+            {filtered.capabilities.map((capability) => (
+              <Link
+                className="arc-capability-card"
+                href={`/arc/skills/${capability.gapId}`}
+                key={capability.gapId}
+              >
+                <span className="arc-capability-check" aria-hidden="true">
+                  ✓
+                </span>
+                <span>
+                  <strong>{capability.targetCapability ?? capability.title}</strong>
+                  <small>
+                    {capability.objectiveIds.length} mastered objectives · filled{' '}
+                    {new Date(capability.filledAt).toLocaleDateString()}
+                  </small>
+                </span>
+                <span aria-hidden="true">→</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       <div className="arc-add-panel" id="add-skill">
         <p>What would you like to make progress on?</p>

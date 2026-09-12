@@ -384,6 +384,29 @@ paths:
                     type: array
                     items: { $ref: '#/components/schemas/ArcSkill' }
 
+  /arc/capabilities:
+    get:
+      tags: [arc]
+      operationId: arcCapabilities
+      summary: Search the learner's filled capabilities
+      parameters:
+        - name: query
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        '200':
+          description: Filled gaps matching the title, target capability, or objective ids.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  capabilities:
+                    type: array
+                    items: { $ref: '#/components/schemas/ArcCapability' }
+        '401': { $ref: '#/components/responses/Unauthorised' }
+
   /arc/calibration:
     get:
       tags: [arc]
@@ -540,6 +563,52 @@ paths:
                 type: object
                 properties:
                   progress: { $ref: '#/components/schemas/ArcProgress' }
+
+  /arc/reviews:
+    get:
+      tags: [arc]
+      operationId: arcReviews
+      summary: List due learner reviews with server-owned questions
+      responses:
+        '200':
+          description: Due reviews without answer keys.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reviews:
+                    type: array
+                    items: { $ref: '#/components/schemas/ArcReview' }
+        '401': { $ref: '#/components/responses/Unauthorised' }
+
+  /arc/reviews/{reviewId}:
+    parameters:
+      - name: reviewId
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      tags: [arc]
+      operationId: arcSubmitReview
+      summary: Grade and complete a learner review
+      description: Correctness is computed server-side; the request cannot declare its verdict.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [response, idempotencyKey]
+              properties:
+                response: { type: string, minLength: 1 }
+                confidence: { type: string, enum: [low, medium, high] }
+                idempotencyKey: { type: string, minLength: 1 }
+      responses:
+        '200':
+          description: Graded feedback and the next scheduled review, when any.
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
 
   /arc/profile:
     get:
@@ -1078,6 +1147,51 @@ components:
         percent: { type: integer }
         started: { type: boolean }
 
+    ArcCapability:
+      type: object
+      required: [gapId, title, objectiveIds, filledAt]
+      properties:
+        gapId: { type: string }
+        title: { type: string }
+        targetCapability: { type: string }
+        objectiveIds:
+          type: array
+          items: { type: string }
+        filledAt: { type: string, format: date-time }
+
+    ArcReview:
+      type: object
+      required:
+        [
+          reviewId,
+          questionId,
+          gapId,
+          gapTitle,
+          objectiveId,
+          capabilityStatement,
+          dueAt,
+          reason,
+          prompt,
+          type,
+        ]
+      properties:
+        reviewId: { type: string }
+        questionId: { type: string }
+        gapId: { type: string }
+        gapTitle: { type: string }
+        objectiveId: { type: string }
+        capabilityStatement: { type: string }
+        dueAt: { type: string, format: date-time }
+        reason: { type: string, enum: [ladder, remediation, confidence_drop] }
+        prompt: { type: string }
+        type:
+          type: string
+          enum: [multiple_choice, short_answer, worked_problem, code_proof]
+        options:
+          type: array
+          items: { type: string }
+        hint: { type: string }
+
     ArcMap:
       type: object
       required: [gap, progress, sequence]
@@ -1109,16 +1223,19 @@ components:
           type: array
           items:
             type: object
-            required: [objectiveId, capabilityStatement, state]
+            required: [objectiveId, capabilityStatement, state, missing]
             properties:
               objectiveId: { type: string }
               capabilityStatement: { type: string }
               state: { type: string, enum: [cleared, current, later] }
               lessonDay: { type: integer }
+              missing:
+                type: array
+                items: { type: string }
 
     ArcLesson:
       type: object
-      required: [gap, lesson, transcript]
+      required: [gap, lesson, transcript, practice, defaultMode]
       properties:
         gap:
           type: object
@@ -1144,6 +1261,23 @@ components:
             artefactId: { type: string }
             durationSeconds: { type: number }
         transcript: { type: string }
+        defaultMode: { type: string, enum: [theory, practice] }
+        practice:
+          type: array
+          items:
+            type: object
+            required: [questionId, prompt, type, role]
+            properties:
+              questionId: { type: string }
+              prompt: { type: string }
+              type:
+                type: string
+                enum: [multiple_choice, short_answer, worked_problem]
+              role: { type: string, enum: [retrieval, application, transfer] }
+              options:
+                type: array
+                items: { type: string }
+              hint: { type: string }
         notebook:
           type: object
           required: [questionId, prompt, starterCode]

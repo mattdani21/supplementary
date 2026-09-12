@@ -25,6 +25,15 @@ interface LessonView {
     starterCode: string;
     hint?: string;
   };
+  practice: {
+    questionId: string;
+    prompt: string;
+    type: 'multiple_choice' | 'short_answer' | 'worked_problem';
+    role: 'retrieval' | 'application' | 'transfer';
+    options?: readonly string[];
+    hint?: string;
+  }[];
+  defaultMode: 'theory' | 'practice';
 }
 
 export default async function ArcLessonPage({ params }: { params: Promise<{ gapId: string }> }) {
@@ -44,6 +53,8 @@ export default async function ArcLessonPage({ params }: { params: Promise<{ gapI
       audio={lesson.audio}
       transcript={lesson.transcript}
       notebook={lesson.notebook}
+      practice={lesson.practice}
+      defaultMode={lesson.defaultMode}
       backHref={`/arc/skills/${gapId}`}
     />
   );

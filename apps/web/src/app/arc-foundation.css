@@ -190,7 +190,9 @@ html[data-theme='dark'] .arc .arc-primary {
 }
 
 .arc-calibration-settings :is(input, select),
-.arc-source-form :is(input, textarea) {
+.arc-source-form :is(input, textarea),
+.arc-practice-form :is(select, textarea),
+.arc-review-card :is(select, textarea) {
   width: 100%;
   min-height: 46px;
   border: 1px solid var(--line);
@@ -203,6 +205,136 @@ html[data-theme='dark'] .arc .arc-primary {
 .arc-source-form textarea {
   min-height: 132px;
   resize: vertical;
+}
+
+.arc-practice-form,
+.arc-practice-result,
+.arc-review-card,
+.arc-review-result,
+.arc-capability-list {
+  display: grid;
+  gap: 16px;
+}
+
+.arc-practice-form,
+.arc-review-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: clamp(18px, 5vw, 28px);
+  background: var(--surface);
+}
+
+.arc-practice-heading h2,
+.arc-review-card h2 {
+  margin: 8px 0 0;
+  letter-spacing: -0.035em;
+  font-size: 20px;
+  line-height: 1.25;
+}
+
+.arc-practice-options {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.arc-practice-options label {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 11px;
+  background: var(--surface-soft);
+}
+
+.arc-practice-options input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--blue);
+}
+
+.arc-notebook-section {
+  margin-top: 22px;
+  border-top: 1px solid var(--line);
+  padding-top: 22px;
+}
+
+.arc-review-meta {
+  display: flex;
+  justify-content: space-between;
+  color: var(--ink-faint);
+  font-size: 11px;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.arc-review-prompt {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+.arc-capability-section {
+  margin-top: 30px;
+}
+
+.arc-capability-card {
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  border: 1px solid var(--mint-deep);
+  border-radius: var(--radius-md);
+  padding: 13px;
+  background: var(--mint);
+}
+
+.arc-capability-card > span:nth-child(2) {
+  display: grid;
+  gap: 4px;
+}
+
+.arc-capability-card small {
+  color: var(--mint-deep);
+  line-height: 1.35;
+}
+
+.arc-capability-check {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--surface);
+  background: var(--mint-deep);
+  font-weight: 850;
+}
+
+.arc-mastery-needs {
+  margin: 8px 0 0;
+  padding-left: 17px;
+  color: var(--ink-soft);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.arc-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+  padding: 0;
 }
 
 .arc-source-policy {

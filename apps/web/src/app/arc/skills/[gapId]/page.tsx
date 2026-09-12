@@ -22,6 +22,7 @@ interface MapView {
     capabilityStatement: string;
     state: 'cleared' | 'current' | 'later';
     lessonDay?: number;
+    missing: string[];
   }[];
 }
 
@@ -125,6 +126,13 @@ export default async function ArcSkillMapPage({ params }: { params: Promise<{ ga
                           ? 'Audio + notebook proof'
                           : 'Ready after the gap above'}
                     </p>
+                    {item.state === 'current' && item.missing.length > 0 && (
+                      <ul className="arc-mastery-needs" aria-label="Evidence still needed">
+                        {item.missing.slice(0, 2).map((requirement) => (
+                          <li key={requirement}>{requirement}</li>
+                        ))}
+                      </ul>
+                    )}
                   </span>
                   <span className="arc-gap-status">
                     {item.state === 'cleared'

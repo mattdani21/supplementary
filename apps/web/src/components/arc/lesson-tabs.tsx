@@ -9,6 +9,7 @@
 import Link from 'next/link';
 import { useId, useRef, useState, type KeyboardEvent } from 'react';
 import { ArcAudioPlayer } from './arc-audio-player';
+import { ArcPractice, type ArcPracticeQuestion } from './arc-practice';
 import { Notebook } from './notebook';
 
 interface LessonTabsProps {
@@ -32,15 +33,28 @@ interface LessonTabsProps {
     starterCode: string;
     hint?: string;
   };
+  readonly practice: readonly ArcPracticeQuestion[];
+  readonly defaultMode: 'theory' | 'practice';
   readonly backHref: string;
 }
 
 export function LessonTabs(props: LessonTabsProps) {
-  const { gapId, sessionId, gapTitle, lesson, audio, transcript, notebook, backHref } = props;
-  const [tab, setTab] = useState<'theory' | 'notebook'>('theory');
+  const {
+    gapId,
+    sessionId,
+    gapTitle,
+    lesson,
+    audio,
+    transcript,
+    notebook,
+    practice,
+    defaultMode,
+    backHref,
+  } = props;
+  const [tab, setTab] = useState<'theory' | 'practice'>(defaultMode);
   const id = useId();
   const theoryTab = useRef<HTMLButtonElement>(null);
-  const notebookTab = useRef<HTMLButtonElement>(null);
+  const practiceTab = useRef<HTMLButtonElement>(null);
 
   const selectFromKeyboard = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
@@ -48,7 +62,7 @@ export function LessonTabs(props: LessonTabsProps) {
     const next =
       event.key === 'ArrowLeft' || event.key === 'Home'
         ? { name: 'theory' as const, ref: theoryTab }
-        : { name: 'notebook' as const, ref: notebookTab };
+        : { name: 'practice' as const, ref: practiceTab };
     setTab(next.name);
     next.ref.current?.focus();
   };
@@ -93,18 +107,18 @@ export function LessonTabs(props: LessonTabsProps) {
           Theory
         </button>
         <button
-          ref={notebookTab}
-          id={`${id}-notebook-tab`}
-          className={`arc-mode-button${tab === 'notebook' ? ' is-active' : ''}`}
+          ref={practiceTab}
+          id={`${id}-practice-tab`}
+          className={`arc-mode-button${tab === 'practice' ? ' is-active' : ''}`}
           type="button"
           role="tab"
-          aria-selected={tab === 'notebook'}
-          aria-controls={`${id}-notebook-panel`}
-          tabIndex={tab === 'notebook' ? 0 : -1}
+          aria-selected={tab === 'practice'}
+          aria-controls={`${id}-practice-panel`}
+          tabIndex={tab === 'practice' ? 0 : -1}
           onKeyDown={selectFromKeyboard}
-          onClick={() => setTab('notebook')}
+          onClick={() => setTab('practice')}
         >
-          Notebook
+          Practice
         </button>
       </div>
 
@@ -135,11 +149,11 @@ export function LessonTabs(props: LessonTabsProps) {
             </span>
           </div>
           <div className="arc-lesson-footer">
-            {notebook ? (
+            {notebook || practice.length > 0 ? (
               <button
                 className="arc-primary arc-full"
                 type="button"
-                onClick={() => setTab('notebook')}
+                onClick={() => setTab('practice')}
               >
                 Make it tangible →
               </button>
@@ -152,31 +166,37 @@ export function LessonTabs(props: LessonTabsProps) {
         </div>
       )}
 
-      {tab === 'notebook' && (
+      {tab === 'practice' && (
         <div
-          id={`${id}-notebook-panel`}
+          id={`${id}-practice-panel`}
           role="tabpanel"
-          aria-labelledby={`${id}-notebook-tab`}
+          aria-labelledby={`${id}-practice-tab`}
           tabIndex={0}
         >
-          <p className="arc-eyebrow">Notebook · demonstrate</p>
+          <p className="arc-eyebrow">Practice · demonstrate</p>
           <h1 className="arc-lesson-title">Show the proof.</h1>
           <p className="arc-lesson-subtitle">
-            Your code runs on the server in a sandbox. A correct proof records an attempt; a miss
-            changes nothing but your next try.
+            Responses are graded on the server. Correct work records evidence; a miss schedules
+            correction without pretending the objective is mastered.
           </p>
+          {practice.length > 0 ? (
+            <ArcPractice gapId={gapId} sessionId={sessionId} questions={practice} />
+          ) : null}
           {notebook ? (
-            <Notebook gapId={gapId} sessionId={sessionId} question={notebook} />
-          ) : (
+            <div className={practice.length > 0 ? 'arc-notebook-section' : undefined}>
+              <Notebook gapId={gapId} sessionId={sessionId} question={notebook} />
+            </div>
+          ) : practice.length === 0 ? (
             <>
               <p className="arc-theory-text">
-                This lesson has no notebook cell. Practise the questions on the study page instead.
+                This lesson has no practice item yet. The transcript remains available while Arc
+                repairs the route.
               </p>
               <Link className="arc-primary arc-full" href={backHref}>
                 Return to map →
               </Link>
             </>
-          )}
+          ) : null}
         </div>
       )}
     </>

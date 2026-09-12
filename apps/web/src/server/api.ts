@@ -27,16 +27,19 @@ import {
   type RegisterSourceInput,
 } from './services/gap-service.js';
 import {
+  arcCapabilities,
   arcLesson,
   arcMap,
   arcProfile,
   arcProgress,
+  arcReviews,
   arcSkills,
   arcToday,
   calibrationKit,
   getPreferences,
   runCalibration,
   setPreferences,
+  submitArcReview,
   type CalibrationInput,
 } from './services/arc-service.js';
 import {
@@ -177,6 +180,14 @@ const proofSchema = z
     sessionId: z.string().min(1),
     code: z.string().min(1).max(20_000),
     hintsUsed: z.number().int().min(0).optional(),
+    idempotencyKey: z.string().min(1),
+  })
+  .strict();
+
+const arcReviewSchema = z
+  .object({
+    response: z.string().min(1),
+    confidence: z.enum(['low', 'medium', 'high']).optional(),
     idempotencyKey: z.string().min(1),
   })
   .strict();
@@ -567,6 +578,14 @@ export const arcSkillsHandler = async (
   skills: await arcSkills(context, owner),
 });
 
+export const arcCapabilitiesHandler = async (
+  context: ServerContext,
+  owner: OwnerId,
+  query = '',
+): Promise<{ capabilities: Awaited<ReturnType<typeof arcCapabilities>> }> => ({
+  capabilities: await arcCapabilities(context, owner, query),
+});
+
 export const arcCalibrationKitHandler = async (
   context: ServerContext,
   owner: OwnerId,
@@ -641,6 +660,22 @@ export const arcProgressHandler = async (
   owner: OwnerId,
 ): Promise<{ progress: Awaited<ReturnType<typeof arcProgress>> }> => ({
   progress: await arcProgress(context, owner),
+});
+
+export const arcReviewsHandler = async (
+  context: ServerContext,
+  owner: OwnerId,
+): Promise<{ reviews: Awaited<ReturnType<typeof arcReviews>> }> => ({
+  reviews: await arcReviews(context, owner),
+});
+
+export const arcSubmitReviewHandler = async (
+  context: ServerContext,
+  owner: OwnerId,
+  reviewId: string,
+  body: unknown,
+): Promise<{ review: Awaited<ReturnType<typeof submitArcReview>> }> => ({
+  review: await submitArcReview(context, owner, reviewId, arcReviewSchema.parse(body)),
 });
 
 export const arcProfileHandler = async (
