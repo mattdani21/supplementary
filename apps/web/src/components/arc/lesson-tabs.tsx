@@ -140,7 +140,9 @@ export function LessonTabs(props: LessonTabsProps) {
             />
           ) : (
             <StatusMessage tone="warning" title="This lesson is text-only.">
-              <p>Audio was not published, so use the verified transcript without losing progress.</p>
+              <p>
+                Audio was not published, so use the verified transcript without losing progress.
+              </p>
               <details className="arc-transcript-copy">
                 <summary>Read transcript</summary>
                 {transcript

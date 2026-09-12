@@ -130,9 +130,7 @@ export function SkillSetup({
 
   const compile = async () => {
     const retry =
-      compileState.phase === 'failed' ||
-      gap.status === 'failed' ||
-      lastRun?.status === 'partial';
+      compileState.phase === 'failed' || gap.status === 'failed' || lastRun?.status === 'partial';
     setCompileState({ phase: 'running' });
     try {
       if (gap.status === 'draft') {
@@ -333,8 +331,8 @@ export function SkillSetup({
 
       {lastRun?.status === 'partial' && compileState.phase === 'idle' && (
         <StatusMessage tone="warning" title="Part of this route still needs repair.">
-          Verified lessons remain available. Retry compilation to rebuild the missing coverage
-          with a fresh generation attempt.
+          Verified lessons remain available. Retry compilation to rebuild the missing coverage with
+          a fresh generation attempt.
         </StatusMessage>
       )}
 

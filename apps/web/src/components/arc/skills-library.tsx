@@ -64,9 +64,7 @@ export function SkillsLibrary({
       arcFetch(`/api/arc/capabilities?query=${encodeURIComponent(normalized)}`)
         .then((body) => {
           if (cancelled) return;
-          setCapabilityResults(
-            (body as { capabilities: CapabilityView[] }).capabilities,
-          );
+          setCapabilityResults((body as { capabilities: CapabilityView[] }).capabilities);
         })
         .catch((cause) => {
           if (cancelled) return;
@@ -144,11 +142,7 @@ export function SkillsLibrary({
             <Link
               key={skill.gapId}
               className={`arc-skill-card${skill.started ? '' : ' is-muted'}`}
-              href={
-                needsSetup
-                  ? `/arc/skills/${skill.gapId}/setup`
-                  : `/arc/skills/${skill.gapId}`
-              }
+              href={needsSetup ? `/arc/skills/${skill.gapId}/setup` : `/arc/skills/${skill.gapId}`}
             >
               <span className="arc-symbol arc-symbol-large">{symbolFor(skill.title)}</span>
               <span>

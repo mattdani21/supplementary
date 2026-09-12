@@ -38,10 +38,10 @@ const seedPublishedLesson = async (page: Page, owner: string): Promise<string> =
   return gapId;
 };
 
-test('a visited Arc lesson keeps its text and explains offline limits', async (
-  { context, page },
-  testInfo: TestInfo,
-) => {
+test('a visited Arc lesson keeps its text and explains offline limits', async ({
+  context,
+  page,
+}, testInfo: TestInfo) => {
   test.skip(testInfo.project.name !== 'mobile', 'The offline contract targets the mobile PWA.');
   test.setTimeout(90_000);
 
@@ -71,14 +71,18 @@ test('a visited Arc lesson keeps its text and explains offline limits', async (
   await page.goto(lessonPath);
   await expect(page.getByRole('tab', { name: 'Theory' })).toBeVisible();
   await expect(
-    page.locator('.arc-theory-text p').filter({ hasText: 'Today we are going to earn one sentence' }),
+    page
+      .locator('.arc-theory-text p')
+      .filter({ hasText: 'Today we are going to earn one sentence' }),
   ).toBeVisible();
 
   await context.setOffline(true);
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('tab', { name: 'Theory' })).toBeVisible();
   await expect(
-    page.locator('.arc-theory-text p').filter({ hasText: 'Today we are going to earn one sentence' }),
+    page
+      .locator('.arc-theory-text p')
+      .filter({ hasText: 'Today we are going to earn one sentence' }),
   ).toBeVisible();
 
   await page.getByRole('tab', { name: 'Practice' }).click();

@@ -74,9 +74,7 @@ export default async function ArcSkillMapPage({ params }: { params: Promise<{ ga
             <Link
               className="arc-primary"
               href={
-                map.gap.status === 'archived'
-                  ? '/arc/skills'
-                  : `/arc/skills/${map.gap.id}/setup`
+                map.gap.status === 'archived' ? '/arc/skills' : `/arc/skills/${map.gap.id}/setup`
               }
             >
               {map.gap.status === 'compiling'
@@ -132,8 +130,8 @@ export default async function ArcSkillMapPage({ params }: { params: Promise<{ ga
                 </Link>
               }
             >
-              Published lessons remain usable. Arc does not count unpublished objectives as
-              mastery evidence.
+              Published lessons remain usable. Arc does not count unpublished objectives as mastery
+              evidence.
             </StatusMessage>
           )}
 
