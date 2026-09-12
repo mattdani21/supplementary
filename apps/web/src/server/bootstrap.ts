@@ -22,14 +22,21 @@ import { createServerContext, type ServerContext } from './context.js';
 
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
-let contextPromise: Promise<ServerContext> | undefined;
-let pool: { end: () => Promise<void> } | undefined;
+interface RuntimeState {
+  contextPromise?: Promise<ServerContext>;
+  pool?: { end: () => Promise<void> };
+}
+
+const runtime = globalThis as typeof globalThis & {
+  __gaposServerRuntime?: RuntimeState;
+};
+const state = (runtime.__gaposServerRuntime ??= {});
 
 export const getServerContext = (): Promise<ServerContext> => {
-  if (!contextPromise) {
-    contextPromise = buildContext();
+  if (!state.contextPromise) {
+    state.contextPromise = buildContext();
   }
-  return contextPromise;
+  return state.contextPromise;
 };
 
 const buildContext = async (): Promise<ServerContext> => {
@@ -41,7 +48,7 @@ const buildContext = async (): Promise<ServerContext> => {
     const pgPool = createPool(databaseUrl, { schema: 'public' });
     await ensureSchema(pgPool, 'public');
     await migrate(pgPool);
-    pool = pgPool;
+    state.pool = pgPool;
     return createServerContext({
       uow: createPostgresUnitOfWork(pgPool),
       storage: await createStorage(logger),
@@ -58,9 +65,9 @@ const buildContext = async (): Promise<ServerContext> => {
 };
 
 export const closeServerContext = async (): Promise<void> => {
-  await pool?.end();
-  contextPromise = undefined;
-  pool = undefined;
+  await state.pool?.end();
+  state.contextPromise = undefined;
+  state.pool = undefined;
 };
 
 const createStorage = async (log: ReturnType<typeof createLogger>): Promise<ObjectStore> => {
