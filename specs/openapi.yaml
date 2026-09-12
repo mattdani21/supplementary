@@ -155,6 +155,24 @@ paths:
       summary: Start an idempotent compilation
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [idempotencyKey]
+              properties:
+                idempotencyKey: { type: string, minLength: 1 }
+                audioEnabled: { type: boolean }
+                concurrency: { type: integer, minimum: 1, maximum: 8 }
+                surface:
+                  type: string
+                  enum: [arc_setup]
+                  description: Records content-free Arc setup and compile telemetry.
+                retry:
+                  type: boolean
+                  description: Distinguishes a deliberate Arc retry from an initial compile.
       responses:
         '202':
           description: |

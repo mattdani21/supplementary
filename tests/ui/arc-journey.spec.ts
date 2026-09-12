@@ -66,7 +66,9 @@ test('the Arc journey reaches practice, correction and server-graded review', as
   await page.getByRole('link', { name: 'Profile' }).click();
   await page.getByRole('checkbox', { name: /spaced review/i }).check();
   await expect(page.getByRole('checkbox', { name: /spaced review/i })).toBeChecked();
-  await page.getByRole('link', { name: 'Today' }).click();
+  const todayLink = page.getByRole('link', { name: 'Today' });
+  await todayLink.focus();
+  await todayLink.press('Enter');
   await page.getByRole('link', { name: /ready/i }).click();
 
   await expect(page.getByRole('heading', { name: 'Due reviews' })).toBeVisible();

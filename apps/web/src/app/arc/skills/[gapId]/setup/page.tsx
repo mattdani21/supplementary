@@ -34,6 +34,10 @@ export default async function ArcSkillSetupPage({
     getGap(context, owner, gapId),
     listSources(context, owner, gapId),
   ])) as [{ gap: GapView }, { sources: SourceView[] }];
+  const curriculum = await context.uow.curricula.getCurrentForGap(owner, gapId);
+  const lastRun = curriculum
+    ? await context.uow.generation.getRun(owner, curriculum.runId)
+    : undefined;
 
   return (
     <>
@@ -49,7 +53,18 @@ export default async function ArcSkillSetupPage({
       <p className="arc-lesson-subtitle">
         Confirm the brief, attach trusted material, and compile one verified route.
       </p>
-      <SkillSetup gap={gap} initialSources={sources} />
+      <SkillSetup
+        gap={gap}
+        initialSources={sources}
+        lastRun={
+          lastRun
+            ? {
+                status: lastRun.status,
+                ...(lastRun.error ? { error: lastRun.error } : {}),
+              }
+            : undefined
+        }
+      />
     </>
   );
 }

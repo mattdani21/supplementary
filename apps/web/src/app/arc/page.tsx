@@ -3,7 +3,7 @@ import { arcTodayHandler } from '../../server/api';
 import { getServerContext } from '../../server/bootstrap';
 import { viewerOwner } from '../../lib/viewer';
 import { ProgressRing } from '../../components/arc/progress-ring';
-import { EmptyState } from '@gapos/ui';
+import { EmptyState, StatusMessage } from '@gapos/ui';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,6 +19,11 @@ interface TodayView {
   };
   mapProgress: { percent: number; cleared: number; total: number };
   suggestions: { gapId: string; title: string; status: string }[];
+  attention: {
+    gapId: string;
+    title: string;
+    state: 'compiling' | 'failed' | 'partial';
+  }[];
   momentumDays: number;
   dueReviews: { reviewId: string; gapId: string; objectiveId: string; dueAt: Date }[];
 }
@@ -39,7 +44,10 @@ export default async function ArcTodayPage() {
       : 0;
   const momentumDots = Array.from({ length: 7 }, (_, index) => index < today.momentumDays);
   const isFirstRun =
-    !today.continueGap && today.mapProgress.total === 0 && today.suggestions.length === 0;
+    !today.continueGap &&
+    today.mapProgress.total === 0 &&
+    today.suggestions.length === 0 &&
+    today.attention.length === 0;
 
   return (
     <>
@@ -82,6 +90,31 @@ export default async function ArcTodayPage() {
         </div>
         <small>{today.focus.itemsLabel}</small>
       </div>
+
+      {today.attention.map((item) => (
+        <StatusMessage
+          key={item.gapId}
+          tone={item.state === 'failed' ? 'error' : item.state === 'partial' ? 'warning' : 'info'}
+          title={
+            item.state === 'failed'
+              ? `${item.title} needs a fresh compile.`
+              : item.state === 'partial'
+                ? `${item.title} has verified lessons and missing coverage.`
+                : `${item.title} is still compiling.`
+          }
+          action={
+            <Link className="arc-secondary" href={`/arc/skills/${item.gapId}/setup`}>
+              {item.state === 'compiling' ? 'Check status' : 'Review recovery'}
+            </Link>
+          }
+        >
+          {item.state === 'failed'
+            ? 'Your brief and accepted sources are saved.'
+            : item.state === 'partial'
+              ? 'Continue published work or rebuild the missing objectives.'
+              : 'Day 1 appears as soon as it passes verification.'}
+        </StatusMessage>
+      ))}
 
       {isFirstRun && (
         <EmptyState

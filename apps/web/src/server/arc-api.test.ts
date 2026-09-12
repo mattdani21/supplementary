@@ -37,6 +37,7 @@ import {
   registerSourceHandler,
   transitionGap,
 } from './api.js';
+import { applyTransition } from './services/gap-service.js';
 import { submitAttempt } from './services/learning-service.js';
 
 const OWNER = 'arc_user_1';
@@ -220,6 +221,47 @@ describe('Arc calibration', () => {
       await context.uow.calibrations.get(OTHER, result.calibration.calibrationId),
     ).toBeUndefined();
     expect(await context.uow.calibrations.listForOwner(OTHER)).toEqual([]);
+  });
+});
+
+describe('Arc setup telemetry', () => {
+  it('records setup, compile result and retry categories without learner content', async () => {
+    const { context } = buildContext();
+    await seedUser(context);
+    const created = (await createGap(context, OWNER, {
+      title: 'Relations and proof techniques',
+      rawStatement: REFERENCE_GAP_STATEMENT,
+      dailyMinutes: 25,
+      sourcePolicy: 'sources_only',
+    })) as { gap: Gap };
+    await transitionGap(context, OWNER, created.gap.id, { type: 'define' });
+    await registerSourceHandler(context, OWNER, {
+      gapId: created.gap.id,
+      filename: 'set-theory-primer.md',
+      mediaType: 'text/markdown',
+      text: SET_THEORY_SOURCE,
+    });
+
+    await compile(context, OWNER, created.gap.id, {
+      idempotencyKey: 'arc-setup-initial',
+      surface: 'arc_setup',
+      retry: false,
+    });
+    expect(context.metrics.sum('arc_setup_completed_total')).toBe(1);
+    expect(context.metrics.sum('arc_compile_started_total', { retry: 'false' })).toBe(1);
+    expect(context.metrics.sum('arc_compile_result_total', { status: 'complete' })).toBe(1);
+
+    await compile(context, OWNER, created.gap.id, {
+      idempotencyKey: 'arc-setup-retry',
+      surface: 'arc_setup',
+      retry: true,
+    });
+    expect(context.metrics.sum('arc_setup_completed_total')).toBe(1);
+    expect(context.metrics.sum('arc_compile_started_total', { retry: 'true' })).toBe(1);
+    expect(context.metrics.sum('arc_compile_retry_total')).toBe(1);
+    expect(JSON.stringify(context.metrics.points.map((point) => point.labels))).not.toContain(
+      SET_THEORY_SOURCE,
+    );
   });
 });
 
@@ -545,5 +587,30 @@ describe('Arc views reflect real database state', () => {
     expect(today.today.mapProgress.total).toBeGreaterThan(0);
     expect(today.today.focus.plannedMinutes).toBe(35);
     expect(today.today.momentumDays).toBe(0);
+  });
+
+  it('keeps a failed compile visible with a recovery route', async () => {
+    const { context } = buildContext();
+    await seedUser(context);
+    const created = (await createGap(context, OWNER, {
+      title: 'Recoverable skill',
+      rawStatement: 'I need a route that demonstrates failed compilation recovery.',
+      dailyMinutes: 20,
+    })) as { gap: Gap };
+    await transitionGap(context, OWNER, created.gap.id, { type: 'define' });
+    await applyTransition(context, OWNER, created.gap.id, { type: 'compile' });
+    await applyTransition(context, OWNER, created.gap.id, {
+      type: 'compilation_failed',
+      reason: 'No lesson was publishable.',
+    });
+
+    const skills = await arcSkillsHandler(context, OWNER);
+    expect(skills.skills).toEqual([
+      expect.objectContaining({ gapId: created.gap.id, status: 'failed' }),
+    ]);
+    const today = await arcTodayHandler(context, OWNER);
+    expect(today.today.attention).toEqual([
+      { gapId: created.gap.id, title: 'Recoverable skill', state: 'failed' },
+    ]);
   });
 });

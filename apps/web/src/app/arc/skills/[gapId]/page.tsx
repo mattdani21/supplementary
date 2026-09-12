@@ -3,7 +3,7 @@ import { arcMapHandler } from '../../../../server/api';
 import { getServerContext } from '../../../../server/bootstrap';
 import { viewerOwner } from '../../../../lib/viewer';
 import { ProgressRing } from '../../../../components/arc/progress-ring';
-import { EmptyState } from '@gapos/ui';
+import { EmptyState, StatusMessage } from '@gapos/ui';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,6 +34,9 @@ export default async function ArcSkillMapPage({ params }: { params: Promise<{ ga
 
   const current = map.sequence.find((item) => item.state === 'current');
   const currentIndex = map.sequence.findIndex((item) => item.state === 'current');
+  const repairPending = map.sequence.some(
+    (item) => item.state !== 'cleared' && item.lessonDay === undefined,
+  );
 
   return (
     <>
@@ -49,28 +52,91 @@ export default async function ArcSkillMapPage({ params }: { params: Promise<{ ga
 
       {map.sequence.length === 0 && (
         <EmptyState
-          eyebrow={map.gap.status === 'compiling' ? 'Compilation in progress' : 'Route setup'}
+          eyebrow={
+            map.gap.status === 'compiling'
+              ? 'Compilation in progress'
+              : map.gap.status === 'failed'
+                ? 'Compilation stopped'
+                : map.gap.status === 'archived'
+                  ? 'Archived skill'
+                  : 'Route setup'
+          }
           title={
             map.gap.status === 'compiling'
               ? 'Arc is building the first verified lesson.'
-              : 'This skill needs sources before the map can open.'
+              : map.gap.status === 'failed'
+                ? 'Day 1 was not publishable yet.'
+                : map.gap.status === 'archived'
+                  ? 'This skill is no longer active.'
+                  : 'This skill needs sources before the map can open.'
           }
           action={
-            <Link className="arc-primary" href={`/arc/skills/${map.gap.id}/setup`}>
+            <Link
+              className="arc-primary"
+              href={
+                map.gap.status === 'archived'
+                  ? '/arc/skills'
+                  : `/arc/skills/${map.gap.id}/setup`
+              }
+            >
               {map.gap.status === 'compiling'
                 ? 'Check compile status'
-                : 'Review sources and compile'}
+                : map.gap.status === 'failed'
+                  ? 'Review and retry'
+                  : map.gap.status === 'archived'
+                    ? 'Return to Skills'
+                    : 'Review sources and compile'}
             </Link>
           }
         >
           {map.gap.status === 'compiling'
             ? 'The map appears as soon as Day 1 passes validation.'
-            : 'Confirm the learning brief, choose the evidence boundary, and compile the route.'}
+            : map.gap.status === 'failed'
+              ? 'Your brief and accepted sources are saved for a fresh attempt.'
+              : map.gap.status === 'archived'
+                ? 'Archived skills stay out of the active library and cannot be recompiled.'
+                : 'Confirm the learning brief, choose the evidence boundary, and compile the route.'}
         </EmptyState>
       )}
 
       {map.sequence.length > 0 && (
         <>
+          {map.gap.status === 'archived' && (
+            <StatusMessage
+              tone="warning"
+              title="This skill is archived."
+              action={
+                <Link className="arc-secondary" href="/arc/skills">
+                  Return to Skills
+                </Link>
+              }
+            >
+              The existing proof record is read-only.
+            </StatusMessage>
+          )}
+
+          {repairPending && map.gap.status !== 'archived' && (
+            <StatusMessage
+              tone="warning"
+              title="Part of this route still needs repair."
+              action={
+                <Link
+                  className="arc-secondary"
+                  href={
+                    map.hero?.lessonId
+                      ? `/arc/skills/${map.gap.id}/lesson`
+                      : `/arc/skills/${map.gap.id}/setup`
+                  }
+                >
+                  {map.hero?.lessonId ? 'Continue verified lesson' : 'Repair route'}
+                </Link>
+              }
+            >
+              Published lessons remain usable. Arc does not count unpublished objectives as
+              mastery evidence.
+            </StatusMessage>
+          )}
+
           <div className="arc-map-intro">
             <ProgressRing percent={map.progress.percent} label="Skill map" size="large" />
             <div>
@@ -170,9 +236,17 @@ export default async function ArcSkillMapPage({ params }: { params: Promise<{ ga
           </div>
 
           {current === undefined && map.sequence.length > 0 && (
-            <p className="arc-theory-text" style={{ marginTop: 18 }}>
-              Every objective is cleared. Your proof ledger says it all — this skill is done.
-            </p>
+            <StatusMessage
+              tone="success"
+              title="Every objective is cleared."
+              action={
+                <Link className="arc-primary" href="/arc/progress">
+                  Open proof ledger →
+                </Link>
+              }
+            >
+              Your proof ledger says it all — this skill is filled and retained.
+            </StatusMessage>
           )}
         </>
       )}

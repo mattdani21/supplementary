@@ -8,6 +8,7 @@
 
 import Link from 'next/link';
 import { useId, useRef, useState, type KeyboardEvent } from 'react';
+import { StatusMessage } from '@gapos/ui';
 import { ArcAudioPlayer } from './arc-audio-player';
 import { ArcPractice, type ArcPracticeQuestion } from './arc-practice';
 import { Notebook } from './notebook';
@@ -129,7 +130,7 @@ export function LessonTabs(props: LessonTabsProps) {
           aria-labelledby={`${id}-theory-tab`}
           tabIndex={0}
         >
-          {audio && (
+          {audio ? (
             <ArcAudioPlayer
               gapId={gapId}
               artefactId={audio.artefactId}
@@ -137,6 +138,20 @@ export function LessonTabs(props: LessonTabsProps) {
               durationSeconds={audio.durationSeconds}
               transcript={transcript}
             />
+          ) : (
+            <StatusMessage tone="warning" title="This lesson is text-only.">
+              <p>Audio was not published, so use the verified transcript without losing progress.</p>
+              <details className="arc-transcript-copy">
+                <summary>Read transcript</summary>
+                {transcript
+                  .split(/\n+/)
+                  .map((paragraph) => paragraph.trim())
+                  .filter(Boolean)
+                  .map((paragraph, index) => (
+                    <p key={index}>{paragraph}</p>
+                  ))}
+              </details>
+            </StatusMessage>
           )}
           <div className="arc-theory-text">
             <strong>{lesson.summary}</strong>

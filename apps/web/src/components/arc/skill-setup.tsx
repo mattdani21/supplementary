@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Field, StatusMessage } from '@gapos/ui';
 import { arcFetch } from './arc-client';
 
@@ -20,6 +20,11 @@ interface SetupSource {
   readonly id: string;
   readonly filename: string;
   readonly processingStatus: string;
+}
+
+interface SetupRun {
+  readonly status: string;
+  readonly error?: string;
 }
 
 type CompileState = { phase: 'idle' } | { phase: 'running' } | { phase: 'failed'; message: string };
@@ -42,9 +47,11 @@ const compilationKey = (gapId: string): string => {
 export function SkillSetup({
   gap,
   initialSources,
+  lastRun,
 }: {
   gap: SetupGap;
   initialSources: SetupSource[];
+  lastRun?: SetupRun;
 }) {
   const router = useRouter();
   const sourceForm = useRef<HTMLFormElement>(null);
@@ -54,6 +61,12 @@ export function SkillSetup({
   const [sourceMessage, setSourceMessage] = useState<string | null>(null);
   const [generalKnowledgeConfirmed, setGeneralKnowledgeConfirmed] = useState(false);
   const [compileState, setCompileState] = useState<CompileState>({ phase: 'idle' });
+
+  useEffect(() => {
+    if (gap.status === 'failed' || lastRun?.status === 'partial') {
+      window.sessionStorage.removeItem(`arc:compile:${gap.id}`);
+    }
+  }, [gap.id, gap.status, lastRun?.status]);
 
   const addSource = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -116,6 +129,10 @@ export function SkillSetup({
   };
 
   const compile = async () => {
+    const retry =
+      compileState.phase === 'failed' ||
+      gap.status === 'failed' ||
+      lastRun?.status === 'partial';
     setCompileState({ phase: 'running' });
     try {
       if (gap.status === 'draft') {
@@ -125,11 +142,15 @@ export function SkillSetup({
         });
       }
 
+      const idempotencyKey = compilationKey(gap.id);
       const body = (await arcFetch(`/api/gaps/${gap.id}/compile`, {
         method: 'POST',
+        headers: { 'idempotency-key': idempotencyKey },
         body: JSON.stringify({
-          idempotencyKey: compilationKey(gap.id),
+          idempotencyKey,
           audioEnabled: true,
+          surface: 'arc_setup',
+          retry,
         }),
       })) as { run: { status: string; error?: string } };
 
@@ -144,6 +165,9 @@ export function SkillSetup({
         return;
       }
 
+      if (body.run.status === 'partial') {
+        window.sessionStorage.removeItem(`arc:compile:${gap.id}`);
+      }
       router.push(`/arc/skills/${gap.id}`);
       router.refresh();
     } catch (cause) {
@@ -154,7 +178,26 @@ export function SkillSetup({
     }
   };
 
-  if (gap.status === 'active' || gap.status === 'filled' || gap.status === 'review_due') {
+  if (gap.status === 'archived') {
+    return (
+      <StatusMessage
+        tone="warning"
+        title="This skill is archived."
+        action={
+          <Link className="arc-primary" href="/arc/skills">
+            Return to Skills
+          </Link>
+        }
+      >
+        Archived skills cannot be recompiled. Choose another active route from your library.
+      </StatusMessage>
+    );
+  }
+
+  if (
+    (gap.status === 'active' || gap.status === 'filled' || gap.status === 'review_due') &&
+    lastRun?.status !== 'partial'
+  ) {
     return (
       <StatusMessage
         tone="success"
@@ -281,6 +324,20 @@ export function SkillSetup({
         </StatusMessage>
       )}
 
+      {gap.status === 'failed' && compileState.phase === 'idle' && (
+        <StatusMessage tone="error" title="The previous compilation stopped.">
+          {lastRun?.error ??
+            'Your sources and brief are still here. Retry to create a fresh generation attempt.'}
+        </StatusMessage>
+      )}
+
+      {lastRun?.status === 'partial' && compileState.phase === 'idle' && (
+        <StatusMessage tone="warning" title="Part of this route still needs repair.">
+          Verified lessons remain available. Retry compilation to rebuild the missing coverage
+          with a fresh generation attempt.
+        </StatusMessage>
+      )}
+
       {compileState.phase === 'failed' && (
         <StatusMessage tone="error" title="Compilation needs another try.">
           {compileState.message}
@@ -288,7 +345,15 @@ export function SkillSetup({
       )}
 
       {compileBusy && (
-        <StatusMessage tone="info" title="Creating your first usable lesson…">
+        <StatusMessage
+          tone="info"
+          title="Creating your first usable lesson…"
+          action={
+            <Link className="arc-secondary" href={`/arc/skills/${gap.id}/setup`}>
+              Refresh compile status
+            </Link>
+          }
+        >
           Arc is normalizing evidence, planning objectives, verifying practice, and synthesizing
           available audio. Keep this page open.
         </StatusMessage>
@@ -302,7 +367,9 @@ export function SkillSetup({
       >
         {compileBusy
           ? 'Compiling Day 1…'
-          : compileState.phase === 'failed'
+          : compileState.phase === 'failed' ||
+              gap.status === 'failed' ||
+              lastRun?.status === 'partial'
             ? 'Retry compile'
             : 'Compile my route →'}
       </button>

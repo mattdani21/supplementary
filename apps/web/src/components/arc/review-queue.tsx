@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { EmptyState, Field, StatusMessage } from '@gapos/ui';
-import { arcFetch } from './arc-client';
+import { ArcFetchError, arcFetch } from './arc-client';
 
 export interface ArcReviewItem {
   readonly reviewId: string;
@@ -33,8 +33,25 @@ export function ReviewQueue({ initialReviews }: { initialReviews: readonly ArcRe
   const [hintOpen, setHintOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [stale, setStale] = useState(false);
   const [result, setResult] = useState<ReviewResult | null>(null);
   const review = reviews[0];
+
+  if (stale) {
+    return (
+      <EmptyState
+        eyebrow="Review refreshed"
+        title="That review is no longer due."
+        action={
+          <Link className="arc-primary" href="/arc">
+            Return to Today
+          </Link>
+        }
+      >
+        Another session may already have completed it. Nothing was submitted twice.
+      </EmptyState>
+    );
+  }
 
   if (!review) {
     return (
@@ -67,6 +84,10 @@ export function ReviewQueue({ initialReviews }: { initialReviews: readonly ArcRe
       })) as { review: ReviewResult };
       setResult(body.review);
     } catch (cause) {
+      if (cause instanceof ArcFetchError && cause.status === 404) {
+        setStale(true);
+        return;
+      }
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
       setBusy(false);

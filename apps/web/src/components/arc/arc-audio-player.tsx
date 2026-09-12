@@ -7,6 +7,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { StatusMessage } from '@gapos/ui';
 import { arcFetch } from './arc-client';
 
 const RATES = [1, 1.25, 1.5] as const;
@@ -96,7 +97,23 @@ export function ArcAudioPlayer({
     Math.floor((currentTime / Math.max(1, durationSeconds)) * paragraphs.length),
   );
 
-  if (error) return <p className="arc-theory-text">{error}</p>;
+  if (error) {
+    return (
+      <StatusMessage tone="warning" title="Audio is unavailable.">
+        <p>{error}</p>
+        <p>
+          The complete transcript remains available below. Uncached signed audio needs a network
+          connection.
+        </p>
+        <details className="arc-transcript-copy">
+          <summary>Read transcript</summary>
+          {paragraphs.map((paragraph, index) => (
+            <p key={index}>{paragraph}</p>
+          ))}
+        </details>
+      </StatusMessage>
+    );
+  }
 
   return (
     <div className="arc-audio-card">
@@ -108,6 +125,13 @@ export function ArcAudioPlayer({
         onPause={() => setPlaying(false)}
         onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
         onEnded={() => setPlaying(false)}
+        onError={() =>
+          setError(
+            navigator.onLine
+              ? 'The audio file could not be loaded.'
+              : 'Arc is offline, so this audio file cannot be loaded.',
+          )
+        }
         onLoadedMetadata={(event) => {
           event.currentTarget.playbackRate = rate;
           if (durationSeconds === 0) setCurrentTime(0);

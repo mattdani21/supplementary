@@ -88,26 +88,41 @@ export function SkillsLibrary({
       )}
 
       <div className="arc-skill-list">
-        {filtered.active.map((skill) => (
-          <Link
-            key={skill.gapId}
-            className={`arc-skill-card${skill.started ? '' : ' is-muted'}`}
-            href={skill.started ? `/arc/skills/${skill.gapId}` : `/arc/skills/${skill.gapId}/setup`}
-          >
-            <span className="arc-symbol arc-symbol-large">{symbolFor(skill.title)}</span>
-            <span>
-              <h3>{skill.title}</h3>
-              <p>
-                {skill.objectivesTotal > 0
-                  ? `${skill.objectivesTotal} objectives · ${skill.percent}% explored`
-                  : skill.status === 'compiling'
-                    ? 'Compiling your first lesson'
-                    : 'Review sources and compile'}
-              </p>
-            </span>
-            <span className="arc-skill-meta">{skill.started ? 'In progress\n→' : 'Set up\n→'}</span>
-          </Link>
-        ))}
+        {filtered.active.map((skill) => {
+          const needsSetup = ['draft', 'ready', 'compiling', 'failed'].includes(skill.status);
+          return (
+            <Link
+              key={skill.gapId}
+              className={`arc-skill-card${skill.started ? '' : ' is-muted'}`}
+              href={
+                needsSetup
+                  ? `/arc/skills/${skill.gapId}/setup`
+                  : `/arc/skills/${skill.gapId}`
+              }
+            >
+              <span className="arc-symbol arc-symbol-large">{symbolFor(skill.title)}</span>
+              <span>
+                <h3>{skill.title}</h3>
+                <p>
+                  {skill.status === 'failed'
+                    ? 'Compilation stopped · recovery available'
+                    : skill.objectivesTotal > 0
+                      ? `${skill.objectivesTotal} objectives · ${skill.percent}% explored`
+                      : skill.status === 'compiling'
+                        ? 'Compiling your first lesson'
+                        : 'Review sources and compile'}
+                </p>
+              </span>
+              <span className="arc-skill-meta">
+                {skill.status === 'failed'
+                  ? 'Retry\n→'
+                  : skill.started
+                    ? 'In progress\n→'
+                    : 'Set up\n→'}
+              </span>
+            </Link>
+          );
+        })}
         {totalResults === 0 && (
           <EmptyState
             eyebrow="No match"

@@ -127,6 +127,8 @@ const compileSchema = z.object({
   idempotencyKey: z.string().min(1),
   audioEnabled: z.boolean().optional(),
   concurrency: z.number().int().min(1).max(8).optional(),
+  surface: z.literal('arc_setup').optional(),
+  retry: z.boolean().optional(),
 });
 
 const registerSourceSchema = z.object({
@@ -256,14 +258,31 @@ export const compile = async (
   body: unknown,
 ): Promise<{ run: unknown }> => {
   const input = compileSchema.parse(body);
-  const outcome = await compileGap(context, owner, { gapId, ...input });
-  return {
-    run: {
-      runId: outcome.runId,
-      status: outcome.status,
-      ...(outcome.error === undefined ? {} : { error: outcome.error }),
-    },
-  };
+  const { surface, retry = false, ...compileInput } = input;
+  if (surface === 'arc_setup') {
+    if (!retry) context.metrics.increment('arc_setup_completed_total');
+    context.metrics.increment('arc_compile_started_total', { retry: String(retry) });
+    if (retry) context.metrics.increment('arc_compile_retry_total');
+  }
+
+  try {
+    const outcome = await compileGap(context, owner, { gapId, ...compileInput });
+    if (surface === 'arc_setup') {
+      context.metrics.increment('arc_compile_result_total', { status: outcome.status });
+    }
+    return {
+      run: {
+        runId: outcome.runId,
+        status: outcome.status,
+        ...(outcome.error === undefined ? {} : { error: outcome.error }),
+      },
+    };
+  } catch (error) {
+    if (surface === 'arc_setup') {
+      context.metrics.increment('arc_compile_result_total', { status: 'request_error' });
+    }
+    throw error;
+  }
 };
 
 export const registerSourceHandler = async (

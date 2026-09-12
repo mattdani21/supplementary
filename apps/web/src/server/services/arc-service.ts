@@ -273,7 +273,7 @@ export const arcSkills = async (
   const gaps = await context.uow.gaps.list(owner);
   const views = await Promise.all(
     gaps
-      .filter((g) => g.status !== 'archived' && g.status !== 'failed')
+      .filter((g) => g.status !== 'archived')
       .map((g) => skillView(context, owner, g.id, g.title, g.status)),
   );
   return views.sort(
@@ -639,6 +639,11 @@ export interface ArcTodayView {
   };
   readonly mapProgress: { percent: number; cleared: number; total: number };
   readonly suggestions: readonly { gapId: string; title: string; status: string }[];
+  readonly attention: readonly {
+    gapId: string;
+    title: string;
+    state: 'compiling' | 'failed' | 'partial';
+  }[];
   readonly momentumDays: number;
   readonly dueReviews: readonly {
     reviewId: string;
@@ -734,6 +739,25 @@ export const arcToday = async (context: ServerContext, owner: OwnerId): Promise<
     .slice(0, 2)
     .map((g) => ({ gapId: g.id, title: g.title, status: g.status }));
 
+  const attention = (
+    await Promise.all(
+      gaps
+        .filter((gap) => gap.status !== 'archived')
+        .map(async (gap) => {
+          if (gap.status === 'compiling' || gap.status === 'failed') {
+            return { gapId: gap.id, title: gap.title, state: gap.status };
+          }
+          const curriculum = await context.uow.curricula.getCurrentForGap(owner, gap.id);
+          const run = curriculum
+            ? await context.uow.generation.getRun(owner, curriculum.runId)
+            : undefined;
+          return run?.status === 'partial'
+            ? { gapId: gap.id, title: gap.title, state: 'partial' as const }
+            : undefined;
+        }),
+    )
+  ).filter((item): item is NonNullable<typeof item> => item !== undefined);
+
   const continueLesson = continueGap
     ? await nextLessonForGap(context, owner, continueGap.gapId)
     : undefined;
@@ -765,6 +789,7 @@ export const arcToday = async (context: ServerContext, owner: OwnerId): Promise<
       total: totalObjectives,
     },
     suggestions,
+    attention,
     momentumDays: momentumDays(evidenceDates, now),
     dueReviews,
   };
