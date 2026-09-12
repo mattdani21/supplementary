@@ -599,6 +599,18 @@
     }
    ],
    "notes": "Arc UI founder spec implemented. Notebook proofs run REAL server-side sandboxed code (apps/worker/src/notebook/executor.ts: fresh node:vm realm with no host objects, timeouts, length/output caps) validated by the independent verifier at generation time (cellRuns: a code_proof whose reference solution fails its own checks blocks publication). Correctness is decided by executing the learner's code and its check expressions - no regex on source text, no fake audio timer; the prototype's demo JS does not survive. Audio is the compiled lesson's real TTS artefact driven through a real <audio> element (play/pause, +-15s, 1x/1.25x/1.5x, transcript drawer). Calibration is a real 3-step flow through the provider adapters (arc_calibration contract + adaptive diagnostic on the baseline outcome), persisted in arc_calibrations, creating the real gap and mapping to existing gaps. Proofs record attempt + mastery evidence (GAP-012) and advance the gap state machine; wrong answers are state-neutral. The spaced-review preference gates the real due-review queue in Today without cancelling scheduling. All seven screens (Today, Skills, AI calibration, Skill map, Lesson theory+notebook, Progress, Profile) implemented in apps/web in the prototype design language (paper/surface/line tokens, blue AI signal, mint cleared, dark+light themes, focus rings, prefers-reduced-motion, aria labels). Migration 006 (forward-only) extends the questions type CHECK with code_proof and adds learner_preferences + arc_calibrations; rollback of the CHECK change would require a new forward-only migration. Specs: openapi.yaml documents the /arc/* surface; generation schemas regenerated. Telemetry: arc_calibration_total, arc_cell_run_total, arc_proof_submit_total, arc_preferences_updated_total. NOTE: the environment sandbox denies git index writes (no approval channel available), so the commit step of the controller loop could not be executed by the agent; the change set is in the working tree and ready for a human \"git add -A && git commit\"."
+  },
+  "GAP-033": {
+   "status": "in_progress",
+   "startedAt": "2026-09-12T19:17:00.000Z",
+   "evidence": [
+    {
+     "command": "pnpm verify",
+     "result": "blocked",
+     "note": "Initial baseline could not start because the environment snapshot had no node_modules (prettier: not found). Restoring the frozen lockfile before rerunning; this is an environment setup failure, not a test failure."
+    }
+   ],
+   "notes": "Scope: specify the unified Arc learner journey, preserve real provider/audio/proof boundaries, create a browser and accessibility acceptance harness, and maintain a route-by-route UX audit. No migrations; no live providers; no generated visual binaries in source control."
   }
  },
  "GAP-014b": {
