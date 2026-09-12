@@ -1,4 +1,4 @@
-/* global self, caches, URL, Request, fetch, Response, decodeURIComponent */
+/* global self, caches, URL, Request, fetch, Response */
 /**
  * Arc service worker (E14 — offline polish).
  *
