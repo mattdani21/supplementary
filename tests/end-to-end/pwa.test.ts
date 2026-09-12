@@ -30,7 +30,7 @@ describe('the offline service worker (E14)', () => {
     expect(sw).toContain("request.headers.get('cookie')");
     expect(sw).toContain("self.cookieStore?.get('gapos_owner')");
     expect(sw).toContain('scopedUrl.searchParams.set(OWNER_KEY, owner)');
-    expect(sw).toContain('new Request(scopedUrl, request)');
+    expect(sw).toContain('headers: request.headers');
     expect(sw).toContain('if (!cacheKey)');
   });
 

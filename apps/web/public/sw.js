@@ -37,7 +37,13 @@ const scopedArcRequest = async (request) => {
   if (!owner) return undefined;
   const scopedUrl = new URL(request.url);
   scopedUrl.searchParams.set(OWNER_KEY, owner);
-  return new Request(scopedUrl, request);
+  // Cloning the full navigation Request would copy its non-constructible `navigate` mode.
+  // Preserve the headers used by Vary while creating a cache-only same-origin GET key.
+  return new Request(scopedUrl, {
+    method: request.method,
+    headers: request.headers,
+    credentials: request.credentials,
+  });
 };
 
 const offlineDocument = () =>
