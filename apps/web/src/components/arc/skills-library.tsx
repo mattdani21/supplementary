@@ -6,8 +6,9 @@
  */
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
-import { EmptyState } from '@gapos/ui';
+import { useEffect, useMemo, useState } from 'react';
+import { EmptyState, StatusMessage } from '@gapos/ui';
+import { arcFetch } from './arc-client';
 
 interface SkillView {
   gapId: string;
@@ -43,6 +44,44 @@ export function SkillsLibrary({
 }) {
   const [query, setQuery] = useState('');
   const [chosen, setChosen] = useState<string | null>(null);
+  const [capabilityResults, setCapabilityResults] = useState(capabilities);
+  const [searchBusy, setSearchBusy] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const normalized = query.trim();
+    if (!normalized) {
+      setCapabilityResults(capabilities);
+      setSearchBusy(false);
+      setSearchError(null);
+      return;
+    }
+
+    let cancelled = false;
+    setSearchBusy(true);
+    setSearchError(null);
+    const timer = window.setTimeout(() => {
+      arcFetch(`/api/arc/capabilities?query=${encodeURIComponent(normalized)}`)
+        .then((body) => {
+          if (cancelled) return;
+          setCapabilityResults(
+            (body as { capabilities: CapabilityView[] }).capabilities,
+          );
+        })
+        .catch((cause) => {
+          if (cancelled) return;
+          setSearchError(cause instanceof Error ? cause.message : String(cause));
+        })
+        .finally(() => {
+          if (!cancelled) setSearchBusy(false);
+        });
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [capabilities, query]);
 
   const filtered = useMemo(() => {
     const terms = query.toLowerCase().trim();
@@ -52,11 +91,11 @@ export function SkillsLibrary({
       values.some((value) => value.toLowerCase().includes(terms));
     return {
       active: active.filter((skill) => matches([skill.title])),
-      capabilities: capabilities.filter((capability) =>
+      capabilities: capabilityResults.filter((capability) =>
         matches([capability.title, capability.targetCapability ?? '', ...capability.objectiveIds]),
       ),
     };
-  }, [skills, capabilities, query]);
+  }, [skills, capabilityResults, query]);
 
   const totalResults = filtered.active.length + filtered.capabilities.length;
 
@@ -72,6 +111,17 @@ export function SkillsLibrary({
           onChange={(event) => setQuery(event.target.value)}
         />
       </label>
+
+      {searchBusy ? (
+        <p className="arc-add-note" role="status">
+          Searching retained capabilities…
+        </p>
+      ) : null}
+      {searchError ? (
+        <StatusMessage tone="warning" title="Capability search is temporarily unavailable.">
+          {searchError} Active skill titles are still filtered on this device.
+        </StatusMessage>
+      ) : null}
 
       {skills.length === 0 && capabilities.length === 0 && (
         <EmptyState

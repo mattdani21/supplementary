@@ -70,12 +70,16 @@ test('a visited Arc lesson keeps its text and explains offline limits', async (
   const lessonPath = `/arc/skills/${gapId}/lesson`;
   await page.goto(lessonPath);
   await expect(page.getByRole('tab', { name: 'Theory' })).toBeVisible();
-  await expect(page.getByText(/today we are going to earn one sentence/i)).toBeVisible();
+  await expect(
+    page.locator('.arc-theory-text p').filter({ hasText: 'Today we are going to earn one sentence' }),
+  ).toBeVisible();
 
   await context.setOffline(true);
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('tab', { name: 'Theory' })).toBeVisible();
-  await expect(page.getByText(/today we are going to earn one sentence/i)).toBeVisible();
+  await expect(
+    page.locator('.arc-theory-text p').filter({ hasText: 'Today we are going to earn one sentence' }),
+  ).toBeVisible();
 
   await page.getByRole('tab', { name: 'Practice' }).click();
   await page.getByLabel('A and B share no elements').check();

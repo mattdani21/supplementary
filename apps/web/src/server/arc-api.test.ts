@@ -263,6 +263,26 @@ describe('Arc setup telemetry', () => {
       SET_THEORY_SOURCE,
     );
   });
+
+  it('publishes Day 1 after explicit general-knowledge setup without an upload', async () => {
+    const { context } = buildContext();
+    const created = (await createGap(context, OWNER, {
+      title: 'Relations and proof techniques',
+      rawStatement: REFERENCE_GAP_STATEMENT,
+      dailyMinutes: 25,
+      sourcePolicy: 'general_knowledge_allowed',
+    })) as { gap: Gap };
+    await transitionGap(context, OWNER, created.gap.id, { type: 'define' });
+
+    const outcome = (await compile(context, OWNER, created.gap.id, {
+      idempotencyKey: 'arc-general-knowledge',
+      surface: 'arc_setup',
+      retry: false,
+    })) as { run: { status: string } };
+    expect(outcome.run.status).toBe('complete');
+    expect(await context.uow.sources.listForGap(OWNER, created.gap.id)).toEqual([]);
+    expect((await arcLessonHandler(context, OWNER, created.gap.id)).lesson.lesson.day).toBe(1);
+  });
 });
 
 describe('Arc notebook proofs', () => {
