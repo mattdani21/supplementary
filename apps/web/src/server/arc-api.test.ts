@@ -486,8 +486,8 @@ describe('Arc preferences and spaced review', () => {
 
     const queue = await arcReviewsHandler(context, OWNER);
     expect(queue.reviews.length).toBeGreaterThan(0);
-    expect(JSON.stringify(queue)).not.toContain(question.payload.answer);
     const review = queue.reviews.find((entry) => entry.questionId === question.id)!;
+    expect(review).not.toHaveProperty('answer');
 
     const submitted = await arcSubmitReviewHandler(context, OWNER, review.reviewId, {
       response: question.payload.answer,

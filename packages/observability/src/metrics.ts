@@ -30,6 +30,8 @@ export const METRICS = [
   'arc_cell_run_total',
   'arc_proof_submit_total',
   'arc_preferences_updated_total',
+  'arc_review_completed_total',
+  'arc_capability_search_total',
 ] as const;
 
 export type MetricName = (typeof METRICS)[number];

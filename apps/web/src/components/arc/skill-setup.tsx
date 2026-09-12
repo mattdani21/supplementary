@@ -96,13 +96,14 @@ export function SkillSetup({
         setSourceError(body.registration.message);
         return;
       }
+      const accepted = body.registration;
 
       setSources((current) => {
-        if (current.some((source) => source.id === body.registration.source.id)) return current;
-        return [...current, body.registration.source];
+        if (current.some((source) => source.id === accepted.source.id)) return current;
+        return [...current, accepted.source];
       });
       setSourceMessage(
-        body.registration.deduplicated
+        accepted.deduplicated
           ? 'That source was already attached, so Arc reused it.'
           : 'Source attached. It will be normalized during compile.',
       );
