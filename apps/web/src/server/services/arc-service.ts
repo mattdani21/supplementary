@@ -157,16 +157,6 @@ export const runCalibration = async (
   if (!kit) throw new CalibrationKitUnavailableError();
   const baselineCorrect = kit.baselineQuestion.answer === input.baselineAnswer;
 
-  const gap = await createGap(context, owner, {
-    title: input.subject,
-    rawStatement:
-      `I want to ${input.goal} in ${input.subject}. ` +
-      `Arc calibration baseline: ${baselineCorrect ? 'correct' : 'needs support'}.`,
-    dailyMinutes: input.dailyMinutes ?? 35,
-    ...(input.deadline ? { deadline: input.deadline } : {}),
-    sourcePolicy: input.sourcePolicy ?? 'general_knowledge_allowed',
-  });
-
   const diagnostic = (
     await context.providers.languageModel.generate({
       contract: DiagnosticInterpretationContract,
@@ -182,6 +172,18 @@ export const runCalibration = async (
         'lowers the starting difficulty and widens it.',
     })
   ).value;
+
+  // Provider failure is state-neutral. Persist the gap only after the diagnostic has crossed the
+  // schema-validating adapter boundary, so retry cannot leave or duplicate an orphan draft.
+  const gap = await createGap(context, owner, {
+    title: input.subject,
+    rawStatement:
+      `I want to ${input.goal} in ${input.subject}. ` +
+      `Arc calibration baseline: ${baselineCorrect ? 'correct' : 'needs support'}.`,
+    dailyMinutes: input.dailyMinutes ?? 35,
+    ...(input.deadline ? { deadline: input.deadline } : {}),
+    sourcePolicy: input.sourcePolicy ?? 'general_knowledge_allowed',
+  });
 
   const calibration = await context.uow.calibrations.create(owner, {
     id: context.newId('cal'),

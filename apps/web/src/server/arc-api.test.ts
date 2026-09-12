@@ -15,6 +15,7 @@ import {
   REFERENCE_GAP_STATEMENT,
   SET_THEORY_SOURCE,
   referenceCalibration,
+  referenceDiagnostic,
 } from '@gapos/test-fixtures';
 import type { Gap } from '@gapos/database';
 import { createServerContext, type ServerContext } from './context.js';
@@ -304,6 +305,45 @@ describe('Arc calibration', () => {
     const expired = await arcCalibrateHandler(context, OWNER, body).catch(toHttpError);
     expect(expired).toMatchObject({ status: 409, code: 'calibration_kit_expired' });
     expect(await context.uow.gaps.list(OWNER)).toEqual([]);
+  });
+
+  it('leaves no orphan gap when diagnostic generation fails, then creates one on retry', async () => {
+    let diagnosticCalls = 0;
+    const context = createServerContext({
+      fake: {
+        script: {
+          diagnostic_interpretation: () => {
+            diagnosticCalls += 1;
+            if (diagnosticCalls === 1) throw new Error('Diagnostic provider unavailable.');
+            return referenceDiagnostic({
+              knowledgeGaps: ['double inclusion', 'relation properties'],
+              recommendedStartingDifficulty: 2,
+            });
+          },
+        },
+      },
+    });
+    const kit = await calibrationKitFor(context);
+    const request = {
+      kitId: kit.kitId,
+      subject: kit.subject,
+      goal: kit.goalOptions[0]!,
+      baselineAnswer: '12',
+      dailyMinutes: 25,
+      sourcePolicy: 'sources_only' as const,
+    };
+
+    await expect(arcCalibrateHandler(context, OWNER, request)).rejects.toThrow(
+      'Diagnostic provider unavailable.',
+    );
+    expect(await context.uow.gaps.list(OWNER)).toEqual([]);
+    expect(await context.uow.calibrations.listForOwner(OWNER)).toEqual([]);
+
+    const recovered = await arcCalibrateHandler(context, OWNER, request);
+    expect(await context.uow.gaps.list(OWNER)).toEqual([
+      expect.objectContaining({ id: recovered.calibration.gapId }),
+    ]);
+    expect(await context.uow.calibrations.listForOwner(OWNER)).toHaveLength(1);
   });
 });
 
