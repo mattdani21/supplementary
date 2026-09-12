@@ -64,11 +64,16 @@ test('the Arc journey reaches practice, correction and server-graded review', as
   const lessonTargets = page.locator(
     '.arc-mode-button, .arc-play, .arc-audio-skip, .arc-audio-rate, .arc-transcript-toggle',
   );
-  for (let index = 0; index < (await lessonTargets.count()); index += 1) {
-    const box = await lessonTargets.nth(index).boundingBox();
-    expect(box, `lesson target ${index} has a rendered box`).not.toBeNull();
-    expect(box!.width, `lesson target ${index} width`).toBeGreaterThanOrEqual(44);
-    expect(box!.height, `lesson target ${index} height`).toBeGreaterThanOrEqual(44);
+  const lessonTargetBoxes = await lessonTargets.evaluateAll((elements) =>
+    elements.map((element) => {
+      const box = element.getBoundingClientRect();
+      return { width: box.width, height: box.height };
+    }),
+  );
+  expect(lessonTargetBoxes.length).toBeGreaterThanOrEqual(8);
+  for (const [index, box] of lessonTargetBoxes.entries()) {
+    expect(box.width, `lesson target ${index} width`).toBeGreaterThanOrEqual(44);
+    expect(box.height, `lesson target ${index} height`).toBeGreaterThanOrEqual(44);
   }
   const theoryTab = page.getByRole('tab', { name: 'Theory' });
   await theoryTab.focus();
