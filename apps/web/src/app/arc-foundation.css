@@ -358,9 +358,11 @@ html[data-theme='dark'] .arc .arc-primary {
   display: grid;
   grid-template-columns: 22px 1fr;
   gap: 10px;
+  margin: 0;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   padding: 13px;
+  color: var(--ink);
   background: var(--surface);
 }
 
