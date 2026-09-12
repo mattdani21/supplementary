@@ -35,7 +35,7 @@ export default async function ArcSkillSetupPage({
     listSources(context, owner, gapId),
   ])) as [{ gap: GapView }, { sources: SourceView[] }];
   const curriculum = await context.uow.curricula.getCurrentForGap(owner, gapId);
-  const lastRun = curriculum
+  const lastRun = curriculum?.runId
     ? await context.uow.generation.getRun(owner, curriculum.runId)
     : undefined;
 

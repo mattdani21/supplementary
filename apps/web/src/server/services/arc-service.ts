@@ -748,7 +748,7 @@ export const arcToday = async (context: ServerContext, owner: OwnerId): Promise<
             return { gapId: gap.id, title: gap.title, state: gap.status };
           }
           const curriculum = await context.uow.curricula.getCurrentForGap(owner, gap.id);
-          const run = curriculum
+          const run = curriculum?.runId
             ? await context.uow.generation.getRun(owner, curriculum.runId)
             : undefined;
           return run?.status === 'partial'
