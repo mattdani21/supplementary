@@ -12,10 +12,17 @@ import {
   DiagnosticInterpretationContract,
   type Calibration,
 } from '@gapos/ai-contracts';
-import type { LearnerPreferences, OwnerId } from '@gapos/database';
+import type { LearnerPreferences, OwnerId, ReviewItem, StoredQuestion } from '@gapos/database';
 import type { ServerContext } from '../context.js';
 import { createGap } from './gap-service.js';
-import { assessMastery, getToday } from './learning-service.js';
+import {
+  assessMastery,
+  completeReview,
+  getToday,
+  searchCapabilities,
+  submitAttempt,
+  type AttemptResult,
+} from './learning-service.js';
 
 /* --------------------------------------------------------------- preferences */
 
@@ -47,6 +54,7 @@ export const setPreferences = async (
 /* --------------------------------------------------------------- calibration */
 
 export interface CalibrationKitView {
+  readonly kitId: string;
   readonly subject: string;
   readonly goalOptions: readonly string[];
   readonly baselineQuestion: {
@@ -82,7 +90,8 @@ const fetchCalibrationKit = async (
     })
   ).value;
 
-export const toCalibrationKitView = (kit: Calibration): CalibrationKitView => ({
+export const toCalibrationKitView = (kitId: string, kit: Calibration): CalibrationKitView => ({
+  kitId,
   subject: kit.subject,
   goalOptions: kit.goalOptions,
   baselineQuestion: {
@@ -97,13 +106,19 @@ export const calibrationKit = async (
   context: ServerContext,
   owner: OwnerId,
   subject: string,
-): Promise<CalibrationKitView> =>
-  toCalibrationKitView(await fetchCalibrationKit(context, owner, subject));
+): Promise<CalibrationKitView> => {
+  const kit = await fetchCalibrationKit(context, owner, subject);
+  return toCalibrationKitView(context.calibrationKits.issue(owner, subject, kit), kit);
+};
 
 export interface CalibrationInput {
+  readonly kitId: string;
   readonly subject: string;
   readonly goal: string;
   readonly baselineAnswer: string;
+  readonly dailyMinutes?: number;
+  readonly deadline?: string;
+  readonly sourcePolicy?: 'general_knowledge_allowed' | 'sources_only';
 }
 
 export interface CalibrationResult {
@@ -119,6 +134,13 @@ export interface CalibrationResult {
   readonly relatedGapIds: readonly string[];
 }
 
+export class CalibrationKitUnavailableError extends Error {
+  constructor() {
+    super('This calibration check expired or belongs to another learner. Load a fresh check.');
+    this.name = 'CalibrationKitUnavailableError';
+  }
+}
+
 /**
  * Run the 3-step calibration: grade the baseline answer (exact option match, server-side),
  * create the real gap the route leads to, and interpret the diagnostic through the provider
@@ -131,16 +153,9 @@ export const runCalibration = async (
   owner: OwnerId,
   input: CalibrationInput,
 ): Promise<CalibrationResult> => {
-  const kit = await fetchCalibrationKit(context, owner, input.subject);
+  const kit = context.calibrationKits.get(owner, input.kitId, input.subject);
+  if (!kit) throw new CalibrationKitUnavailableError();
   const baselineCorrect = kit.baselineQuestion.answer === input.baselineAnswer;
-
-  const gap = await createGap(context, owner, {
-    title: input.subject,
-    rawStatement:
-      `I want to ${input.goal} in ${input.subject}. ` +
-      `Arc calibration baseline: ${baselineCorrect ? 'correct' : 'needs support'}.`,
-    dailyMinutes: 35,
-  });
 
   const diagnostic = (
     await context.providers.languageModel.generate({
@@ -157,6 +172,18 @@ export const runCalibration = async (
         'lowers the starting difficulty and widens it.',
     })
   ).value;
+
+  // Provider failure is state-neutral. Persist the gap only after the diagnostic has crossed the
+  // schema-validating adapter boundary, so retry cannot leave or duplicate an orphan draft.
+  const gap = await createGap(context, owner, {
+    title: input.subject,
+    rawStatement:
+      `I want to ${input.goal} in ${input.subject}. ` +
+      `Arc calibration baseline: ${baselineCorrect ? 'correct' : 'needs support'}.`,
+    dailyMinutes: input.dailyMinutes ?? 35,
+    ...(input.deadline ? { deadline: input.deadline } : {}),
+    sourcePolicy: input.sourcePolicy ?? 'general_knowledge_allowed',
+  });
 
   const calibration = await context.uow.calibrations.create(owner, {
     id: context.newId('cal'),
@@ -262,7 +289,7 @@ export const arcSkills = async (
   const gaps = await context.uow.gaps.list(owner);
   const views = await Promise.all(
     gaps
-      .filter((g) => g.status !== 'archived' && g.status !== 'failed')
+      .filter((g) => g.status !== 'archived')
       .map((g) => skillView(context, owner, g.id, g.title, g.status)),
   );
   return views.sort(
@@ -275,6 +302,7 @@ export interface ArcMapItem {
   readonly capabilityStatement: string;
   readonly state: 'cleared' | 'current' | 'later';
   readonly lessonDay?: number;
+  readonly missing: readonly string[];
 }
 
 export interface ArcMapView {
@@ -354,6 +382,8 @@ export const arcMap = async (
       objectiveId: objective.id,
       capabilityStatement: objective.capabilityStatement,
       state: cleared ? 'cleared' : current ? 'current' : 'later',
+      missing:
+        mastery.assessments.find((entry) => entry.objectiveId === objective.id)?.missing ?? [],
       ...(lessonForObjective.get(objective.id)?.day === undefined
         ? {}
         : { lessonDay: lessonForObjective.get(objective.id)!.day }),
@@ -396,6 +426,15 @@ export interface ArcNotebookView {
   readonly hint?: string;
 }
 
+export interface ArcPracticeView {
+  readonly questionId: string;
+  readonly prompt: string;
+  readonly type: 'multiple_choice' | 'short_answer' | 'worked_problem';
+  readonly role: 'retrieval' | 'application' | 'transfer';
+  readonly options?: readonly string[];
+  readonly hint?: string;
+}
+
 export interface ArcLessonView {
   readonly gap: { id: string; title: string };
   readonly lesson: {
@@ -410,6 +449,8 @@ export interface ArcLessonView {
   readonly audio?: { artefactId: string; durationSeconds: number };
   readonly transcript: string;
   readonly notebook?: ArcNotebookView;
+  readonly practice: readonly ArcPracticeView[];
+  readonly defaultMode: 'theory' | 'practice';
 }
 
 /**
@@ -422,7 +463,10 @@ export const arcLesson = async (
   owner: OwnerId,
   gapId: string,
 ): Promise<ArcLessonView | undefined> => {
-  const gap = await context.uow.gaps.get(owner, gapId);
+  const [gap, preferences] = await Promise.all([
+    context.uow.gaps.get(owner, gapId),
+    getPreferences(context, owner),
+  ]);
   if (!gap) return undefined;
   const curriculum = await context.uow.curricula.getCurrentForGap(owner, gapId);
   if (!curriculum) return undefined;
@@ -447,6 +491,23 @@ export const arcLesson = async (
   const totalAudioSeconds = audioArtefacts.reduce((sum, a) => sum + (a.durationSeconds ?? 0), 0);
 
   const notebookQuestion = questions.find((q) => q.payload.type === 'code_proof');
+  const practice: ArcPracticeView[] = questions.flatMap((question) => {
+    if (question.payload.type === 'code_proof') return [];
+    return [
+      {
+        questionId: question.id,
+        prompt: question.payload.prompt,
+        type: question.payload.type,
+        role: question.payload.role,
+        ...(question.payload.type === 'multiple_choice'
+          ? { options: question.payload.options }
+          : {}),
+        ...(preferences.gentleHints && question.payload.hint
+          ? { hint: question.payload.hint }
+          : {}),
+      },
+    ];
+  });
 
   return {
     gap: { id: gap.id, title: gap.title },
@@ -469,10 +530,14 @@ export const arcLesson = async (
             questionId: notebookQuestion.id,
             prompt: notebookQuestion.payload.prompt,
             starterCode: notebookQuestion.payload.starterCode ?? '',
-            ...(notebookQuestion.payload.hint ? { hint: notebookQuestion.payload.hint } : {}),
+            ...(preferences.gentleHints && notebookQuestion.payload.hint
+              ? { hint: notebookQuestion.payload.hint }
+              : {}),
           },
         }
       : {}),
+    practice,
+    defaultMode: preferences.audioTheory ? 'theory' : 'practice',
   };
 };
 
@@ -486,11 +551,18 @@ export interface ArcProofView {
 
 export interface ArcProgressView {
   readonly percent: number;
-  readonly clearedGaps: number;
+  readonly filledGaps: number;
   readonly totalGaps: number;
   readonly weeklyMinutes: number;
   readonly momentumDays: number;
   readonly proofs: readonly ArcProofView[];
+  readonly needs: readonly {
+    gapId: string;
+    gapTitle: string;
+    objectiveId: string;
+    capabilityStatement: string;
+    missing: readonly string[];
+  }[];
 }
 
 const momentumDays = (evidenceDates: readonly Date[], now: Date): number => {
@@ -505,7 +577,7 @@ const momentumDays = (evidenceDates: readonly Date[], now: Date): number => {
 };
 
 /**
- * The Progress screen: cleared gaps and the proofs ledger from real mastery evidence, weekly
+ * The Progress screen: filled gaps and the proofs ledger from real mastery evidence, weekly
  * focused minutes from the lessons the learner actually practised, and momentum from the
  * consecutive days with evidence.
  */
@@ -517,6 +589,13 @@ export const arcProgress = async (
   const activeGaps = gaps.filter((g) => g.status !== 'archived' && g.status !== 'failed');
 
   const proofs: ArcProofView[] = [];
+  const needs: {
+    gapId: string;
+    gapTitle: string;
+    objectiveId: string;
+    capabilityStatement: string;
+    missing: readonly string[];
+  }[] = [];
   const evidenceDates: Date[] = [];
   let weeklyMinutes = 0;
 
@@ -542,6 +621,22 @@ export const arcProgress = async (
       evidenceDates.push(record.recordedAt);
     }
 
+    if (gap.status !== 'filled') {
+      const mastery = await assessMastery(context, owner, gap.id);
+      for (const assessment of mastery.assessments.filter((item) => !item.mastered)) {
+        const objective = curriculum.plan.objectives.find(
+          (item) => item.id === assessment.objectiveId,
+        );
+        needs.push({
+          gapId: gap.id,
+          gapTitle: gap.title,
+          objectiveId: assessment.objectiveId,
+          capabilityStatement: objective?.capabilityStatement ?? assessment.objectiveId,
+          missing: assessment.missing,
+        });
+      }
+    }
+
     for (const lesson of lessons) {
       const questions = await context.uow.curricula.listQuestions(owner, lesson.id);
       // Weekly minutes are real practice time: the lesson's estimate, but only for lessons
@@ -552,16 +647,17 @@ export const arcProgress = async (
     }
   }
 
-  const clearedGaps = activeGaps.filter((g) => g.status === 'filled').length;
-  const percent = activeGaps.length === 0 ? 0 : Math.round((clearedGaps / activeGaps.length) * 100);
+  const filledGaps = activeGaps.filter((g) => g.status === 'filled').length;
+  const percent = activeGaps.length === 0 ? 0 : Math.round((filledGaps / activeGaps.length) * 100);
 
   return {
     percent,
-    clearedGaps,
+    filledGaps,
     totalGaps: activeGaps.length,
     weeklyMinutes,
     momentumDays: momentumDays(evidenceDates, context.now()),
     proofs: proofs.sort((a, b) => b.recordedAt.getTime() - a.recordedAt.getTime()).slice(0, 20),
+    needs,
   };
 };
 
@@ -590,6 +686,11 @@ export interface ArcTodayView {
   };
   readonly mapProgress: { percent: number; cleared: number; total: number };
   readonly suggestions: readonly { gapId: string; title: string; status: string }[];
+  readonly attention: readonly {
+    gapId: string;
+    title: string;
+    state: 'compiling' | 'failed' | 'partial';
+  }[];
   readonly momentumDays: number;
   readonly dueReviews: readonly {
     reviewId: string;
@@ -685,6 +786,25 @@ export const arcToday = async (context: ServerContext, owner: OwnerId): Promise<
     .slice(0, 2)
     .map((g) => ({ gapId: g.id, title: g.title, status: g.status }));
 
+  const attention = (
+    await Promise.all(
+      gaps
+        .filter((gap) => gap.status !== 'archived')
+        .map(async (gap) => {
+          if (gap.status === 'compiling' || gap.status === 'failed') {
+            return { gapId: gap.id, title: gap.title, state: gap.status };
+          }
+          const curriculum = await context.uow.curricula.getCurrentForGap(owner, gap.id);
+          const run = curriculum?.runId
+            ? await context.uow.generation.getRun(owner, curriculum.runId)
+            : undefined;
+          return run?.status === 'partial'
+            ? { gapId: gap.id, title: gap.title, state: 'partial' as const }
+            : undefined;
+        }),
+    )
+  ).filter((item): item is NonNullable<typeof item> => item !== undefined);
+
   const continueLesson = continueGap
     ? await nextLessonForGap(context, owner, continueGap.gapId)
     : undefined;
@@ -716,6 +836,7 @@ export const arcToday = async (context: ServerContext, owner: OwnerId): Promise<
       total: totalObjectives,
     },
     suggestions,
+    attention,
     momentumDays: momentumDays(evidenceDates, now),
     dueReviews,
   };
@@ -738,11 +859,159 @@ const anyQuestionAttemptedToday = async (
   return false;
 };
 
+/* ------------------------------------------------------------ reviews/retention */
+
+interface ResolvedReview {
+  readonly review: ReviewItem;
+  readonly question: StoredQuestion;
+  readonly gapId: string;
+  readonly gapTitle: string;
+  readonly capabilityStatement: string;
+}
+
+const resolveReview = async (
+  context: ServerContext,
+  owner: OwnerId,
+  review: ReviewItem,
+): Promise<ResolvedReview | undefined> => {
+  const curriculum = await context.uow.curricula.get(owner, review.curriculumId);
+  if (!curriculum) return undefined;
+  const gap = await context.uow.gaps.get(owner, curriculum.gapId);
+  if (!gap) return undefined;
+
+  let question = review.questionId
+    ? await context.uow.curricula.getQuestion(owner, review.questionId)
+    : undefined;
+  if (!question) {
+    const lessons = await context.uow.curricula.listLessons(owner, curriculum.id);
+    const candidates: StoredQuestion[] = [];
+    for (const lesson of lessons) {
+      candidates.push(...(await context.uow.curricula.listQuestions(owner, lesson.id)));
+    }
+    question =
+      candidates.find(
+        (candidate) =>
+          candidate.objectiveId === review.objectiveId && candidate.payload.role === 'retrieval',
+      ) ?? candidates.find((candidate) => candidate.objectiveId === review.objectiveId);
+  }
+  if (!question) return undefined;
+
+  const objective = curriculum.plan.objectives.find((entry) => entry.id === review.objectiveId);
+  return {
+    review,
+    question,
+    gapId: gap.id,
+    gapTitle: gap.title,
+    capabilityStatement: objective?.capabilityStatement ?? review.objectiveId,
+  };
+};
+
+export interface ArcReviewView {
+  readonly reviewId: string;
+  readonly questionId: string;
+  readonly gapId: string;
+  readonly gapTitle: string;
+  readonly objectiveId: string;
+  readonly capabilityStatement: string;
+  readonly dueAt: Date;
+  readonly reason: ReviewItem['reason'];
+  readonly prompt: string;
+  readonly type: StoredQuestion['payload']['type'];
+  readonly options?: readonly string[];
+  readonly hint?: string;
+}
+
+export const arcReviews = async (
+  context: ServerContext,
+  owner: OwnerId,
+): Promise<ArcReviewView[]> => {
+  const [due, preferences] = await Promise.all([
+    context.uow.mastery.listDueReviews(owner, context.now()),
+    getPreferences(context, owner),
+  ]);
+  const resolved = await Promise.all(due.map((review) => resolveReview(context, owner, review)));
+  return resolved.flatMap((entry) => {
+    if (!entry) return [];
+    const { review, question } = entry;
+    return [
+      {
+        reviewId: review.id,
+        questionId: question.id,
+        gapId: entry.gapId,
+        gapTitle: entry.gapTitle,
+        objectiveId: review.objectiveId,
+        capabilityStatement: entry.capabilityStatement,
+        dueAt: review.dueAt,
+        reason: review.reason,
+        prompt: question.payload.prompt,
+        type: question.payload.type,
+        ...(question.payload.type === 'multiple_choice'
+          ? { options: question.payload.options }
+          : {}),
+        ...(preferences.gentleHints && question.payload.hint
+          ? { hint: question.payload.hint }
+          : {}),
+      },
+    ];
+  });
+};
+
+export interface ArcReviewSubmission {
+  readonly correct: boolean;
+  readonly feedback: AttemptResult['feedback'];
+  readonly nextReview?: ReviewItem;
+}
+
+export const submitArcReview = async (
+  context: ServerContext,
+  owner: OwnerId,
+  reviewId: string,
+  input: {
+    readonly response: string;
+    readonly confidence?: 'low' | 'medium' | 'high';
+    readonly idempotencyKey: string;
+  },
+): Promise<ArcReviewSubmission> => {
+  const review = (await context.uow.mastery.listDueReviews(owner, context.now())).find(
+    (candidate) => candidate.id === reviewId,
+  );
+  if (!review) throw new Error(`Review ${reviewId} was not found in due reviews for this owner.`);
+  const resolved = await resolveReview(context, owner, review);
+  if (!resolved) throw new Error(`Review ${reviewId} has no available practice question.`);
+
+  const result = await submitAttempt(context, owner, resolved.gapId, {
+    questionId: resolved.question.id,
+    sessionId: `review:${review.id}`,
+    response: input.response,
+    ...(input.confidence ? { confidence: input.confidence } : {}),
+    idempotencyKey: input.idempotencyKey,
+    evidenceType: 'retrieval',
+    scheduleReviews: false,
+  });
+  const nextReview = await completeReview(context, owner, review.id, result.correct);
+  context.metrics.increment('arc_review_completed_total', {
+    correct: String(result.correct),
+  });
+
+  return {
+    correct: result.correct,
+    feedback: result.feedback,
+    ...(nextReview ? { nextReview } : {}),
+  };
+};
+
+export const arcCapabilities = async (context: ServerContext, owner: OwnerId, query = '') => {
+  context.metrics.increment('arc_capability_search_total', {
+    hasQuery: String(query.trim().length > 0),
+  });
+  return searchCapabilities(context, owner, query);
+};
+
 export interface ArcProfileView {
   readonly name: string;
   readonly email: string;
   readonly preferences: LearnerPreferences;
-  readonly stats: { clearedGaps: number; totalGaps: number };
+  readonly stats: { filledGaps: number; totalGaps: number };
 }
 
 export const arcProfile = async (
@@ -760,7 +1029,7 @@ export const arcProfile = async (
     email: user?.email ?? '',
     preferences,
     stats: {
-      clearedGaps: active.filter((g) => g.status === 'filled').length,
+      filledGaps: active.filter((g) => g.status === 'filled').length,
       totalGaps: active.length,
     },
   };

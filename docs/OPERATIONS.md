@@ -170,7 +170,7 @@ Required signals:
 - audit findings by category;
 - repair attempts and their success rate;
 - audio generation failures;
-- attempt correctness by objective;
+- attempt correctness by stable question type and assessment role;
 - Day 1 and full-course publication latency.
 
 Every log line is structured and carries `run_id`, `gap_id` and `step` where applicable. No user

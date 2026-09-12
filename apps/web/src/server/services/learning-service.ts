@@ -106,6 +106,8 @@ export interface SubmitAttemptInput {
   /** Required: a replayed submit must not record a second piece of evidence. */
   readonly idempotencyKey: string;
   readonly evidenceType?: EvidenceType;
+  /** Internal review flow: the completed review owns the next ladder step. */
+  readonly scheduleReviews?: boolean;
 }
 
 export interface AttemptResult {
@@ -130,6 +132,28 @@ const evidenceTypeFor = (question: StoredQuestion, override?: EvidenceType): Evi
   }
 };
 
+export class QuestionNotInGapError extends Error {
+  constructor(questionId: string, gapId: string) {
+    super(`Question ${questionId} is not part of gap ${gapId}.`);
+    this.name = 'QuestionNotInGapError';
+  }
+}
+
+const curriculumForQuestion = async (
+  context: ServerContext,
+  owner: OwnerId,
+  gapId: string,
+  question: StoredQuestion,
+): Promise<Curriculum> => {
+  const curriculum = await context.uow.curricula.getCurrentForGap(owner, gapId);
+  if (!curriculum) throw new Error(`No curriculum for gap ${gapId}.`);
+  const lessons = await context.uow.curricula.listLessons(owner, curriculum.id);
+  if (!lessons.some((lesson) => lesson.id === question.lessonId)) {
+    throw new QuestionNotInGapError(question.id, gapId);
+  }
+  return curriculum;
+};
+
 export const submitAttempt = async (
   context: ServerContext,
   owner: OwnerId,
@@ -139,8 +163,7 @@ export const submitAttempt = async (
   const question = await context.uow.curricula.getQuestion(owner, input.questionId);
   if (!question) throw new Error(`Question ${input.questionId} was not found for this owner.`);
 
-  const curriculum = await context.uow.curricula.getCurrentForGap(owner, gapId);
-  if (!curriculum) throw new Error(`No curriculum for gap ${gapId}.`);
+  const curriculum = await curriculumForQuestion(context, owner, gapId, question);
 
   const hintsUsed = input.hintsUsed ?? 0;
 
@@ -178,13 +201,16 @@ export const submitAttempt = async (
     completedAt: context.now(),
   });
 
-  context.metrics.increment('attempt_total', { objectiveId: question.objectiveId });
-  if (correct)
-    context.metrics.increment('attempt_correct_total', { objectiveId: question.objectiveId });
-
   const scheduledReviews: ReviewItem[] = [];
 
   if (created) {
+    const metricLabels = {
+      role: question.payload.role,
+      type: question.payload.type,
+    };
+    context.metrics.increment('attempt_total', metricLabels);
+    if (correct) context.metrics.increment('attempt_correct_total', metricLabels);
+
     await context.uow.mastery.addEvidence(owner, {
       id: context.newId('evidence'),
       objectiveId: question.objectiveId,
@@ -198,25 +224,27 @@ export const submitAttempt = async (
       recordedAt: context.now(),
     });
 
-    for (const scheduled of scheduleAfterAttempt({
-      objectiveId: question.objectiveId,
-      questionId: input.questionId,
-      correct,
-      ...(input.confidence ? { confidence: input.confidence } : {}),
-      at: context.now(),
-    })) {
-      scheduledReviews.push(
-        await context.uow.mastery.scheduleReview(owner, {
-          id: context.newId('review'),
-          objectiveId: scheduled.objectiveId,
-          ...(scheduled.questionId ? { questionId: scheduled.questionId } : {}),
-          curriculumId: curriculum.id,
-          dueAt: scheduled.dueAt,
-          intervalDays: scheduled.intervalDays,
-          state: 'scheduled',
-          reason: scheduled.reason,
-        }),
-      );
+    if (input.scheduleReviews !== false) {
+      for (const scheduled of scheduleAfterAttempt({
+        objectiveId: question.objectiveId,
+        questionId: input.questionId,
+        correct,
+        ...(input.confidence ? { confidence: input.confidence } : {}),
+        at: context.now(),
+      })) {
+        scheduledReviews.push(
+          await context.uow.mastery.scheduleReview(owner, {
+            id: context.newId('review'),
+            objectiveId: scheduled.objectiveId,
+            ...(scheduled.questionId ? { questionId: scheduled.questionId } : {}),
+            curriculumId: curriculum.id,
+            dueAt: scheduled.dueAt,
+            intervalDays: scheduled.intervalDays,
+            state: 'scheduled',
+            reason: scheduled.reason,
+          }),
+        );
+      }
     }
 
     // Once an attempt references a lesson's artefacts, those artefacts are frozen: an edit
@@ -268,13 +296,7 @@ export const runProofCell = async (
   if (question.payload.type !== 'code_proof') {
     throw new Error(`Question ${questionId} is not a code_proof question.`);
   }
-  const curriculum = await context.uow.curricula.getCurrentForGap(owner, gapId);
-  const lesson = curriculum
-    ? (await context.uow.curricula.listLessons(owner, curriculum.id)).find(
-        (l) => l.id === question.lessonId,
-      )
-    : undefined;
-  if (!lesson) throw new Error(`Question ${questionId} is not part of gap ${gapId}.`);
+  await curriculumForQuestion(context, owner, gapId, question);
   const executed = runCell(code, question.payload.checks ?? []);
   context.metrics.increment('arc_cell_run_total');
   return {
@@ -324,6 +346,7 @@ export const submitProof = async (
   if (question.payload.type !== 'code_proof') {
     throw new Error(`Question ${input.questionId} is not a code_proof question.`);
   }
+  await curriculumForQuestion(context, owner, gapId, question);
 
   const executed = runCell(input.code, question.payload.checks ?? []);
   if (!executed.passed) {

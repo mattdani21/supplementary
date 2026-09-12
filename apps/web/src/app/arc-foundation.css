@@ -1,0 +1,584 @@
+/*
+ * Arc foundations shared by every learner route. Route-specific compositions remain in arc.css.
+ * These rules deliberately override the original founder-prototype shell while preserving its
+ * paper, blue-AI and mint-proof language.
+ */
+
+:root {
+  --ink-faint: #626a74;
+  --focus-ring: rgba(63, 92, 244, 0.48);
+  --shell-max: 1180px;
+  --content-max: 760px;
+}
+
+html[data-theme='dark'] {
+  --ink-faint: #a9b1bb;
+  --focus-ring: rgba(141, 154, 255, 0.62);
+}
+
+.arc :is(a, button, input, select, textarea):focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+.arc-shell {
+  width: min(100%, var(--shell-max));
+  box-shadow: 0 24px 80px rgba(23, 25, 29, 0.08);
+}
+
+.arc-screen {
+  width: 100%;
+  max-width: var(--content-max);
+  margin-inline: auto;
+  padding-bottom: calc(32px + env(safe-area-inset-bottom));
+}
+
+.arc-icon-button,
+.arc-avatar {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+}
+
+.arc-nav {
+  position: sticky;
+  z-index: 3;
+  bottom: 0;
+  flex-basis: calc(72px + env(safe-area-inset-bottom));
+  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+}
+
+.arc-nav-link {
+  min-width: 44px;
+  min-height: 48px;
+}
+
+.arc .arc-primary {
+  color: #fff;
+}
+
+html[data-theme='dark'] .arc .arc-primary {
+  color: #111419;
+}
+
+.ui-empty-state,
+.ui-status {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: clamp(20px, 5vw, 32px);
+  background: var(--surface);
+}
+
+.ui-empty-state {
+  display: grid;
+  gap: 12px;
+  text-align: left;
+}
+
+.ui-empty-state__eyebrow {
+  margin: 0;
+  color: var(--blue-deep);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.ui-empty-state h2,
+.ui-empty-state__copy,
+.ui-status__copy {
+  margin: 0;
+}
+
+.ui-empty-state h2 {
+  letter-spacing: -0.045em;
+  font-size: clamp(24px, 7vw, 34px);
+  line-height: 1.05;
+}
+
+.ui-empty-state__copy,
+.ui-status__copy {
+  color: var(--ink-soft);
+  line-height: 1.55;
+}
+
+.ui-empty-state__action,
+.ui-status__action {
+  margin-top: 6px;
+}
+
+.ui-status {
+  border-radius: var(--radius-md);
+}
+
+.ui-status--success {
+  border-color: var(--mint-deep);
+  background: var(--mint);
+}
+
+.ui-status--warning {
+  border-color: var(--amber-deep);
+  background: var(--amber);
+}
+
+.ui-status--error {
+  border-color: #a74040;
+  background: color-mix(in srgb, #a74040 12%, var(--surface));
+}
+
+.ui-field {
+  display: grid;
+  gap: 7px;
+}
+
+.ui-field__label {
+  color: var(--ink);
+  font-weight: 750;
+}
+
+.ui-field__hint,
+.ui-field__error {
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.ui-field__error {
+  color: #9d3030;
+}
+
+.arc-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.arc-route-state {
+  display: grid;
+  min-height: 55dvh;
+  place-content: center;
+  justify-items: center;
+  text-align: center;
+}
+
+.arc-route-state h1 {
+  margin: 12px 0;
+  letter-spacing: -0.05em;
+}
+
+.arc-route-state__orb {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 20px;
+  border-radius: 50%;
+  background: var(--blue-soft);
+  box-shadow: inset 0 0 0 12px var(--blue);
+  animation: arc-route-pulse 1.4s ease-in-out infinite;
+}
+
+.arc-calibration-settings,
+.arc-setup,
+.arc-source-form {
+  display: grid;
+  gap: 16px;
+}
+
+.arc-calibration-settings {
+  margin-top: 24px;
+  border-top: 1px solid var(--line);
+  padding-top: 24px;
+}
+
+.arc-calibration-settings :is(input, select),
+.arc-source-form :is(input, textarea),
+.arc-practice-form :is(select, textarea),
+.arc-review-card :is(select, textarea) {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 11px 12px;
+  color: var(--ink);
+  background: var(--surface);
+}
+
+.arc-source-form textarea {
+  min-height: 132px;
+  resize: vertical;
+}
+
+.arc-practice-form,
+.arc-practice-result,
+.arc-review-card,
+.arc-review-result,
+.arc-capability-list {
+  display: grid;
+  gap: 16px;
+}
+
+.arc-practice-form,
+.arc-review-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: clamp(18px, 5vw, 28px);
+  background: var(--surface);
+}
+
+.arc-practice-heading h2,
+.arc-review-card h2 {
+  margin: 8px 0 0;
+  letter-spacing: -0.035em;
+  font-size: 20px;
+  line-height: 1.25;
+}
+
+.arc-practice-options {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.arc-practice-options label {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  min-height: 48px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 11px;
+  color: var(--ink);
+  background: var(--surface-soft);
+}
+
+.arc-practice-options input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--blue);
+}
+
+.arc-notebook-section {
+  margin-top: 22px;
+  border-top: 1px solid var(--line);
+  padding-top: 22px;
+}
+
+.arc-mode-button,
+.arc-audio-skip,
+.arc-audio-rate,
+.arc-transcript-toggle,
+.arc-transcript-copy > summary {
+  min-height: 44px;
+}
+
+.arc-play {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  flex-basis: 44px;
+}
+
+.arc-audio-skip,
+.arc-audio-rate {
+  min-width: 44px;
+}
+
+.arc-transcript-copy > summary {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.arc-switch {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  justify-content: center;
+}
+
+.arc-review-meta {
+  display: flex;
+  justify-content: space-between;
+  color: var(--ink-faint);
+  font-size: 11px;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.arc-review-prompt {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+.arc-capability-section {
+  margin-top: 30px;
+}
+
+.arc-capability-card {
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  border: 1px solid var(--mint-deep);
+  border-radius: var(--radius-md);
+  padding: 13px;
+  background: var(--mint);
+}
+
+.arc-capability-card > span:nth-child(2) {
+  display: grid;
+  gap: 4px;
+}
+
+.arc-capability-card small {
+  color: var(--mint-deep);
+  line-height: 1.35;
+}
+
+.arc-capability-check {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--surface);
+  background: var(--mint-deep);
+  font-weight: 850;
+}
+
+.arc-mastery-needs {
+  margin: 8px 0 0;
+  padding-left: 17px;
+  color: var(--ink-soft);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.arc-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+  padding: 0;
+}
+
+.arc-source-policy {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.arc-source-policy legend {
+  margin-bottom: 8px;
+  font-weight: 750;
+}
+
+.arc-source-policy label,
+.arc-confirmation {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 10px;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 13px;
+  color: var(--ink);
+  background: var(--surface);
+}
+
+.arc-source-policy input,
+.arc-confirmation input {
+  width: 20px;
+  height: 20px;
+  margin: 1px 0 0;
+  accent-color: var(--blue);
+}
+
+.arc-source-policy span,
+.arc-confirmation span {
+  display: grid;
+  gap: 3px;
+}
+
+.arc-source-policy small,
+.arc-confirmation {
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.arc-brief,
+.arc-setup-section {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: clamp(18px, 5vw, 28px);
+  background: var(--surface);
+}
+
+.arc-brief h2,
+.arc-setup-section h2 {
+  margin: 8px 0 10px;
+  letter-spacing: -0.04em;
+}
+
+.arc-brief > p:not(.arc-eyebrow) {
+  color: var(--ink-soft);
+  line-height: 1.5;
+}
+
+.arc-brief dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 18px 0 0;
+}
+
+.arc-brief dl div {
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  background: var(--surface-soft);
+}
+
+.arc-brief dt,
+.arc-brief dd {
+  margin: 0;
+}
+
+.arc-brief dt {
+  color: var(--ink-faint);
+  font-size: 10px;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.arc-brief dd {
+  margin-top: 5px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.arc-source-list {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 18px;
+  padding: 0;
+  list-style: none;
+}
+
+.arc-source-list li {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: 8px;
+  border-radius: var(--radius-sm);
+  padding: 11px;
+  background: var(--surface-soft);
+}
+
+.arc-source-list li span:last-child {
+  display: grid;
+  gap: 2px;
+}
+
+.arc-source-list small {
+  color: var(--ink-faint);
+}
+
+.arc-source-divider {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--ink-faint);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.arc-source-divider::before,
+.arc-source-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+@keyframes arc-route-pulse {
+  50% {
+    transform: scale(0.92);
+    opacity: 0.72;
+  }
+}
+
+@media (min-width: 900px) {
+  .arc {
+    padding: 28px;
+  }
+
+  .arc-shell {
+    display: grid;
+    grid-template-columns: 210px minmax(0, 1fr);
+    min-height: calc(100dvh - 56px);
+    overflow: clip;
+    border: 1px solid var(--line);
+    border-radius: 32px;
+  }
+
+  .arc-screen {
+    grid-column: 2;
+    grid-row: 1;
+    max-width: 860px;
+    padding: 40px clamp(36px, 6vw, 72px) 56px;
+  }
+
+  .arc-nav {
+    position: static;
+    grid-column: 1;
+    grid-row: 1;
+    grid-template-columns: 1fr;
+    grid-template-rows: repeat(4, min-content);
+    align-content: center;
+    gap: 8px;
+    border-top: 0;
+    border-right: 1px solid var(--line);
+    padding: 24px;
+  }
+
+  .arc-nav-link {
+    grid-template-columns: 30px 1fr;
+    justify-items: start;
+    gap: 12px;
+    padding-inline: 14px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 359px) {
+  .arc-screen {
+    padding-inline: 14px;
+  }
+}
+
+@media (max-width: 520px) {
+  .arc-brief dl {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arc {
+    scroll-behavior: auto;
+  }
+}

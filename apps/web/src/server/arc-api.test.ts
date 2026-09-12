@@ -11,20 +11,28 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { REFERENCE_GAP_STATEMENT, SET_THEORY_SOURCE } from '@gapos/test-fixtures';
+import {
+  REFERENCE_GAP_STATEMENT,
+  SET_THEORY_SOURCE,
+  referenceCalibration,
+  referenceDiagnostic,
+} from '@gapos/test-fixtures';
 import type { Gap } from '@gapos/database';
 import { createServerContext, type ServerContext } from './context.js';
 import {
   arcCalibrateHandler,
   arcCalibrationKitHandler,
+  arcCapabilitiesHandler,
   arcLessonHandler,
   arcMapHandler,
   arcPreferencesHandler,
   arcProgressHandler,
   arcRunCellHandler,
+  arcReviewsHandler,
   arcSetPreferencesHandler,
   arcSkillsHandler,
   arcSubmitProofHandler,
+  arcSubmitReviewHandler,
   arcTodayHandler,
   audioUrl,
   compile,
@@ -32,8 +40,10 @@ import {
   createUser,
   getGap,
   registerSourceHandler,
+  toHttpError,
   transitionGap,
 } from './api.js';
+import { applyTransition } from './services/gap-service.js';
 import { submitAttempt } from './services/learning-service.js';
 
 const OWNER = 'arc_user_1';
@@ -56,6 +66,7 @@ const buildContext = (): { context: ServerContext; clock: { set: (at: Date) => v
 };
 
 const seedUser = async (context: ServerContext, owner = OWNER) => {
+  if (await context.uow.users.find(owner)) return;
   await createUser(context, owner, {
     email: `${owner}@example.com`,
     locale: 'en',
@@ -101,12 +112,19 @@ const firstCodeProof = async (
   return { questionId: proof.id, lessonId: published.id };
 };
 
+const calibrationKitFor = async (
+  context: ServerContext,
+  owner = OWNER,
+  subject = 'Python for data work',
+) => (await arcCalibrationKitHandler(context, owner, subject)).calibration;
+
 describe('Arc calibration', () => {
   it('serves the 3-step kit without leaking the answer key', async () => {
     const { context } = buildContext();
     await seedUser(context);
     const { calibration } = await arcCalibrationKitHandler(context, OWNER, 'Python for data work');
     expect(calibration.subject).toBe('Python for data work');
+    expect(calibration.kitId).toMatch(/^cal-kit_/);
     expect(calibration.goalOptions.length).toBeGreaterThanOrEqual(3);
     expect(calibration.baselineQuestion.code).toContain('values');
     expect(calibration.baselineQuestion.options).toContain('12');
@@ -116,8 +134,10 @@ describe('Arc calibration', () => {
   it('persists the selections, creates a real gap, and maps to real gaps', async () => {
     const { context } = buildContext();
     await seedUser(context);
+    const kit = await calibrationKitFor(context);
 
     const result = await arcCalibrateHandler(context, OWNER, {
+      kitId: kit.kitId,
       subject: 'Python for data work',
       goal: 'Build a project I can show',
       baselineAnswer: '12',
@@ -145,13 +165,43 @@ describe('Arc calibration', () => {
     });
     expect(stored!.gapsIdentified).toEqual(result.calibration.gapsIdentified);
     expect(await context.uow.calibrations.listForOwner(OWNER)).toHaveLength(1);
+    expect(context.metrics.sum('model_call_total', { contract: 'arc_calibration' })).toBe(1);
+    expect(context.metrics.sum('model_call_total', { contract: 'diagnostic_interpretation' })).toBe(
+      1,
+    );
+  });
+
+  it('persists learner-confirmed time, deadline and source policy on the draft gap', async () => {
+    const { context } = buildContext();
+    const kit = await calibrationKitFor(context);
+
+    const result = await arcCalibrateHandler(context, OWNER, {
+      kitId: kit.kitId,
+      subject: 'Python for data work',
+      goal: 'Build a project I can show',
+      baselineAnswer: '12',
+      dailyMinutes: 25,
+      deadline: '2026-10-03',
+      sourcePolicy: 'sources_only',
+    });
+
+    const gap = (await getGap(context, OWNER, result.calibration.gapId)) as { gap: Gap };
+    expect(gap.gap).toMatchObject({
+      dailyMinutes: 25,
+      deadline: '2026-10-03',
+      sourcePolicy: 'sources_only',
+      status: 'draft',
+    });
+    expect(await context.uow.users.find(OWNER)).toBeDefined();
   });
 
   it('adapts the placement on a wrong baseline through the provider adapter', async () => {
     const { context } = buildContext();
     await seedUser(context);
+    const kit = await calibrationKitFor(context);
 
     const result = await arcCalibrateHandler(context, OWNER, {
+      kitId: kit.kitId,
       subject: 'Python for data work',
       goal: 'Understand the foundations',
       baselineAnswer: '24',
@@ -173,8 +223,10 @@ describe('Arc calibration', () => {
       rawStatement: 'I want to automate my reporting.',
       dailyMinutes: 30,
     })) as { gap: Gap };
+    const kit = await calibrationKitFor(context);
 
     const result = await arcCalibrateHandler(context, OWNER, {
+      kitId: kit.kitId,
       subject: 'Python for data work',
       goal: 'Build a project I can show',
       baselineAnswer: '12',
@@ -186,7 +238,9 @@ describe('Arc calibration', () => {
   it('keeps calibrations inside the owner', async () => {
     const { context } = buildContext();
     await seedUser(context);
+    const kit = await calibrationKitFor(context);
     const result = await arcCalibrateHandler(context, OWNER, {
+      kitId: kit.kitId,
       subject: 'Python for data work',
       goal: 'Build a project I can show',
       baselineAnswer: '12',
@@ -195,6 +249,217 @@ describe('Arc calibration', () => {
       await context.uow.calibrations.get(OTHER, result.calibration.calibrationId),
     ).toBeUndefined();
     expect(await context.uow.calibrations.listForOwner(OTHER)).toEqual([]);
+  });
+
+  it('grades the displayed kit rather than regenerating a different answer key', async () => {
+    let kitCalls = 0;
+    const context = createServerContext({
+      fake: {
+        script: {
+          arc_calibration: (request) => {
+            kitCalls += 1;
+            const kit = referenceCalibration(request.subject);
+            return kitCalls === 1
+              ? kit
+              : {
+                  ...kit,
+                  baselineQuestion: { ...kit.baselineQuestion, answer: '24' },
+                };
+          },
+        },
+      },
+    });
+    const kit = await calibrationKitFor(context);
+
+    const result = await arcCalibrateHandler(context, OWNER, {
+      kitId: kit.kitId,
+      subject: kit.subject,
+      goal: kit.goalOptions[0]!,
+      baselineAnswer: '12',
+    });
+
+    expect(result.calibration.baselineCorrect).toBe(true);
+    expect(kitCalls).toBe(1);
+  });
+
+  it('refuses an expired, cross-owner, or subject-mismatched kit before creating a gap', async () => {
+    const { context, clock } = buildContext();
+    const kit = await calibrationKitFor(context);
+
+    const body = {
+      kitId: kit.kitId,
+      subject: kit.subject,
+      goal: kit.goalOptions[0]!,
+      baselineAnswer: '12',
+    };
+    const crossOwner = await arcCalibrateHandler(context, OTHER, body).catch(toHttpError);
+    expect(crossOwner).toMatchObject({ status: 409, code: 'calibration_kit_expired' });
+
+    const wrongSubject = await arcCalibrateHandler(context, OWNER, {
+      ...body,
+      subject: 'SQL foundations',
+    }).catch(toHttpError);
+    expect(wrongSubject).toMatchObject({ status: 409, code: 'calibration_kit_expired' });
+
+    clock.set(new Date('2026-08-30T09:16:00Z'));
+    const expired = await arcCalibrateHandler(context, OWNER, body).catch(toHttpError);
+    expect(expired).toMatchObject({ status: 409, code: 'calibration_kit_expired' });
+    expect(await context.uow.gaps.list(OWNER)).toEqual([]);
+  });
+
+  it('leaves no orphan gap when diagnostic generation fails, then creates one on retry', async () => {
+    let diagnosticCalls = 0;
+    const context = createServerContext({
+      fake: {
+        script: {
+          diagnostic_interpretation: () => {
+            diagnosticCalls += 1;
+            if (diagnosticCalls === 1) throw new Error('Diagnostic provider unavailable.');
+            return referenceDiagnostic({
+              knowledgeGaps: ['double inclusion', 'relation properties'],
+              recommendedStartingDifficulty: 2,
+            });
+          },
+        },
+      },
+    });
+    const kit = await calibrationKitFor(context);
+    const request = {
+      kitId: kit.kitId,
+      subject: kit.subject,
+      goal: kit.goalOptions[0]!,
+      baselineAnswer: '12',
+      dailyMinutes: 25,
+      sourcePolicy: 'sources_only' as const,
+    };
+
+    await expect(arcCalibrateHandler(context, OWNER, request)).rejects.toThrow(
+      'Diagnostic provider unavailable.',
+    );
+    expect(await context.uow.gaps.list(OWNER)).toEqual([]);
+    expect(await context.uow.calibrations.listForOwner(OWNER)).toEqual([]);
+
+    const recovered = await arcCalibrateHandler(context, OWNER, request);
+    expect(await context.uow.gaps.list(OWNER)).toEqual([
+      expect.objectContaining({ id: recovered.calibration.gapId }),
+    ]);
+    expect(await context.uow.calibrations.listForOwner(OWNER)).toHaveLength(1);
+  });
+});
+
+describe('Arc setup telemetry', () => {
+  it('records setup, compile result and retry categories without learner content', async () => {
+    const { context } = buildContext();
+    await seedUser(context);
+    const created = (await createGap(context, OWNER, {
+      title: 'Relations and proof techniques',
+      rawStatement: REFERENCE_GAP_STATEMENT,
+      dailyMinutes: 25,
+      sourcePolicy: 'sources_only',
+    })) as { gap: Gap };
+    await transitionGap(context, OWNER, created.gap.id, { type: 'define' });
+    await registerSourceHandler(context, OWNER, {
+      gapId: created.gap.id,
+      filename: 'set-theory-primer.md',
+      mediaType: 'text/markdown',
+      text: SET_THEORY_SOURCE,
+    });
+
+    await compile(context, OWNER, created.gap.id, {
+      idempotencyKey: 'arc-setup-initial',
+      surface: 'arc_setup',
+      retry: false,
+    });
+    expect(context.metrics.sum('arc_setup_completed_total')).toBe(1);
+    expect(context.metrics.sum('arc_compile_started_total', { retry: 'false' })).toBe(1);
+    expect(context.metrics.sum('arc_compile_result_total', { status: 'complete' })).toBe(1);
+
+    await compile(context, OWNER, created.gap.id, {
+      idempotencyKey: 'arc-setup-retry',
+      surface: 'arc_setup',
+      retry: true,
+    });
+    expect(context.metrics.sum('arc_setup_completed_total')).toBe(1);
+    expect(context.metrics.sum('arc_compile_started_total', { retry: 'true' })).toBe(1);
+    expect(context.metrics.sum('arc_compile_retry_total')).toBe(1);
+    expect(JSON.stringify(context.metrics.points.map((point) => point.labels))).not.toContain(
+      SET_THEORY_SOURCE,
+    );
+  });
+
+  it('publishes Day 1 after explicit general-knowledge setup without an upload', async () => {
+    const { context } = buildContext();
+    const created = (await createGap(context, OWNER, {
+      title: 'Relations and proof techniques',
+      rawStatement: REFERENCE_GAP_STATEMENT,
+      dailyMinutes: 25,
+      sourcePolicy: 'general_knowledge_allowed',
+    })) as { gap: Gap };
+    await transitionGap(context, OWNER, created.gap.id, { type: 'define' });
+
+    const outcome = (await compile(context, OWNER, created.gap.id, {
+      idempotencyKey: 'arc-general-knowledge',
+      generalKnowledgeConfirmed: true,
+      surface: 'arc_setup',
+      retry: false,
+    })) as { run: { status: string } };
+    expect(outcome.run.status).toBe('complete');
+    expect(await context.uow.sources.listForGap(OWNER, created.gap.id)).toEqual([]);
+    expect((await arcLessonHandler(context, OWNER, created.gap.id)).lesson.lesson.day).toBe(1);
+  });
+
+  it('refuses compile without the source or explicit general-knowledge consent', async () => {
+    const { context } = buildContext();
+    const sourceOnly = (await createGap(context, OWNER, {
+      title: 'Source-constrained route',
+      rawStatement: 'I need a source-constrained route with explicit evidence boundaries.',
+      dailyMinutes: 25,
+      sourcePolicy: 'sources_only',
+    })) as { gap: Gap };
+    await transitionGap(context, OWNER, sourceOnly.gap.id, { type: 'define' });
+
+    const missingSource = await compile(context, OWNER, sourceOnly.gap.id, {
+      idempotencyKey: 'missing-source',
+    }).catch(toHttpError);
+    expect(missingSource).toMatchObject({ status: 409, code: 'source_required' });
+    expect((await getGap(context, OWNER, sourceOnly.gap.id)) as { gap: Gap }).toMatchObject({
+      gap: { status: 'ready' },
+    });
+
+    const general = (await createGap(context, OWNER, {
+      title: 'General-knowledge route',
+      rawStatement: 'I need a route where general knowledge consent must be explicit.',
+      dailyMinutes: 25,
+      sourcePolicy: 'general_knowledge_allowed',
+    })) as { gap: Gap };
+    await transitionGap(context, OWNER, general.gap.id, { type: 'define' });
+    const missingConsent = await compile(context, OWNER, general.gap.id, {
+      idempotencyKey: 'missing-consent',
+    }).catch(toHttpError);
+    expect(missingConsent).toMatchObject({
+      status: 409,
+      code: 'general_knowledge_confirmation_required',
+    });
+    expect(context.metrics.sum('model_call_total')).toBe(0);
+  });
+
+  it('keeps an active gap active when a completed compile key is replayed', async () => {
+    const { context } = buildContext();
+    const gapId = await seedCompiledGap(context, OWNER, 'completed-replay');
+    const firstCurriculum = await context.uow.curricula.getCurrentForGap(OWNER, gapId);
+    const callsBeforeReplay = context.metrics.sum('model_call_total');
+
+    const replay = (await compile(context, OWNER, gapId, {
+      idempotencyKey: 'completed-replay',
+    })) as { run: { runId: string; status: string; deduplicated: boolean } };
+
+    expect(replay.run.status).toBe('complete');
+    expect(replay.run.deduplicated).toBe(true);
+    expect(replay.run.runId).toBe(firstCurriculum!.runId);
+    expect((await getGap(context, OWNER, gapId)) as { gap: Gap }).toMatchObject({
+      gap: { status: 'active' },
+    });
+    expect(context.metrics.sum('model_call_total')).toBe(callsBeforeReplay);
   });
 });
 
@@ -287,6 +552,42 @@ describe('Arc notebook proofs', () => {
     expect(await context.uow.attempts.listForObjective(OWNER, question!.objectiveId)).toHaveLength(
       1,
     );
+    expect(context.metrics.sum('attempt_total')).toBe(1);
+    expect(context.metrics.points.find((point) => point.name === 'attempt_total')?.labels).toEqual({
+      role: question!.payload.role,
+      type: question!.payload.type,
+    });
+  });
+
+  it('rejects another gap’s attempt and proof with zero side effects', async () => {
+    const { context } = buildContext();
+    const firstGapId = await seedCompiledGap(context, OWNER, 'cross-gap-a');
+    const secondGapId = await seedCompiledGap(context, OWNER, 'cross-gap-b');
+    const { questionId } = await firstCodeProof(context, OWNER, secondGapId);
+    const question = await context.uow.curricula.getQuestion(OWNER, questionId);
+
+    const attemptError = await submitAttempt(context, OWNER, firstGapId, {
+      questionId,
+      sessionId: 'cross-gap-attempt',
+      response: question!.payload.answer,
+      idempotencyKey: 'cross-gap-attempt',
+    }).catch(toHttpError);
+    expect(attemptError).toMatchObject({ status: 409, code: 'question_not_in_gap' });
+
+    const proofError = await arcSubmitProofHandler(context, OWNER, firstGapId, {
+      questionId,
+      sessionId: 'cross-gap-proof',
+      code: 'function isSubset() { return false; }',
+      idempotencyKey: 'cross-gap-proof',
+    }).catch(toHttpError);
+    expect(proofError).toMatchObject({ status: 409, code: 'question_not_in_gap' });
+    expect(await context.uow.attempts.listForObjective(OWNER, question!.objectiveId)).toEqual([]);
+    expect(await context.uow.mastery.listEvidence(OWNER, question!.objectiveId)).toEqual([]);
+    expect(context.metrics.sum('attempt_total')).toBe(0);
+    expect(context.metrics.sum('arc_proof_submit_total')).toBe(0);
+    expect((await getGap(context, OWNER, firstGapId)) as { gap: Gap }).toMatchObject({
+      gap: { status: 'active' },
+    });
   });
 
   it('advances the gap to filled once the proofs and practice satisfy the mastery rule', async () => {
@@ -353,9 +654,19 @@ describe('Arc notebook proofs', () => {
     expect(gap.gap.status).toBe('filled');
 
     const progress = await arcProgressHandler(context, OWNER);
-    expect(progress.progress.clearedGaps).toBe(1);
+    expect(progress.progress.filledGaps).toBe(1);
     expect(progress.progress.proofs.length).toBeGreaterThan(0);
     expect(progress.progress.momentumDays).toBeGreaterThanOrEqual(1);
+
+    const capabilities = await arcCapabilitiesHandler(context, OWNER, 'relations');
+    expect(capabilities.capabilities).toEqual(
+      expect.arrayContaining([expect.objectContaining({ gapId, title: expect.any(String) })]),
+    );
+    expect(context.metrics.sum('arc_capability_search_total', { hasQuery: 'true' })).toBe(1);
+    const searchMetric = context.metrics.points.find(
+      (point) => point.name === 'arc_capability_search_total',
+    );
+    expect(searchMetric?.labels).toEqual({ hasQuery: 'true' });
   });
 });
 
@@ -423,6 +734,96 @@ describe('Arc preferences and spaced review', () => {
     expect(shown.today.dueReviews.length).toBeGreaterThan(0);
     expect(shown.today.dueReviews[0]!.gapId).toBe(gapId);
   });
+
+  it('makes preferences alter the lesson and grades review responses on the server', async () => {
+    const { context } = buildContext();
+    const gapId = await seedCompiledGap(context);
+
+    await arcSetPreferencesHandler(context, OWNER, {
+      audioTheory: false,
+      gentleHints: false,
+      darkMode: false,
+      spacedReview: true,
+    });
+    const lesson = await arcLessonHandler(context, OWNER, gapId);
+    expect(lesson.lesson.defaultMode).toBe('practice');
+    expect(lesson.lesson.notebook?.hint).toBeUndefined();
+    expect(lesson.lesson.practice.length).toBeGreaterThan(0);
+    expect(lesson.lesson.practice.every((question) => question.hint === undefined)).toBe(true);
+
+    const curriculum = await context.uow.curricula.getCurrentForGap(OWNER, gapId);
+    const dayOne = (await context.uow.curricula.listLessons(OWNER, curriculum!.id)).find(
+      (entry) => entry.day === 1,
+    )!;
+    const question = (await context.uow.curricula.listQuestions(OWNER, dayOne.id)).find(
+      (entry) => entry.payload.type !== 'code_proof',
+    )!;
+    await submitAttempt(context, OWNER, gapId, {
+      questionId: question.id,
+      sessionId: 'review_seed',
+      response: 'incorrect',
+      idempotencyKey: 'review_seed_wrong',
+    });
+
+    const queue = await arcReviewsHandler(context, OWNER);
+    expect(queue.reviews.length).toBeGreaterThan(0);
+    const review = queue.reviews.find((entry) => entry.questionId === question.id)!;
+    expect(review).not.toHaveProperty('answer');
+
+    const submitted = await arcSubmitReviewHandler(context, OWNER, review.reviewId, {
+      response: question.payload.answer,
+      confidence: 'medium',
+      idempotencyKey: `review:${review.reviewId}`,
+    });
+    expect(submitted.review.correct).toBe(true);
+    expect(submitted.review.feedback.answer).toBe(question.payload.answer);
+    expect(submitted.review.nextReview).toBeDefined();
+  });
+
+  it('advances, resets, and graduates the review ladder from the completed review', async () => {
+    const runCase = async (intervalDays: number, response: 'correct' | 'wrong') => {
+      const { context } = buildContext();
+      const gapId = await seedCompiledGap(context);
+      const curriculum = await context.uow.curricula.getCurrentForGap(OWNER, gapId);
+      const lesson = (await context.uow.curricula.listLessons(OWNER, curriculum!.id))[0]!;
+      const question = (await context.uow.curricula.listQuestions(OWNER, lesson.id)).find(
+        (candidate) => candidate.payload.type !== 'code_proof',
+      )!;
+      const review = await context.uow.mastery.scheduleReview(OWNER, {
+        id: `review-${intervalDays}-${response}`,
+        objectiveId: question.objectiveId,
+        questionId: question.id,
+        curriculumId: curriculum!.id,
+        dueAt: new Date('2026-08-29T09:00:00Z'),
+        intervalDays,
+        state: 'scheduled',
+        reason: 'ladder',
+      });
+      const submitted = await arcSubmitReviewHandler(context, OWNER, review.id, {
+        response: response === 'correct' ? question.payload.answer : 'definitely incorrect',
+        idempotencyKey: `submit-${review.id}`,
+      });
+      return { context, submitted };
+    };
+
+    const advanced = await runCase(3, 'correct');
+    expect(advanced.submitted.review.nextReview).toMatchObject({
+      intervalDays: 7,
+      reason: 'ladder',
+    });
+
+    const reset = await runCase(3, 'wrong');
+    expect(reset.submitted.review.nextReview).toMatchObject({
+      intervalDays: 1,
+      reason: 'remediation',
+    });
+
+    const graduated = await runCase(7, 'correct');
+    expect(graduated.submitted.review.nextReview).toBeUndefined();
+    expect(
+      await graduated.context.uow.mastery.listDueReviews(OWNER, new Date('2100-01-01')),
+    ).toEqual([]);
+  });
 });
 
 describe('Arc views reflect real database state', () => {
@@ -440,6 +841,14 @@ describe('Arc views reflect real database state', () => {
     const skills = await arcSkillsHandler(context, OWNER);
     expect(skills.skills).toHaveLength(1);
     expect(skills.skills[0]).toMatchObject({ started: true, objectivesCleared: 0 });
+
+    const progress = await arcProgressHandler(context, OWNER);
+    expect(progress.progress.filledGaps).toBe(0);
+    expect(progress.progress.needs.length).toBeGreaterThan(0);
+    expect(progress.progress.needs[0]).toMatchObject({
+      gapId,
+      missing: expect.arrayContaining([expect.any(String)]),
+    });
 
     const lesson = await arcLessonHandler(context, OWNER, gapId);
     expect(lesson.lesson.lesson.day).toBe(1);
@@ -470,5 +879,30 @@ describe('Arc views reflect real database state', () => {
     expect(today.today.mapProgress.total).toBeGreaterThan(0);
     expect(today.today.focus.plannedMinutes).toBe(35);
     expect(today.today.momentumDays).toBe(0);
+  });
+
+  it('keeps a failed compile visible with a recovery route', async () => {
+    const { context } = buildContext();
+    await seedUser(context);
+    const created = (await createGap(context, OWNER, {
+      title: 'Recoverable skill',
+      rawStatement: 'I need a route that demonstrates failed compilation recovery.',
+      dailyMinutes: 20,
+    })) as { gap: Gap };
+    await transitionGap(context, OWNER, created.gap.id, { type: 'define' });
+    await applyTransition(context, OWNER, created.gap.id, { type: 'compile' });
+    await applyTransition(context, OWNER, created.gap.id, {
+      type: 'compilation_failed',
+      reason: 'No lesson was publishable.',
+    });
+
+    const skills = await arcSkillsHandler(context, OWNER);
+    expect(skills.skills).toEqual([
+      expect.objectContaining({ gapId: created.gap.id, status: 'failed' }),
+    ]);
+    const today = await arcTodayHandler(context, OWNER);
+    expect(today.today.attention).toEqual([
+      { gapId: created.gap.id, title: 'Recoverable skill', state: 'failed' },
+    ]);
   });
 });

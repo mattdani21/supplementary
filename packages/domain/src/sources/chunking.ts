@@ -35,7 +35,12 @@ const DEFAULTS = { maxCharacters: 1800, minCharacters: 120 } as const;
 /** Rough token estimate. Only used for budgeting, so approximate is fine. */
 export const estimateTokens = (text: string): number => Math.ceil(text.length / 4);
 
-export const SUPPORTED_MEDIA_TYPES = ['text/plain', 'text/markdown', 'text/x-markdown'] as const;
+export const SUPPORTED_MEDIA_TYPES = [
+  'text/plain',
+  'text/markdown',
+  'text/x-markdown',
+  'text/html',
+] as const;
 
 export type SupportedMediaType = (typeof SUPPORTED_MEDIA_TYPES)[number];
 

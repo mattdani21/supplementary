@@ -3,6 +3,7 @@ import { arcTodayHandler } from '../../server/api';
 import { getServerContext } from '../../server/bootstrap';
 import { viewerOwner } from '../../lib/viewer';
 import { ProgressRing } from '../../components/arc/progress-ring';
+import { EmptyState, StatusMessage } from '@gapos/ui';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,6 +19,11 @@ interface TodayView {
   };
   mapProgress: { percent: number; cleared: number; total: number };
   suggestions: { gapId: string; title: string; status: string }[];
+  attention: {
+    gapId: string;
+    title: string;
+    state: 'compiling' | 'failed' | 'partial';
+  }[];
   momentumDays: number;
   dueReviews: { reviewId: string; gapId: string; objectiveId: string; dueAt: Date }[];
 }
@@ -37,11 +43,16 @@ export default async function ArcTodayPage() {
       ? Math.min(100, Math.round((today.focus.completedMinutes / today.focus.plannedMinutes) * 100))
       : 0;
   const momentumDots = Array.from({ length: 7 }, (_, index) => index < today.momentumDays);
+  const isFirstRun =
+    !today.continueGap &&
+    today.mapProgress.total === 0 &&
+    today.suggestions.length === 0 &&
+    today.attention.length === 0;
 
   return (
     <>
       <div className="arc-topbar">
-        <Link className="arc-wordmark" href="/arc">
+        <Link className="arc-wordmark" href="/arc" aria-label="Go to Arc home">
           arc
         </Link>
         <Link className="arc-icon-button" href="/arc/profile" aria-label="Open profile">
@@ -79,6 +90,46 @@ export default async function ArcTodayPage() {
         </div>
         <small>{today.focus.itemsLabel}</small>
       </div>
+
+      {today.attention.map((item) => (
+        <StatusMessage
+          key={item.gapId}
+          tone={item.state === 'failed' ? 'error' : item.state === 'partial' ? 'warning' : 'info'}
+          title={
+            item.state === 'failed'
+              ? `${item.title} needs a fresh compile.`
+              : item.state === 'partial'
+                ? `${item.title} has verified lessons and missing coverage.`
+                : `${item.title} is still compiling.`
+          }
+          action={
+            <Link className="arc-secondary" href={`/arc/skills/${item.gapId}/setup`}>
+              {item.state === 'compiling' ? 'Check status' : 'Review recovery'}
+            </Link>
+          }
+        >
+          {item.state === 'failed'
+            ? 'Your brief and accepted sources are saved.'
+            : item.state === 'partial'
+              ? 'Continue published work or rebuild the missing objectives.'
+              : 'Day 1 appears as soon as it passes verification.'}
+        </StatusMessage>
+      ))}
+
+      {isFirstRun && (
+        <EmptyState
+          eyebrow="Your first skill"
+          title="Turn a gap into a route you can prove."
+          action={
+            <Link className="arc-primary" href="/arc/calibrate">
+              Start calibration →
+            </Link>
+          }
+        >
+          Tell Arc what useful looks like. A short baseline check will place the first lesson
+          without asking you to rate your own confidence.
+        </EmptyState>
+      )}
 
       {today.continueGap && (
         <Link
@@ -119,28 +170,34 @@ export default async function ArcTodayPage() {
       {today.dueReviews.length > 0 && (
         <div className="arc-section-heading">
           <h2>Due for review</h2>
-          <span className="arc-text-button">{today.dueReviews.length} ready</span>
+          <Link className="arc-text-button" href="/arc/reviews">
+            {today.dueReviews.length} ready →
+          </Link>
         </div>
       )}
 
-      <div className="arc-section-heading">
-        <h2>Your map</h2>
-        <Link className="arc-text-button" href="/arc/skills">
-          Open skills
-        </Link>
-      </div>
-      <Link className="arc-active-skill" href="/arc/skills">
-        <ProgressRing percent={today.mapProgress.percent} label="Overall map" size="large" />
-        <div>
-          <h3>All your skills</h3>
-          <p>
-            {today.mapProgress.cleared} of {today.mapProgress.total} objectives cleared
-          </p>
-        </div>
-        <span className="arc-row-arrow" aria-hidden="true">
-          ›
-        </span>
-      </Link>
+      {!isFirstRun && (
+        <>
+          <div className="arc-section-heading">
+            <h2>Your map</h2>
+            <Link className="arc-text-button" href="/arc/skills">
+              Open skills
+            </Link>
+          </div>
+          <Link className="arc-active-skill" href="/arc/skills">
+            <ProgressRing percent={today.mapProgress.percent} label="Overall map" size="large" />
+            <div>
+              <h3>All your skills</h3>
+              <p>
+                {today.mapProgress.cleared} of {today.mapProgress.total} objectives cleared
+              </p>
+            </div>
+            <span className="arc-row-arrow" aria-hidden="true">
+              ›
+            </span>
+          </Link>
+        </>
+      )}
 
       {today.suggestions.length > 0 && (
         <>
@@ -173,7 +230,7 @@ export default async function ArcTodayPage() {
           </strong>{' '}
           of momentum
         </span>
-        <span className="arc-dots" aria-label={`${today.momentumDays} day momentum`}>
+        <span className="arc-dots" role="img" aria-label={`${today.momentumDays} day momentum`}>
           {momentumDots.map((on, index) => (
             <span key={index} className={on ? 'is-on' : ''} />
           ))}

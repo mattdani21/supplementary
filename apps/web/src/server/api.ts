@@ -22,26 +22,32 @@ import type { ServerContext } from './context.js';
 import {
   applyTransition,
   compile as compileGap,
+  CompileSetupError,
   createGap as createGapUseCase,
   registerSource,
   type RegisterSourceInput,
 } from './services/gap-service.js';
 import {
+  arcCapabilities,
   arcLesson,
   arcMap,
   arcProfile,
   arcProgress,
+  arcReviews,
   arcSkills,
   arcToday,
   calibrationKit,
+  CalibrationKitUnavailableError,
   getPreferences,
   runCalibration,
   setPreferences,
+  submitArcReview,
   type CalibrationInput,
 } from './services/arc-service.js';
 import {
   assessMastery,
   getToday,
+  QuestionNotInGapError,
   runProofCell,
   submitAttempt,
   submitProof,
@@ -65,6 +71,12 @@ export class ApiError extends Error {
 export const toHttpError = (error: unknown): { status: number; code: string; message: string } => {
   if (error instanceof ApiError)
     return { status: error.status, code: error.code, message: error.message };
+  if (error instanceof CalibrationKitUnavailableError)
+    return { status: 409, code: 'calibration_kit_expired', message: error.message };
+  if (error instanceof CompileSetupError)
+    return { status: 409, code: error.code, message: error.message };
+  if (error instanceof QuestionNotInGapError)
+    return { status: 409, code: 'question_not_in_gap', message: error.message };
   if (error instanceof NotFoundError)
     return { status: 404, code: 'not_found', message: error.message };
   if (error instanceof ConcurrentModificationError)
@@ -124,6 +136,9 @@ const compileSchema = z.object({
   idempotencyKey: z.string().min(1),
   audioEnabled: z.boolean().optional(),
   concurrency: z.number().int().min(1).max(8).optional(),
+  generalKnowledgeConfirmed: z.boolean().optional(),
+  surface: z.literal('arc_setup').optional(),
+  retry: z.boolean().optional(),
 });
 
 const registerSourceSchema = z.object({
@@ -155,9 +170,13 @@ const preferencesSchema = z
 
 const calibrationSchema = z
   .object({
+    kitId: z.string().min(1),
     subject: z.string().min(1),
     goal: z.string().min(1),
     baselineAnswer: z.string().min(1),
+    dailyMinutes: z.number().int().min(5).max(480).optional(),
+    deadline: z.iso.date().optional(),
+    sourcePolicy: z.enum(['general_knowledge_allowed', 'sources_only']).optional(),
   })
   .strict();
 
@@ -174,6 +193,14 @@ const proofSchema = z
     sessionId: z.string().min(1),
     code: z.string().min(1).max(20_000),
     hintsUsed: z.number().int().min(0).optional(),
+    idempotencyKey: z.string().min(1),
+  })
+  .strict();
+
+const arcReviewSchema = z
+  .object({
+    response: z.string().min(1),
+    confidence: z.enum(['low', 'medium', 'high']).optional(),
     idempotencyKey: z.string().min(1),
   })
   .strict();
@@ -242,14 +269,32 @@ export const compile = async (
   body: unknown,
 ): Promise<{ run: unknown }> => {
   const input = compileSchema.parse(body);
-  const outcome = await compileGap(context, owner, { gapId, ...input });
-  return {
-    run: {
-      runId: outcome.runId,
-      status: outcome.status,
-      ...(outcome.error === undefined ? {} : { error: outcome.error }),
-    },
-  };
+  const { surface, retry = false, ...compileInput } = input;
+  if (surface === 'arc_setup') {
+    if (!retry) context.metrics.increment('arc_setup_completed_total');
+    context.metrics.increment('arc_compile_started_total', { retry: String(retry) });
+    if (retry) context.metrics.increment('arc_compile_retry_total');
+  }
+
+  try {
+    const outcome = await compileGap(context, owner, { gapId, ...compileInput });
+    if (surface === 'arc_setup') {
+      context.metrics.increment('arc_compile_result_total', { status: outcome.status });
+    }
+    return {
+      run: {
+        runId: outcome.runId,
+        status: outcome.status,
+        deduplicated: outcome.deduplicated ?? false,
+        ...(outcome.error === undefined ? {} : { error: outcome.error }),
+      },
+    };
+  } catch (error) {
+    if (surface === 'arc_setup') {
+      context.metrics.increment('arc_compile_result_total', { status: 'request_error' });
+    }
+    throw error;
+  }
 };
 
 export const registerSourceHandler = async (
@@ -564,6 +609,14 @@ export const arcSkillsHandler = async (
   skills: await arcSkills(context, owner),
 });
 
+export const arcCapabilitiesHandler = async (
+  context: ServerContext,
+  owner: OwnerId,
+  query = '',
+): Promise<{ capabilities: Awaited<ReturnType<typeof arcCapabilities>> }> => ({
+  capabilities: await arcCapabilities(context, owner, query),
+});
+
 export const arcCalibrationKitHandler = async (
   context: ServerContext,
   owner: OwnerId,
@@ -638,6 +691,22 @@ export const arcProgressHandler = async (
   owner: OwnerId,
 ): Promise<{ progress: Awaited<ReturnType<typeof arcProgress>> }> => ({
   progress: await arcProgress(context, owner),
+});
+
+export const arcReviewsHandler = async (
+  context: ServerContext,
+  owner: OwnerId,
+): Promise<{ reviews: Awaited<ReturnType<typeof arcReviews>> }> => ({
+  reviews: await arcReviews(context, owner),
+});
+
+export const arcSubmitReviewHandler = async (
+  context: ServerContext,
+  owner: OwnerId,
+  reviewId: string,
+  body: unknown,
+): Promise<{ review: Awaited<ReturnType<typeof submitArcReview>> }> => ({
+  review: await submitArcReview(context, owner, reviewId, arcReviewSchema.parse(body)),
 });
 
 export const arcProfileHandler = async (

@@ -801,3 +801,127 @@ tasks:
       - pnpm verify
     risk: medium
     human_gate: false
+
+  - id: GAP-033
+    title: 'Specify and test the Arc core learner journey'
+    epic: E21
+    priority: P0
+    status: done
+    goal: 'Turn observed learner friction into an explicit, browser-testable UX contract.'
+    scope:
+      - 'Core-journey UI specification and a durable UX audit log'
+      - 'Playwright mobile/desktop acceptance harness with axe accessibility checks'
+      - 'Deterministic fake-provider browser fixtures; no screenshot binaries in source control'
+    out_of_scope:
+      - 'Visual implementation changes'
+      - 'Live-provider calls'
+    dependencies: [GAP-032]
+    acceptance:
+      - 'The complete Arc journey and its empty, loading, error and recovery states are specified'
+      - 'Browser tests cover navigation, keyboard use, accessibility and the learner journey'
+      - 'Every observed issue has a route, viewport, severity and disposition in the audit log'
+    verification:
+      - pnpm test:ui
+      - pnpm verify
+    risk: low
+    human_gate: false
+
+  - id: GAP-034
+    title: 'Build the accessible responsive Arc foundation'
+    epic: E21
+    priority: P0
+    status: done
+    goal: 'Make Arc usable and coherent from phone through desktop before adding journey screens.'
+    scope:
+      - 'Accessible shared UI primitives and Arc design tokens'
+      - 'Responsive shell, safe-area navigation, theme, loading/error/empty states'
+      - 'Semantic skill-map navigation and lesson tabs'
+    out_of_scope:
+      - 'Legacy /gaps visual redesign'
+      - 'A new brand direction'
+    dependencies: [GAP-033]
+    acceptance:
+      - 'Exactly one primary navigation item is active on every Arc route'
+      - 'Arc controls meet keyboard, focus, reduced-motion and 44px touch-target requirements'
+      - 'Mobile and desktop browser accessibility checks have no serious or critical violations'
+    verification:
+      - pnpm test:ui
+      - pnpm --filter @gapos/web build
+      - pnpm verify
+    risk: medium
+    human_gate: false
+
+  - id: GAP-035
+    title: 'Unify Arc calibration, sources and compilation'
+    epic: E21
+    priority: P0
+    status: done
+    goal: 'Carry a learner from a calibrated goal to a real published Day 1 without leaving Arc.'
+    scope:
+      - 'Learner-confirmed duration, deadline and source policy'
+      - 'Arc source setup with text-based file import or explicit general knowledge'
+      - 'State-machine definition, idempotent compilation, progress, failure and retry UI'
+    out_of_scope:
+      - 'New source extraction formats'
+      - 'New generation infrastructure'
+    dependencies: [GAP-034]
+    acceptance:
+      - 'Calibration persists the learner-confirmed gap constraints'
+      - 'A source-backed and a general-knowledge path both reach a published Arc lesson'
+      - 'Ambiguous compile retries reuse their attempt key and terminal failures remain actionable'
+    verification:
+      - pnpm test apps/web/src/server
+      - pnpm test:ui
+      - pnpm verify
+    risk: high
+    human_gate: false
+
+  - id: GAP-036
+    title: 'Complete Arc practice, reviews, mastery and retention'
+    epic: E21
+    priority: P0
+    status: done
+    goal: 'Make correction, mastery evidence and retained capabilities visible and actionable.'
+    scope:
+      - 'Retrieval/application practice with hidden answers, confidence and corrections'
+      - 'Server-graded learner review queue and behavior-affecting preferences'
+      - 'Objective mastery explanation and searchable filled capabilities'
+    out_of_scope:
+      - 'Changing domain mastery thresholds or review scheduling policy'
+      - 'Educator review workflow changes'
+    dependencies: [GAP-035]
+    acceptance:
+      - 'Non-code practice records confidence and schedules correction/review work'
+      - 'Due reviews can be completed from Arc and display the next scheduled review'
+      - 'A filled gap is findable as a capability from the Arc Skills experience'
+    verification:
+      - pnpm test apps/web/src/server
+      - pnpm test:ui
+      - pnpm verify
+    risk: high
+    human_gate: false
+
+  - id: GAP-037
+    title: 'Harden and verify the Arc core journey'
+    epic: E21
+    priority: P0
+    status: done
+    goal: 'Ship the unified learner journey with explicit edge states, offline behavior and evidence.'
+    scope:
+      - 'Route loading/error boundaries and complete empty/failure recovery states'
+      - 'Arc-aligned PWA shell behavior and documented signed-audio limitation'
+      - 'Operational telemetry, final browser walkthrough and audit dispositions'
+    out_of_scope:
+      - 'Offline caching of cross-origin signed audio bytes'
+      - 'Public deployment'
+    dependencies: [GAP-036]
+    acceptance:
+      - 'The browser acceptance journey passes on mobile and desktop'
+      - 'Offline Arc navigation has a documented and tested fallback'
+      - 'The audit contains no unresolved blocker and every deferred issue has rationale'
+    verification:
+      - pnpm test:ui
+      - pnpm --filter @gapos/web build
+      - pnpm verify
+    risk: medium
+    human_gate: false

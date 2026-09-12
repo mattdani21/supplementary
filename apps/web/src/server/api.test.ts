@@ -225,9 +225,9 @@ describe('the learner journey over the API', () => {
     const gapId = await seedCompiledGap(context);
     const result = (await registerSourceHandler(context, OWNER, {
       gapId,
-      filename: 'evil.html',
-      mediaType: 'text/html',
-      text: '<script>alert(1)</script>',
+      filename: 'unsupported.pdf',
+      mediaType: 'application/pdf',
+      text: 'This media type is intentionally outside the accepted text formats.',
     })) as { registration: { accepted: boolean; code?: string } };
     expect(result.registration.accepted).toBe(false);
     expect(result.registration.code).toBeDefined();
