@@ -60,4 +60,25 @@ test.describe('Arc responsive foundation', () => {
       expect(serious, `${path}: ${serious.map((item) => item.id).join(', ')}`).toEqual([]);
     }
   });
+
+  test('dark mode persists and reduced motion removes essential transitions', async ({
+    page,
+  }, testInfo) => {
+    await openAsNewLearner(page, testInfo, '/arc/profile');
+    await page.getByRole('checkbox', { name: /dark mode/i }).check();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/arc/calibrate');
+    const option = page.getByRole('button', { name: /python for data work/i });
+    await expect(option).toBeVisible();
+    const transitionSeconds = await option.evaluate((element) =>
+      getComputedStyle(element)
+        .transitionDuration.split(',')
+        .map((duration) => Number.parseFloat(duration)),
+    );
+    expect(Math.max(...transitionSeconds)).toBeLessThanOrEqual(0.001);
+    await option.click();
+    await expect(option).toHaveClass(/is-selected/);
+  });
 });
