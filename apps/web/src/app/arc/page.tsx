@@ -195,7 +195,7 @@ export default async function ArcTodayPage() {
           </strong>{' '}
           of momentum
         </span>
-        <span className="arc-dots" aria-label={`${today.momentumDays} day momentum`}>
+        <span className="arc-dots" role="img" aria-label={`${today.momentumDays} day momentum`}>
           {momentumDots.map((on, index) => (
             <span key={index} className={on ? 'is-on' : ''} />
           ))}

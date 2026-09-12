@@ -54,6 +54,14 @@ html[data-theme='dark'] {
   min-height: 48px;
 }
 
+.arc .arc-primary {
+  color: #fff;
+}
+
+html[data-theme='dark'] .arc .arc-primary {
+  color: #111419;
+}
+
 .ui-empty-state,
 .ui-status {
   border: 1px solid var(--line);
