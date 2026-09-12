@@ -93,6 +93,6 @@ test('the Arc journey reaches practice, correction and server-graded review', as
   const progressLink = page.getByRole('link', { name: 'Progress' });
   await progressLink.focus();
   await progressLink.press('Enter');
-  await expect(page.getByRole('heading', { name: 'Progress' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Progress', exact: true, level: 1 })).toBeVisible();
   await expectNoSeriousViolations(page, 'progress');
 });
