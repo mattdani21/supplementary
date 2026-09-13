@@ -36,6 +36,10 @@ export const METRICS = [
   'arc_compile_started_total',
   'arc_compile_result_total',
   'arc_compile_retry_total',
+  'rate_limited_total',
+  'proof_execution_refused_total',
+  'identity_rejected_total',
+  'pilot_learner_filled_total',
 ] as const;
 
 export type MetricName = (typeof METRICS)[number];

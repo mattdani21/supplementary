@@ -189,6 +189,12 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503':
+          description: The durable queue could not accept the job.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
 
   /runs/{runId}:
     parameters:
@@ -547,6 +553,8 @@ paths:
                 properties:
                   run: { $ref: '#/components/schemas/ArcRunCellResult' }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ProofUnavailable' }
 
   /arc/gaps/{gapId}/proofs:
     parameters:
@@ -575,6 +583,8 @@ paths:
                 properties:
                   proof: { $ref: '#/components/schemas/ArcProofResult' }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ProofUnavailable' }
 
   /arc/progress:
     get:
@@ -719,6 +729,16 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
+    RateLimited:
+      description: The authenticated owner exceeded the configured quota. Retry-After is seconds.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ProofUnavailable:
+      description: Notebook execution is disabled on this deployment.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
     NotFound:
       description: |
         No such resource for this learner. Returned identically whether the resource does not
@@ -758,6 +778,13 @@ components:
             - file_too_large
             - encrypted_or_unreadable
             - empty_document
+            - unauthenticated
+            - session_expired
+            - identity_conflict
+            - identity_misconfigured
+            - rate_limited
+            - proof_execution_unavailable
+            - queue_unavailable
         message: { type: string }
         details:
           type: object
@@ -880,6 +907,9 @@ components:
             status: { $ref: '#/components/schemas/GenerationStatus' }
             deduplicated: { type: boolean }
             error: { type: string }
+            jobId:
+              type: string
+              description: Durable queue identity when compile runs as a worker job.
 
     GenerationRun:
       type: object

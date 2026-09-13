@@ -212,3 +212,31 @@ almost always a prompt or model-routing change.
 **Backup and restore.** Database backups are taken daily with point-in-time recovery. Restore is
 rehearsed against staging before each release: restore the snapshot, run migrations, run the smoke
 compilation.
+
+## Pilot readiness (GAPX)
+
+Postgres web and worker share `createPostgresJobQueue` on the same pool. A compile accepted
+in queue transport returns `run.status=queued` and `run.jobId`. Queue failure is `503`
+`queue_unavailable`, never a successful schedule.
+
+| Variable | Purpose |
+| --- | --- |
+| `GAPOS_IDENTITY_MODE` | `demo` (default) or `protected` |
+| `AUTH_SECRET` | Required for protected boot (Auth.js) |
+| `AUTH_GITHUB_ID` / `AUTH_GITHUB_SECRET` | OAuth application |
+| `GAPOS_INVITE_SUBJECTS` | Comma-separated emails/subjects allowed to sign in |
+| `GAPOS_PROOF_EXECUTION` | `disabled` or `local`. Protected mode defaults to disabled |
+| `GAPOS_QUOTA_UPLOAD_LIMIT` / `_WINDOW_MS` | Upload quota |
+| `GAPOS_QUOTA_COMPILE_LIMIT` / `_WINDOW_MS` | Compile quota |
+| `GAPOS_QUOTA_PROOF_LIMIT` / `_WINDOW_MS` | Proof-run quota |
+| `GAPOS_DATABASE_SCHEMA` | Optional search_path schema (tests) |
+
+Protected mode refuses to boot without a verifier, `AUTH_SECRET`, Postgres, and explicit
+quota values. Do not re-enable forged identity or public in-process proofs to recover a
+failing release. Feature flags for live generation remain `GAPOS_PROVIDER_MODE`.
+
+Rollback: forward-only. Migration `007_request_quotas` is additive; disable quotas by
+keeping the instance private, not by dropping the table. Identity rollback is
+`GAPOS_IDENTITY_MODE=demo` on a non-public instance only.
+
+Pilot cohort procedure: [docs/pilot/M4-RUNBOOK.md](pilot/M4-RUNBOOK.md).

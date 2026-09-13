@@ -25,6 +25,7 @@ import {
 } from '@gapos/domain';
 import { runCell } from '../../../../worker/src/notebook/executor.js';
 import type { ServerContext } from '../context.js';
+import { assertProofExecutionEnabled } from '../proof-execution.js';
 
 /* ----------------------------------------------------------------------- today */
 
@@ -291,6 +292,10 @@ export const runProofCell = async (
   questionId: string,
   code: string,
 ): Promise<RunCellResult> => {
+  if (context.proofExecution === 'disabled') {
+    context.metrics.increment('proof_execution_refused_total');
+  }
+  assertProofExecutionEnabled(context.proofExecution);
   const question = await context.uow.curricula.getQuestion(owner, questionId);
   if (!question) throw new Error(`Question ${questionId} was not found for this owner.`);
   if (question.payload.type !== 'code_proof') {
@@ -341,6 +346,10 @@ export const submitProof = async (
   gapId: string,
   input: SubmitProofInput,
 ): Promise<ProofResult> => {
+  if (context.proofExecution === 'disabled') {
+    context.metrics.increment('proof_execution_refused_total');
+  }
+  assertProofExecutionEnabled(context.proofExecution);
   const question = await context.uow.curricula.getQuestion(owner, input.questionId);
   if (!question) throw new Error(`Question ${input.questionId} was not found for this owner.`);
   if (question.payload.type !== 'code_proof') {

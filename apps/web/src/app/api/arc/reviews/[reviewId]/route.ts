@@ -1,5 +1,9 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { arcSubmitReviewHandler, requireOwner, toHttpError } from '../../../../../server/api';
+import {
+  arcSubmitReviewHandler,
+  resolveRequestOwner,
+  toHttpError,
+} from '../../../../../server/api';
 import { getServerContext } from '../../../../../server/bootstrap';
 
 export const POST = async (
@@ -9,7 +13,7 @@ export const POST = async (
   try {
     const { reviewId } = await params;
     const context = await getServerContext();
-    const owner = requireOwner(request.headers);
+    const owner = await resolveRequestOwner(request);
     return NextResponse.json(
       await arcSubmitReviewHandler(context, owner, reviewId, await request.json()),
     );

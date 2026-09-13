@@ -23,7 +23,12 @@ export class ArcFetchError extends Error {
 
 export const arcFetch = async (path: string, init: RequestInit = {}): Promise<unknown> => {
   const headers = new Headers(init.headers);
-  headers.set('x-owner-id', arcOwner());
+  const protectedMode =
+    typeof document !== 'undefined' &&
+    document.documentElement.dataset.identityMode === 'protected';
+  if (!protectedMode) {
+    headers.set('x-owner-id', arcOwner());
+  }
   if (init.body && !headers.has('content-type')) {
     headers.set('content-type', 'application/json');
   }

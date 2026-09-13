@@ -18,7 +18,12 @@ import {
   type OwnerId,
 } from '@gapos/database';
 import { ProviderBudgetError } from '@gapos/provider-adapters';
+import { enqueueCompile } from '../../../worker/src/queue/enqueue.js';
+import type { QuotaOperation } from '@gapos/database';
 import type { ServerContext } from './context.js';
+import { IdentityError } from './identity/errors.js';
+import { resolveOwner } from './identity/resolve-owner.js';
+import { ProofExecutionUnavailableError } from './proof-execution.js';
 import {
   applyTransition,
   compile as compileGap,
@@ -68,9 +73,37 @@ export class ApiError extends Error {
   }
 }
 
+export class RateLimitedError extends Error {
+  constructor(
+    readonly retryAfterSeconds: number,
+    message = 'Too many requests for this owner.',
+  ) {
+    super(message);
+    this.name = 'RateLimitedError';
+  }
+}
+
+export const consumeQuota = async (
+  context: ServerContext,
+  owner: OwnerId,
+  operation: QuotaOperation,
+): Promise<void> => {
+  const admission = await context.limiter.admit(owner, operation, context.now());
+  if (!admission.admitted) {
+    context.metrics.increment('rate_limited_total', { operation });
+    throw new RateLimitedError(admission.retryAfterSeconds);
+  }
+};
+
 export const toHttpError = (error: unknown): { status: number; code: string; message: string } => {
   if (error instanceof ApiError)
     return { status: error.status, code: error.code, message: error.message };
+  if (error instanceof IdentityError)
+    return { status: error.status, code: error.code, message: error.message };
+  if (error instanceof ProofExecutionUnavailableError)
+    return { status: error.status, code: error.code, message: error.message };
+  if (error instanceof RateLimitedError)
+    return { status: 429, code: 'rate_limited', message: error.message };
   if (error instanceof CalibrationKitUnavailableError)
     return { status: 409, code: 'calibration_kit_expired', message: error.message };
   if (error instanceof CompileSetupError)
@@ -103,6 +136,9 @@ export const requireOwner = (headers: Headers): OwnerId => {
   if (!owner) throw new ApiError(401, 'owner_required', 'Set the X-Owner-Id header.');
   return owner as OwnerId;
 };
+
+export const resolveRequestOwner = (request: { headers: Headers }): Promise<OwnerId> =>
+  resolveOwner(request);
 
 /* ------------------------------------------------------------------- schemas */
 
@@ -276,6 +312,31 @@ export const compile = async (
     if (retry) context.metrics.increment('arc_compile_retry_total');
   }
 
+  await consumeQuota(context, owner, 'compile');
+
+  if (context.compileTransport === 'queue') {
+    try {
+      const job = await enqueueCompile(context, owner, { gapId, ...compileInput });
+      if (surface === 'arc_setup') {
+        context.metrics.increment('arc_compile_result_total', { status: 'queued' });
+      }
+      return {
+        run: {
+          runId: job.id,
+          status: 'queued',
+          deduplicated: false,
+          jobId: job.id,
+        },
+      };
+    } catch (error) {
+      if (surface === 'arc_setup') {
+        context.metrics.increment('arc_compile_result_total', { status: 'request_error' });
+      }
+      if (error instanceof CompileSetupError) throw error;
+      throw new ApiError(503, 'queue_unavailable', 'The compile queue could not accept this job.');
+    }
+  }
+
   try {
     const outcome = await compileGap(context, owner, { gapId, ...compileInput });
     if (surface === 'arc_setup') {
@@ -303,6 +364,7 @@ export const registerSourceHandler = async (
   body: unknown,
 ): Promise<{ registration: Awaited<ReturnType<typeof registerSource>> }> => {
   const input = registerSourceSchema.parse(body) as RegisterSourceInput;
+  await consumeQuota(context, owner, 'upload');
   const registration = await registerSource(context, owner, input);
   return { registration };
 };
@@ -673,6 +735,7 @@ export const arcRunCellHandler = async (
   body: unknown,
 ): Promise<{ run: RunCellResult }> => {
   const input = runCellSchema.parse(body);
+  await consumeQuota(context, owner, 'proof');
   return { run: await runProofCell(context, owner, gapId, input.questionId, input.code) };
 };
 
@@ -683,6 +746,7 @@ export const arcSubmitProofHandler = async (
   body: unknown,
 ): Promise<{ proof: Awaited<ReturnType<typeof submitProof>> }> => {
   const input = proofSchema.parse(body);
+  await consumeQuota(context, owner, 'proof');
   return { proof: await submitProof(context, owner, gapId, input) };
 };
 

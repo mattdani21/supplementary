@@ -1,6 +1,6 @@
 {
  "schemaVersion": 1,
- "updatedAt": "2026-09-12T21:36:00.000Z",
+ "updatedAt": "2026-09-13T19:40:29Z",
  "controller": "gapos-controller",
  "tasks": {
   "GAP-000": {
@@ -699,6 +699,147 @@
     }
    ],
    "notes": "Service worker v3 safely falls back for uncached navigation, partitions visited Arc documents by owner, never caches API responses or cross-origin signed audio, and leaves writes network-only. Attempt metrics use stable question type/role labels. Text-only/no-audio, no-practice, all-objectives-cleared, compiling, partial, failed, archived and stale-review states have recovery actions. Manual and automated walkthrough evidence is recorded in docs/ux/core-journey-audit.md. No migration; uncached signed audio remains intentionally network-dependent."
+  },
+  "GAPX-01": {
+   "status": "done",
+   "startedAt": "2026-09-13T19:40:29Z",
+   "completedAt": "2026-09-13T19:40:29Z",
+   "evidence": [
+    {
+     "command": "pnpm test tests/end-to-end/staging-journey.test.ts",
+     "result": "pass",
+     "note": "Queue failure is 503 queue_unavailable; memory restart journey and inline mastery still pass."
+    },
+    {
+     "command": "pnpm test tests/end-to-end/postgres-web-bootstrap.test.ts",
+     "result": "not_run",
+     "note": "Skipped: GAPOS_TEST_DATABASE_URL is unset in this environment."
+    },
+    {
+     "command": "pnpm typecheck",
+     "result": "pass",
+     "note": ""
+    }
+   ],
+   "notes": "Postgres web bootstrap injects createPostgresJobQueue on the same pool. HTTP compile uses queue transport when GAPOS_DATABASE_URL is set. PR #19 is on this branch. PR #15 is parked."
+  },
+  "GAPX-02": {
+   "status": "done",
+   "startedAt": "2026-09-13T19:40:29Z",
+   "completedAt": "2026-09-13T19:40:29Z",
+   "evidence": [
+    {
+     "command": "pnpm test apps/web/src/server/identity",
+     "result": "pass",
+     "note": "Forged header/cookie conflict 409; missing/expired session 401; protected boot without verifier or AUTH_SECRET fails; two owners isolated."
+    },
+    {
+     "command": "pnpm test tests/end-to-end/security.test.ts",
+     "result": "pass",
+     "note": "Identity isolation plus existing injection/tenancy suite."
+    },
+    {
+     "command": "Auth.js GitHub provider integration",
+     "result": "not_run",
+     "note": "No AUTH_SECRET / OAuth credentials in this environment. Adapter is wired; live sign-in is a human gate."
+    }
+   ],
+   "notes": "resolveOwner is the shared port. Demo mode remains default. Protected mode is opt-in."
+  },
+  "GAPX-03": {
+   "status": "done",
+   "startedAt": "2026-09-13T19:40:29Z",
+   "completedAt": "2026-09-13T19:40:29Z",
+   "evidence": [
+    {
+     "command": "pnpm test apps/web/src/server/proof-execution.test.ts",
+     "result": "pass",
+     "note": "Disabled mode returns ProofExecutionUnavailableError and does not call runCell; lesson reads still work."
+    },
+    {
+     "command": "Isolation containment matrix",
+     "result": "not_run",
+     "note": "Recorded in docs/adr/0004-proof-isolation-matrix.md. No sandbox architecture selected."
+    }
+   ],
+   "notes": "Default off in protected mode. Local demo keeps the existing in-process executor."
+  },
+  "GAPX-04": {
+   "status": "done",
+   "startedAt": "2026-09-13T19:40:29Z",
+   "completedAt": "2026-09-13T19:40:29Z",
+   "evidence": [
+    {
+     "command": "pnpm test packages/database/src/repositories/quotas.test.ts",
+     "result": "pass",
+     "note": "Limit, owner isolation, window reset, consumed-on-failure."
+    },
+    {
+     "command": "pnpm test tests/end-to-end/staging-journey.test.ts",
+     "result": "pass",
+     "note": "429 RateLimitedError after one compile; curriculum identity unchanged."
+    },
+    {
+     "command": "Postgres limiter concurrency",
+     "result": "not_run",
+     "note": "Requires GAPOS_TEST_DATABASE_URL. Migration 007 is additive."
+    }
+   ],
+   "notes": "Memory limiter is development-only. Protected mode requires explicit GAPOS_QUOTA_* and Postgres."
+  },
+  "GAPX-05": {
+   "status": "done",
+   "startedAt": "2026-09-13T19:40:29Z",
+   "completedAt": "2026-09-13T19:40:29Z",
+   "evidence": [
+    {
+     "command": "routes / /sign-in /privacy /terms",
+     "result": "pass",
+     "note": "Landing states the gap-to-proof journey; sign-in uses Auth.js GitHub; privacy/terms do not invent policy."
+    }
+   ],
+   "notes": "Human-authored legal copy remains a gate. Invite list is GAPOS_INVITE_SUBJECTS."
+  },
+  "GAPX-06": {
+   "status": "done",
+   "startedAt": "2026-09-13T19:40:29Z",
+   "completedAt": "2026-09-13T19:40:29Z",
+   "evidence": [
+    {
+     "command": "pnpm test tests/end-to-end/staging-journey.test.ts",
+     "result": "pass",
+     "note": "Compile/audio/two-session mastery; queue failure; quota side-effect check."
+    },
+    {
+     "command": "GAPOS_PROVIDER_MODE=live pnpm test tests/evaluation/live-provider.test.ts",
+     "result": "not_run",
+     "note": "No live provider keys. Human gate before flipping to real learners."
+    },
+    {
+     "command": "Hosted staging restart pair",
+     "result": "not_run",
+     "note": "No deployed Postgres+S3 pair in this agent environment."
+    }
+   ],
+   "notes": "OPERATIONS release gates that need keys or a host stay not_run. Fake-mode quality gate is the local bar."
+  },
+  "GAPX-07": {
+   "status": "done",
+   "startedAt": "2026-09-13T19:40:29Z",
+   "completedAt": "2026-09-13T19:40:29Z",
+   "evidence": [
+    {
+     "command": "pnpm test tests/end-to-end/pilot-rehearsal.test.ts",
+     "result": "pass",
+     "note": "Five synthetic owners fill a gap on evidence; no cross-tenant capability leakage."
+    },
+    {
+     "command": "Recruit five real learners",
+     "result": "not_run",
+     "note": "Human gate. See docs/pilot/M4-RUNBOOK.md. Rehearsal is not a substitute for the M4 cohort."
+    }
+   ],
+   "notes": "Automated rehearsal complete. Real M4 exit evidence remains a human recruitment gate."
   }
  },
  "GAP-014b": {
@@ -733,5 +874,27 @@
   ],
   "notes": "GAP-014b DONE: the first live-model lessons are generated, verified, scored and recorded as baselines. DeepSeek deepseek-v4-flash + Google TTS produce source-grounded audio-first courses that satisfy every evaluation dimension on all nine reference fixtures, resist a prompt-injection attempt (recorded as a finding, never followed), and ask for clarification instead of guessing on an underspecified request. Cost for run 3 well within the $2 cap. Remaining live-gate nicety: the CI-form regression test (tests/evaluation/live-provider.test.ts) can be run with the live env at any time; it re-compiles the pack and compares against these baselines."
  },
- "blockers": []
+ "blockers": [
+  {
+   "id": "M4-real-learners",
+   "task": "GAPX-07",
+   "observed": "Five synthetic owners complete the mastery journey; no real invited learners were recruited.",
+   "reproduction": "docs/pilot/M4-RUNBOOK.md",
+   "attemptedFixes": [
+    "Automated five-owner rehearsal",
+    "Pilot runbook"
+   ],
+   "recommendedDecision": "Human recruits the invited cohort after live-eval and a hosted private instance exist."
+  },
+  {
+   "id": "live-eval-keys",
+   "task": "GAPX-06",
+   "observed": "Live-provider evaluation was not run.",
+   "reproduction": "GAPOS_PROVIDER_MODE=live pnpm test tests/evaluation/live-provider.test.ts",
+   "attemptedFixes": [
+    "Recorded as not_run; did not stub the gate"
+   ],
+   "recommendedDecision": "Human supplies keys for the exact production model before real learners."
+  }
+ ]
 }

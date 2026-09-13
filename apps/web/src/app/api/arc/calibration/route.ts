@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server';
 import {
   arcCalibrationKitHandler,
   arcCalibrateHandler,
-  requireOwner,
+  resolveRequestOwner,
   toHttpError,
 } from '../../../../server/api';
 import { getServerContext } from '../../../../server/bootstrap';
@@ -11,7 +11,7 @@ import { getServerContext } from '../../../../server/bootstrap';
 export const GET = async (request: NextRequest) => {
   try {
     const context = await getServerContext();
-    const owner = requireOwner(request.headers);
+    const owner = await resolveRequestOwner(request);
     const subject = request.nextUrl.searchParams.get('subject') ?? '';
     if (!subject) {
       return NextResponse.json(
@@ -29,7 +29,7 @@ export const GET = async (request: NextRequest) => {
 export const POST = async (request: NextRequest) => {
   try {
     const context = await getServerContext();
-    const owner = requireOwner(request.headers);
+    const owner = await resolveRequestOwner(request);
     return NextResponse.json(await arcCalibrateHandler(context, owner, await request.json()));
   } catch (error) {
     const mapped = toHttpError(error);

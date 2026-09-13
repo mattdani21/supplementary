@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server';
 import {
   arcPreferencesHandler,
   arcSetPreferencesHandler,
-  requireOwner,
+  resolveRequestOwner,
   toHttpError,
 } from '../../../../server/api';
 import { getServerContext } from '../../../../server/bootstrap';
@@ -11,7 +11,7 @@ import { getServerContext } from '../../../../server/bootstrap';
 export const GET = async (request: NextRequest) => {
   try {
     const context = await getServerContext();
-    const owner = requireOwner(request.headers);
+    const owner = await resolveRequestOwner(request);
     return NextResponse.json(await arcPreferencesHandler(context, owner));
   } catch (error) {
     const mapped = toHttpError(error);
@@ -22,7 +22,7 @@ export const GET = async (request: NextRequest) => {
 export const PUT = async (request: NextRequest) => {
   try {
     const context = await getServerContext();
-    const owner = requireOwner(request.headers);
+    const owner = await resolveRequestOwner(request);
     return NextResponse.json(await arcSetPreferencesHandler(context, owner, await request.json()));
   } catch (error) {
     const mapped = toHttpError(error);

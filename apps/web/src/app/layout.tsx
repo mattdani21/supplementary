@@ -18,8 +18,9 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
+  const identityMode = process.env.GAPOS_IDENTITY_MODE === 'protected' ? 'protected' : 'demo';
   return (
-    <html lang="en">
+    <html lang="en" data-identity-mode={identityMode}>
       <body>
         {children}
         <RegisterServiceWorker />

@@ -10,12 +10,15 @@ import { randomUUID } from 'node:crypto';
 import {
   createMemoryJobQueue,
   createMemoryObjectStore,
+  createMemoryRequestLimiter,
   createMemoryUnitOfWork,
   type JobQueue,
   type ObjectStore,
   type OwnerId,
+  type RequestLimiter,
   type UnitOfWork,
 } from '@gapos/database';
+import type { ProofExecutionMode } from './proof-execution.js';
 import type { Calibration } from '@gapos/ai-contracts';
 import {
   CostAccountant,
@@ -46,6 +49,9 @@ export interface ServerContext {
   readonly costAccountant: CostAccountant;
   readonly logger: Logger;
   readonly calibrationKits: CalibrationKitStore;
+  readonly compileTransport: 'inline' | 'queue';
+  readonly proofExecution: ProofExecutionMode;
+  readonly limiter: RequestLimiter;
   readonly now: () => Date;
   readonly newId: (prefix: string) => string;
 }
@@ -78,6 +84,9 @@ export interface ContextOptions {
   /** Durable job queue. Defaults to the in-memory queue; the worker uses the Postgres one. */
   readonly queue?: JobQueue;
   readonly calibrationKits?: CalibrationKitStore;
+  readonly compileTransport?: 'inline' | 'queue';
+  readonly proofExecution?: ProofExecutionMode;
+  readonly limiter?: RequestLimiter;
 }
 
 export const createServerContext = (options: ContextOptions = {}): ServerContext => {
@@ -132,6 +141,15 @@ export const createServerContext = (options: ContextOptions = {}): ServerContext
     costAccountant,
     logger,
     calibrationKits,
+    compileTransport: options.compileTransport ?? 'inline',
+    proofExecution: options.proofExecution ?? 'local',
+    limiter:
+      options.limiter ??
+      createMemoryRequestLimiter({
+        upload: { limit: 10_000, windowMs: 60_000 },
+        compile: { limit: 10_000, windowMs: 60_000 },
+        proof: { limit: 10_000, windowMs: 60_000 },
+      }),
     now,
     newId,
   };

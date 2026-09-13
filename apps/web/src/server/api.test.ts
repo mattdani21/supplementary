@@ -37,6 +37,7 @@ import {
   listSources,
   masteryView,
   registerSourceHandler,
+  RateLimitedError,
   requireOwner,
   reviewLesson,
   reviewQueue,
@@ -131,6 +132,10 @@ describe('error mapping', () => {
       createGap(context, OWNER, { title: '', rawStatement: 'short', dailyMinutes: 1 }),
     ).rejects.toMatchObject({ name: 'ZodError' });
     expect(toHttpError(new ZodError([])).status).toBe(400);
+    expect(toHttpError(new RateLimitedError(12))).toMatchObject({
+      status: 429,
+      code: 'rate_limited',
+    });
   });
 
   it('maps missing resources to 404', async () => {
