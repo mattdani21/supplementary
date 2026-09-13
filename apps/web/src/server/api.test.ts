@@ -37,6 +37,7 @@ import {
   listSources,
   masteryView,
   registerSourceHandler,
+  RateLimitedError,
   requireOwner,
   reviewLesson,
   reviewQueue,
@@ -131,6 +132,10 @@ describe('error mapping', () => {
       createGap(context, OWNER, { title: '', rawStatement: 'short', dailyMinutes: 1 }),
     ).rejects.toMatchObject({ name: 'ZodError' });
     expect(toHttpError(new ZodError([])).status).toBe(400);
+    expect(toHttpError(new RateLimitedError(12))).toMatchObject({
+      status: 429,
+      code: 'rate_limited',
+    });
   });
 
   it('maps missing resources to 404', async () => {
@@ -225,9 +230,9 @@ describe('the learner journey over the API', () => {
     const gapId = await seedCompiledGap(context);
     const result = (await registerSourceHandler(context, OWNER, {
       gapId,
-      filename: 'evil.html',
-      mediaType: 'text/html',
-      text: '<script>alert(1)</script>',
+      filename: 'unsupported.pdf',
+      mediaType: 'application/pdf',
+      text: 'This media type is intentionally outside the accepted text formats.',
     })) as { registration: { accepted: boolean; code?: string } };
     expect(result.registration.accepted).toBe(false);
     expect(result.registration.code).toBeDefined();

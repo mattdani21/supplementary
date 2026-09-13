@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { arcSubmitProofHandler, requireOwner, toHttpError } from '../../../../../../server/api';
+import {
+  arcSubmitProofHandler,
+  resolveRequestOwner,
+  toHttpError,
+} from '../../../../../../server/api';
 import { getServerContext } from '../../../../../../server/bootstrap';
 
 export const POST = async (
@@ -10,7 +14,7 @@ export const POST = async (
   try {
     const { gapId } = await params;
     const context = await getServerContext();
-    const owner = requireOwner(request.headers);
+    const owner = await resolveRequestOwner(request);
     return NextResponse.json(
       await arcSubmitProofHandler(context, owner, gapId, await request.json()),
     );

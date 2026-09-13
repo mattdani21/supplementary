@@ -10,12 +10,17 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#0f172a',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#f8f9f7' },
+    { media: '(prefers-color-scheme: dark)', color: '#111419' },
+  ],
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
+  const identityMode = process.env.GAPOS_IDENTITY_MODE === 'protected' ? 'protected' : 'demo';
   return (
-    <html lang="en">
+    <html lang="en" data-identity-mode={identityMode}>
       <body>
         {children}
         <RegisterServiceWorker />

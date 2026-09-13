@@ -1,15 +1,16 @@
 /**
- * Who is the viewer? Single-learner deployments identify the owner by cookie (the API uses the
- * same value in X-Owner-Id). The owner switcher on /gaps writes the cookie.
+ * Who is the viewer? Demo mode still accepts the unsigned owner cookie. Protected mode uses
+ * the same identity port as the API (GAPX-02).
  */
 
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import type { OwnerId } from '@gapos/database';
+import { DEFAULT_OWNER, OWNER_COOKIE, resolveViewerOwner } from '../server/identity/resolve-owner';
 
-export const OWNER_COOKIE = 'gapos_owner';
-export const DEFAULT_OWNER: OwnerId = 'local-learner' as OwnerId;
+export { OWNER_COOKIE, DEFAULT_OWNER };
 
 export const viewerOwner = async (): Promise<OwnerId> => {
   const jar = await cookies();
-  return (jar.get(OWNER_COOKIE)?.value as OwnerId | undefined) ?? DEFAULT_OWNER;
+  const headerList = await headers();
+  return resolveViewerOwner(jar.get(OWNER_COOKIE)?.value, { headers: headerList });
 };

@@ -10,7 +10,7 @@ interface ProfileView {
   name: string;
   email: string;
   preferences: Preferences & { ownerId: string };
-  stats: { clearedGaps: number; totalGaps: number };
+  stats: { filledGaps: number; totalGaps: number };
 }
 
 export default async function ArcProfilePage() {
@@ -37,7 +37,7 @@ export default async function ArcProfilePage() {
         <div>
           <h2>{profile.name}</h2>
           <p>
-            {profile.stats.clearedGaps} of {profile.stats.totalGaps} skills cleared by proof.
+            {profile.stats.filledGaps} of {profile.stats.totalGaps} skills filled by proof.
           </p>
         </div>
       </div>

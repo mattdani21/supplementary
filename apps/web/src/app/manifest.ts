@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: 'Learn the gap. Prove the skill.',
     start_url: '/arc',
     display: 'standalone',
-    background_color: '#0f172a',
-    theme_color: '#0f172a',
+    background_color: '#f8f9f7',
+    theme_color: '#f8f9f7',
     icons: [
       {
         src: '/icon.svg',

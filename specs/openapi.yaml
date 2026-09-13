@@ -155,16 +155,43 @@ paths:
       summary: Start an idempotent compilation
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [idempotencyKey]
+              properties:
+                idempotencyKey: { type: string, minLength: 1 }
+                audioEnabled: { type: boolean }
+                concurrency: { type: integer, minimum: 1, maximum: 8 }
+                generalKnowledgeConfirmed:
+                  type: boolean
+                  description: Required when compiling without a source under the general-knowledge policy.
+                surface:
+                  type: string
+                  enum: [arc_setup]
+                  description: Records content-free Arc setup and compile telemetry.
+                retry:
+                  type: boolean
+                  description: Distinguishes a deliberate Arc retry from an initial compile.
       responses:
-        '202':
+        '200':
           description: |
-            A run was started, or an existing run for this idempotency key was returned. Check
-            `deduplicated` to tell which.
+            The synchronous run completed, or an existing run for this idempotency key was
+            returned. Check `run.deduplicated` to tell which.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/CompileResponse' }
         '409':
           description: The gap is not in a state from which it can be compiled.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503':
+          description: The durable queue could not accept the job.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -384,6 +411,29 @@ paths:
                     type: array
                     items: { $ref: '#/components/schemas/ArcSkill' }
 
+  /arc/capabilities:
+    get:
+      tags: [arc]
+      operationId: arcCapabilities
+      summary: Search the learner's filled capabilities
+      parameters:
+        - name: query
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        '200':
+          description: Filled gaps matching the title, target capability, or objective ids.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  capabilities:
+                    type: array
+                    items: { $ref: '#/components/schemas/ArcCapability' }
+        '401': { $ref: '#/components/responses/Unauthorised' }
+
   /arc/calibration:
     get:
       tags: [arc]
@@ -391,7 +441,8 @@ paths:
       summary: The calibration kit for a subject
       description: |
         Goal options and the baseline code question, produced through the provider adapter and
-        schema-validated. The answer key is never returned.
+        schema-validated. The answer key is never returned; the opaque kit identifier binds the
+        eventual answer to this exact server-held question.
       parameters:
         - name: subject
           in: query
@@ -409,12 +460,13 @@ paths:
     post:
       tags: [arc]
       operationId: arcCalibrate
-      summary: Run the 3-step calibration
+      summary: Run the calibration with confirmed learning constraints
       description: |
         Grades the baseline answer server-side, creates the real gap the route leads to,
         interprets the diagnostic through the provider adapter (a correct baseline raises the
-        starting point), persists the selections, and reports the gaps identified with a
-        next/after/later preview plus any existing gaps matching the subject.
+        starting point), persists the selections and confirmed time/source constraints, and
+        reports the gaps identified with a next/after/later preview plus any existing gaps
+        matching the subject.
       requestBody:
         required: true
         content:
@@ -431,6 +483,11 @@ paths:
                   calibration: { $ref: '#/components/schemas/ArcCalibrationResult' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorised' }
+        '409':
+          description: The calibration kit expired or does not belong to this learner and subject.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
 
   /arc/gaps/{gapId}/map:
     parameters:
@@ -496,6 +553,8 @@ paths:
                 properties:
                   run: { $ref: '#/components/schemas/ArcRunCellResult' }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ProofUnavailable' }
 
   /arc/gaps/{gapId}/proofs:
     parameters:
@@ -524,6 +583,8 @@ paths:
                 properties:
                   proof: { $ref: '#/components/schemas/ArcProofResult' }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ProofUnavailable' }
 
   /arc/progress:
     get:
@@ -539,6 +600,52 @@ paths:
                 type: object
                 properties:
                   progress: { $ref: '#/components/schemas/ArcProgress' }
+
+  /arc/reviews:
+    get:
+      tags: [arc]
+      operationId: arcReviews
+      summary: List due learner reviews with server-owned questions
+      responses:
+        '200':
+          description: Due reviews without answer keys.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reviews:
+                    type: array
+                    items: { $ref: '#/components/schemas/ArcReview' }
+        '401': { $ref: '#/components/responses/Unauthorised' }
+
+  /arc/reviews/{reviewId}:
+    parameters:
+      - name: reviewId
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      tags: [arc]
+      operationId: arcSubmitReview
+      summary: Grade and complete a learner review
+      description: Correctness is computed server-side; the request cannot declare its verdict.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [response, idempotencyKey]
+              properties:
+                response: { type: string, minLength: 1 }
+                confidence: { type: string, enum: [low, medium, high] }
+                idempotencyKey: { type: string, minLength: 1 }
+      responses:
+        '200':
+          description: Graded feedback and the next scheduled review, when any.
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
 
   /arc/profile:
     get:
@@ -622,6 +729,16 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
+    RateLimited:
+      description: The authenticated owner exceeded the configured quota. Retry-After is seconds.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ProofUnavailable:
+      description: Notebook execution is disabled on this deployment.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
     NotFound:
       description: |
         No such resource for this learner. Returned identically whether the resource does not
@@ -661,6 +778,13 @@ components:
             - file_too_large
             - encrypted_or_unreadable
             - empty_document
+            - unauthenticated
+            - session_expired
+            - identity_conflict
+            - identity_misconfigured
+            - rate_limited
+            - proof_execution_unavailable
+            - queue_unavailable
         message: { type: string }
         details:
           type: object
@@ -732,7 +856,7 @@ components:
       required: [filename, mediaType]
       properties:
         filename: { type: string }
-        mediaType: { type: string, enum: [text/plain, text/markdown, text/x-markdown] }
+        mediaType: { type: string, enum: [text/plain, text/markdown, text/x-markdown, text/html] }
         text: { type: string }
 
     RegisterSourceResponse:
@@ -773,11 +897,19 @@ components:
 
     CompileResponse:
       type: object
-      required: [runId, status, deduplicated]
+      required: [run]
       properties:
-        runId: { type: string }
-        status: { $ref: '#/components/schemas/GenerationStatus' }
-        deduplicated: { type: boolean }
+        run:
+          type: object
+          required: [runId, status, deduplicated]
+          properties:
+            runId: { type: string }
+            status: { $ref: '#/components/schemas/GenerationStatus' }
+            deduplicated: { type: boolean }
+            error: { type: string }
+            jobId:
+              type: string
+              description: Durable queue identity when compile runs as a worker job.
 
     GenerationRun:
       type: object
@@ -1008,8 +1140,11 @@ components:
 
     ArcCalibrationKit:
       type: object
-      required: [subject, goalOptions, baselineQuestion]
+      required: [kitId, subject, goalOptions, baselineQuestion]
       properties:
+        kitId:
+          type: string
+          description: Opaque, expiring handle to the answer key retained on the server.
         subject: { type: string }
         goalOptions:
           type: array
@@ -1027,11 +1162,18 @@ components:
 
     ArcCalibrationRequest:
       type: object
-      required: [subject, goal, baselineAnswer]
+      required: [kitId, subject, goal, baselineAnswer]
       properties:
+        kitId: { type: string, minLength: 1 }
         subject: { type: string, minLength: 1 }
         goal: { type: string, minLength: 1 }
         baselineAnswer: { type: string, minLength: 1 }
+        dailyMinutes: { type: integer, minimum: 5, maximum: 480, default: 35 }
+        deadline: { type: string, format: date }
+        sourcePolicy:
+          type: string
+          enum: [general_knowledge_allowed, sources_only]
+          default: general_knowledge_allowed
 
     ArcCalibrationResult:
       type: object
@@ -1071,6 +1213,51 @@ components:
         percent: { type: integer }
         started: { type: boolean }
 
+    ArcCapability:
+      type: object
+      required: [gapId, title, objectiveIds, filledAt]
+      properties:
+        gapId: { type: string }
+        title: { type: string }
+        targetCapability: { type: string }
+        objectiveIds:
+          type: array
+          items: { type: string }
+        filledAt: { type: string, format: date-time }
+
+    ArcReview:
+      type: object
+      required:
+        [
+          reviewId,
+          questionId,
+          gapId,
+          gapTitle,
+          objectiveId,
+          capabilityStatement,
+          dueAt,
+          reason,
+          prompt,
+          type,
+        ]
+      properties:
+        reviewId: { type: string }
+        questionId: { type: string }
+        gapId: { type: string }
+        gapTitle: { type: string }
+        objectiveId: { type: string }
+        capabilityStatement: { type: string }
+        dueAt: { type: string, format: date-time }
+        reason: { type: string, enum: [ladder, remediation, confidence_drop] }
+        prompt: { type: string }
+        type:
+          type: string
+          enum: [multiple_choice, short_answer, worked_problem, code_proof]
+        options:
+          type: array
+          items: { type: string }
+        hint: { type: string }
+
     ArcMap:
       type: object
       required: [gap, progress, sequence]
@@ -1102,16 +1289,19 @@ components:
           type: array
           items:
             type: object
-            required: [objectiveId, capabilityStatement, state]
+            required: [objectiveId, capabilityStatement, state, missing]
             properties:
               objectiveId: { type: string }
               capabilityStatement: { type: string }
               state: { type: string, enum: [cleared, current, later] }
               lessonDay: { type: integer }
+              missing:
+                type: array
+                items: { type: string }
 
     ArcLesson:
       type: object
-      required: [gap, lesson, transcript]
+      required: [gap, lesson, transcript, practice, defaultMode]
       properties:
         gap:
           type: object
@@ -1137,6 +1327,23 @@ components:
             artefactId: { type: string }
             durationSeconds: { type: number }
         transcript: { type: string }
+        defaultMode: { type: string, enum: [theory, practice] }
+        practice:
+          type: array
+          items:
+            type: object
+            required: [questionId, prompt, type, role]
+            properties:
+              questionId: { type: string }
+              prompt: { type: string }
+              type:
+                type: string
+                enum: [multiple_choice, short_answer, worked_problem]
+              role: { type: string, enum: [retrieval, application, transfer] }
+              options:
+                type: array
+                items: { type: string }
+              hint: { type: string }
         notebook:
           type: object
           required: [questionId, prompt, starterCode]
@@ -1188,10 +1395,10 @@ components:
 
     ArcProgress:
       type: object
-      required: [percent, clearedGaps, totalGaps, weeklyMinutes, momentumDays, proofs]
+      required: [percent, filledGaps, totalGaps, weeklyMinutes, momentumDays, proofs, needs]
       properties:
         percent: { type: integer }
-        clearedGaps: { type: integer }
+        filledGaps: { type: integer }
         totalGaps: { type: integer }
         weeklyMinutes: { type: integer }
         momentumDays: { type: integer }
@@ -1206,6 +1413,19 @@ components:
               gapId: { type: string }
               gapTitle: { type: string }
               recordedAt: { type: string, format: date-time }
+        needs:
+          type: array
+          items:
+            type: object
+            required: [gapId, gapTitle, objectiveId, capabilityStatement, missing]
+            properties:
+              gapId: { type: string }
+              gapTitle: { type: string }
+              objectiveId: { type: string }
+              capabilityStatement: { type: string }
+              missing:
+                type: array
+                items: { type: string }
 
     ArcProfile:
       type: object
@@ -1216,9 +1436,9 @@ components:
         preferences: { $ref: '#/components/schemas/ArcPreferences' }
         stats:
           type: object
-          required: [clearedGaps, totalGaps]
+          required: [filledGaps, totalGaps]
           properties:
-            clearedGaps: { type: integer }
+            filledGaps: { type: integer }
             totalGaps: { type: integer }
 
     ArcToday:

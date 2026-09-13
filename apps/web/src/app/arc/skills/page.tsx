@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { arcSkillsHandler } from '../../../server/api';
+import { arcCapabilitiesHandler, arcSkillsHandler } from '../../../server/api';
 import { getServerContext } from '../../../server/bootstrap';
 import { viewerOwner } from '../../../lib/viewer';
 import { SkillsLibrary } from '../../../components/arc/skills-library';
@@ -16,10 +16,21 @@ interface SkillView {
   started: boolean;
 }
 
+interface CapabilityView {
+  gapId: string;
+  title: string;
+  targetCapability?: string;
+  objectiveIds: readonly string[];
+  filledAt: Date;
+}
+
 export default async function ArcSkillsPage() {
   const owner = await viewerOwner();
   const context = await getServerContext();
-  const { skills } = (await arcSkillsHandler(context, owner)) as { skills: SkillView[] };
+  const [{ skills }, { capabilities }] = (await Promise.all([
+    arcSkillsHandler(context, owner),
+    arcCapabilitiesHandler(context, owner),
+  ])) as [{ skills: SkillView[] }, { capabilities: CapabilityView[] }];
 
   return (
     <>
@@ -33,7 +44,13 @@ export default async function ArcSkillsPage() {
           +
         </Link>
       </div>
-      <SkillsLibrary skills={skills} />
+      <SkillsLibrary
+        skills={skills}
+        capabilities={capabilities.map((capability) => ({
+          ...capability,
+          filledAt: capability.filledAt.toISOString(),
+        }))}
+      />
     </>
   );
 }

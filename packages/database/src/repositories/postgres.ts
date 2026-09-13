@@ -1203,7 +1203,7 @@ export const truncateAll = async (pool: Pool): Promise<void> => {
     TRUNCATE users, gaps, sources, source_chunks, diagnostics, curricula, objectives, lessons,
              artefacts, questions, attempts, mastery_evidence, review_items, generation_runs,
              generation_steps, audit_findings, knowledge_edges, jobs, provider_usage, audit_log,
-             learner_profiles, learner_preferences, arc_calibrations
+             learner_profiles, learner_preferences, arc_calibrations, request_quotas
     RESTART IDENTITY CASCADE
   `);
 };

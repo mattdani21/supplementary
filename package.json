@@ -10,6 +10,7 @@
     "setup": "pnpm install",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
+    "test:ui": "playwright test",
     "test:domain": "vitest run packages/domain",
     "test:watch": "vitest",
     "lint": "eslint .",
@@ -22,7 +23,9 @@
     "specs:generate": "tsx scripts/generate-specs.ts"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "^9.39.1",
+    "@playwright/test": "^1.63.0",
     "@types/node": "^22.10.2",
     "eslint": "^9.39.1",
     "prettier": "^3.4.2",

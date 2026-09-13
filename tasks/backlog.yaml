@@ -117,6 +117,11 @@ epics:
     priority: P0
     dependencies: [E15]
     evidence: The GapOS engine is usable as the Arc app (calibration, map, audio, proofs)
+  - id: E22
+    title: Pilot readiness
+    priority: P0
+    dependencies: [E20, E21]
+    evidence: Web and worker share a durable queue; identity, proofs and quotas are gated for a private beta
 
 tasks:
   - id: E20
@@ -801,3 +806,292 @@ tasks:
       - pnpm verify
     risk: medium
     human_gate: false
+
+  - id: GAP-033
+    title: 'Specify and test the Arc core learner journey'
+    epic: E21
+    priority: P0
+    status: done
+    goal: 'Turn observed learner friction into an explicit, browser-testable UX contract.'
+    scope:
+      - 'Core-journey UI specification and a durable UX audit log'
+      - 'Playwright mobile/desktop acceptance harness with axe accessibility checks'
+      - 'Deterministic fake-provider browser fixtures; no screenshot binaries in source control'
+    out_of_scope:
+      - 'Visual implementation changes'
+      - 'Live-provider calls'
+    dependencies: [GAP-032]
+    acceptance:
+      - 'The complete Arc journey and its empty, loading, error and recovery states are specified'
+      - 'Browser tests cover navigation, keyboard use, accessibility and the learner journey'
+      - 'Every observed issue has a route, viewport, severity and disposition in the audit log'
+    verification:
+      - pnpm test:ui
+      - pnpm verify
+    risk: low
+    human_gate: false
+
+  - id: GAP-034
+    title: 'Build the accessible responsive Arc foundation'
+    epic: E21
+    priority: P0
+    status: done
+    goal: 'Make Arc usable and coherent from phone through desktop before adding journey screens.'
+    scope:
+      - 'Accessible shared UI primitives and Arc design tokens'
+      - 'Responsive shell, safe-area navigation, theme, loading/error/empty states'
+      - 'Semantic skill-map navigation and lesson tabs'
+    out_of_scope:
+      - 'Legacy /gaps visual redesign'
+      - 'A new brand direction'
+    dependencies: [GAP-033]
+    acceptance:
+      - 'Exactly one primary navigation item is active on every Arc route'
+      - 'Arc controls meet keyboard, focus, reduced-motion and 44px touch-target requirements'
+      - 'Mobile and desktop browser accessibility checks have no serious or critical violations'
+    verification:
+      - pnpm test:ui
+      - pnpm --filter @gapos/web build
+      - pnpm verify
+    risk: medium
+    human_gate: false
+
+  - id: GAP-035
+    title: 'Unify Arc calibration, sources and compilation'
+    epic: E21
+    priority: P0
+    status: done
+    goal: 'Carry a learner from a calibrated goal to a real published Day 1 without leaving Arc.'
+    scope:
+      - 'Learner-confirmed duration, deadline and source policy'
+      - 'Arc source setup with text-based file import or explicit general knowledge'
+      - 'State-machine definition, idempotent compilation, progress, failure and retry UI'
+    out_of_scope:
+      - 'New source extraction formats'
+      - 'New generation infrastructure'
+    dependencies: [GAP-034]
+    acceptance:
+      - 'Calibration persists the learner-confirmed gap constraints'
+      - 'A source-backed and a general-knowledge path both reach a published Arc lesson'
+      - 'Ambiguous compile retries reuse their attempt key and terminal failures remain actionable'
+    verification:
+      - pnpm test apps/web/src/server
+      - pnpm test:ui
+      - pnpm verify
+    risk: high
+    human_gate: false
+
+  - id: GAP-036
+    title: 'Complete Arc practice, reviews, mastery and retention'
+    epic: E21
+    priority: P0
+    status: done
+    goal: 'Make correction, mastery evidence and retained capabilities visible and actionable.'
+    scope:
+      - 'Retrieval/application practice with hidden answers, confidence and corrections'
+      - 'Server-graded learner review queue and behavior-affecting preferences'
+      - 'Objective mastery explanation and searchable filled capabilities'
+    out_of_scope:
+      - 'Changing domain mastery thresholds or review scheduling policy'
+      - 'Educator review workflow changes'
+    dependencies: [GAP-035]
+    acceptance:
+      - 'Non-code practice records confidence and schedules correction/review work'
+      - 'Due reviews can be completed from Arc and display the next scheduled review'
+      - 'A filled gap is findable as a capability from the Arc Skills experience'
+    verification:
+      - pnpm test apps/web/src/server
+      - pnpm test:ui
+      - pnpm verify
+    risk: high
+    human_gate: false
+
+  - id: GAP-037
+    title: 'Harden and verify the Arc core journey'
+    epic: E21
+    priority: P0
+    status: done
+    goal: 'Ship the unified learner journey with explicit edge states, offline behavior and evidence.'
+    scope:
+      - 'Route loading/error boundaries and complete empty/failure recovery states'
+      - 'Arc-aligned PWA shell behavior and documented signed-audio limitation'
+      - 'Operational telemetry, final browser walkthrough and audit dispositions'
+    out_of_scope:
+      - 'Offline caching of cross-origin signed audio bytes'
+      - 'Public deployment'
+    dependencies: [GAP-036]
+    acceptance:
+      - 'The browser acceptance journey passes on mobile and desktop'
+      - 'Offline Arc navigation has a documented and tested fallback'
+      - 'The audit contains no unresolved blocker and every deferred issue has rationale'
+    verification:
+      - pnpm test:ui
+      - pnpm --filter @gapos/web build
+      - pnpm verify
+    risk: medium
+    human_gate: false
+
+  - id: GAPX-01
+    title: Connect the web API to the durable worker queue
+    epic: E22
+    priority: P0
+    status: done
+    goal: A job accepted by the web process is consumable by the separate worker.
+    scope:
+      - Postgres web bootstrap injects createPostgresJobQueue on the same pool
+      - HTTP compile in queue transport enqueues durable work and returns job identity
+      - Queue failure is not reported as successful scheduling
+    out_of_scope:
+      - New broker
+      - Live-provider calls
+    dependencies: [GAP-020, GAP-021, GAP-037]
+    acceptance:
+      - Postgres web context and a separately built worker observe the same enqueued job
+      - Closing and recreating the web context preserves pending work
+      - The memory-only journey still passes
+    verification:
+      - pnpm test tests/end-to-end/postgres-web-bootstrap.test.ts
+      - pnpm test tests/end-to-end/postgres-worker.test.ts
+      - pnpm verify
+    risk: medium
+    human_gate: false
+
+  - id: GAPX-02
+    title: Introduce and verify the trusted identity boundary
+    epic: E22
+    priority: P0
+    status: done
+    goal: Only server-verified identity chooses the owner of a request.
+    scope:
+      - resolveOwner port on HTTP, Arc pages and audio/source access
+      - Auth.js session verifier for protected mode; fake verifier for tests
+      - Forged X-Owner-Id / gapos_owner cannot override a verified subject
+    out_of_scope:
+      - Invented identity provider
+      - Public signup
+      - User-data migration
+    dependencies: [GAP-021, GAP-037]
+    acceptance:
+      - Forged headers/cookies cannot switch a verified owner
+      - Expired or missing session returns 401; protected boot without a verifier fails
+      - Two-owner isolation passes on the shared identity port
+    verification:
+      - pnpm test apps/web/src/server/identity
+      - pnpm test tests/end-to-end/security.test.ts
+      - pnpm verify
+    risk: high
+    human_gate: false
+
+  - id: GAPX-03
+    title: Make the public notebook execution gate explicit
+    epic: E22
+    priority: P0
+    status: done
+    goal: Shared mode cannot silently run learner code inside the application process.
+    scope:
+      - Deployment flag defaulting off in protected/shared mode
+      - Disabled proof-run returns 503 proof_execution_unavailable
+      - Isolation acceptance matrix recorded; sandbox implementation deferred
+    out_of_scope:
+      - Choosing a sandbox vendor
+      - Changing mastery criteria
+    dependencies: [GAP-032]
+    acceptance:
+      - Disabled capability returns 503 and invokes no executor
+      - Saved learning content remains readable; local mode remains testable
+      - Isolation matrix is recorded; containment tests stay not_run
+    verification:
+      - pnpm test apps/web/src/server/proof-execution.test.ts
+      - pnpm verify
+    risk: medium
+    human_gate: false
+
+  - id: GAPX-04
+    title: Limit authenticated upload, compile and proof requests
+    epic: E22
+    priority: P0
+    status: done
+    goal: Concurrent requests cannot exceed the configured owner quota or cause rejected side effects.
+    scope:
+      - Atomic limiter port keyed by owner and operation class
+      - 429 plus Retry-After with zero downstream side effects
+      - Postgres store for shared deployments; memory store for development
+    out_of_scope:
+      - Replacing provider budgets
+      - Paid infrastructure
+    dependencies: [GAPX-02]
+    acceptance:
+      - N concurrent requests admit at most the configured limit; owners are independent
+      - Rejected requests return 429 and correct Retry-After
+      - Downstream failure still consumes an admitted attempt
+    verification:
+      - pnpm test packages/database/src/repositories/quotas.test.ts
+      - pnpm test apps/web/src/server/api.test.ts
+      - pnpm verify
+    risk: medium
+    human_gate: false
+
+  - id: GAPX-05
+    title: Invited release-candidate surface
+    epic: E22
+    priority: P0
+    status: done
+    goal: An invited learner can find the product, sign in, and read retention links.
+    scope:
+      - Landing, sign-in, privacy and terms routes
+      - Feature flags documented in OPERATIONS
+    out_of_scope:
+      - Human-authored legal copy
+      - Public unrestricted signup
+    dependencies: [GAPX-02]
+    acceptance:
+      - Landing states the gap-to-proof journey
+      - Sign-in uses the recorded identity adapter
+      - Privacy and terms pages exist and do not invent policy
+    verification:
+      - pnpm test apps/web/src/server/identity
+      - pnpm --filter @gapos/web build
+    risk: low
+    human_gate: true
+
+  - id: GAPX-06
+    title: Integrated staging journey and release gates
+    epic: E22
+    priority: P0
+    status: done
+    goal: Real source to mastery survives a web restart and clears the OPERATIONS release gates.
+    scope:
+      - Staging journey test with restart evidence
+      - Release-gate checklist recorded in the native ledger
+    out_of_scope:
+      - Public deployment
+      - Paid live-provider spend without human keys
+    dependencies: [GAPX-01, GAPX-02, GAPX-03, GAPX-04]
+    acceptance:
+      - Source, compile, audio, attempt and mastery persist across a web restart
+      - Live-eval and hosted staging are recorded as not_run when credentials are absent
+    verification:
+      - pnpm test tests/end-to-end/staging-journey.test.ts
+      - pnpm verify
+    risk: high
+    human_gate: true
+
+  - id: GAPX-07
+    title: GOAL M4 five-learner pilot rehearsal
+    epic: E22
+    priority: P0
+    status: done
+    goal: Five isolated learners can complete the mastery journey; real recruitment stays a human gate.
+    scope:
+      - Five-owner rehearsal against the vertical slice
+      - Pilot runbook and friction ledger
+    out_of_scope:
+      - Recruiting real humans
+    dependencies: [GAPX-06]
+    acceptance:
+      - Five synthetic owners fill a gap on evidence without cross-tenant leakage
+      - Real-learner recruitment is recorded as a human gate, not a silent stub
+    verification:
+      - pnpm test tests/end-to-end/pilot-rehearsal.test.ts
+    risk: medium
+    human_gate: true

@@ -1,6 +1,6 @@
 {
  "schemaVersion": 1,
- "updatedAt": "2026-08-30T20:49:22.176152Z",
+ "updatedAt": "2026-09-13T19:41:44Z",
  "controller": "gapos-controller",
  "tasks": {
   "GAP-000": {
@@ -599,6 +599,262 @@
     }
    ],
    "notes": "Arc UI founder spec implemented. Notebook proofs run REAL server-side sandboxed code (apps/worker/src/notebook/executor.ts: fresh node:vm realm with no host objects, timeouts, length/output caps) validated by the independent verifier at generation time (cellRuns: a code_proof whose reference solution fails its own checks blocks publication). Correctness is decided by executing the learner's code and its check expressions - no regex on source text, no fake audio timer; the prototype's demo JS does not survive. Audio is the compiled lesson's real TTS artefact driven through a real <audio> element (play/pause, +-15s, 1x/1.25x/1.5x, transcript drawer). Calibration is a real 3-step flow through the provider adapters (arc_calibration contract + adaptive diagnostic on the baseline outcome), persisted in arc_calibrations, creating the real gap and mapping to existing gaps. Proofs record attempt + mastery evidence (GAP-012) and advance the gap state machine; wrong answers are state-neutral. The spaced-review preference gates the real due-review queue in Today without cancelling scheduling. All seven screens (Today, Skills, AI calibration, Skill map, Lesson theory+notebook, Progress, Profile) implemented in apps/web in the prototype design language (paper/surface/line tokens, blue AI signal, mint cleared, dark+light themes, focus rings, prefers-reduced-motion, aria labels). Migration 006 (forward-only) extends the questions type CHECK with code_proof and adds learner_preferences + arc_calibrations; rollback of the CHECK change would require a new forward-only migration. Specs: openapi.yaml documents the /arc/* surface; generation schemas regenerated. Telemetry: arc_calibration_total, arc_cell_run_total, arc_proof_submit_total, arc_preferences_updated_total. NOTE: the environment sandbox denies git index writes (no approval channel available), so the commit step of the controller loop could not be executed by the agent; the change set is in the working tree and ready for a human \"git add -A && git commit\"."
+  },
+  "GAP-033": {
+   "status": "done",
+   "startedAt": "2026-09-12T19:17:00.000Z",
+   "completedAt": "2026-09-12T21:36:00.000Z",
+   "evidence": [
+    {
+     "command": "pnpm test:ui",
+     "result": "pass",
+     "note": "14 passed, 2 intentional desktop skips: mobile and desktop navigation, touch targets, axe, dark/reduced-motion, source-to-review journey and retained capability search; the two offline owner/fallback scenarios each run once at their specified 375x812 viewport."
+    },
+    {
+     "command": "pnpm verify",
+     "result": "pass",
+     "note": "449 passed, 29 loud environment-gated skips; formatting, lint, typecheck, architecture, domain, worker, evaluation and application suites are green."
+    }
+   ],
+   "notes": "The route/state, responsive, keyboard, screen-reader, owner-isolated offline and refusal contract is in specs/ui-core-journey.md. Playwright uses deterministic fake providers at 375x812 and 1440x900 with axe; generated traces/screenshots remain ignored. The running audit records initial and independent-review findings with final dispositions."
+  },
+  "GAP-034": {
+   "status": "done",
+   "startedAt": "2026-09-12T19:30:00.000Z",
+   "completedAt": "2026-09-12T21:36:00.000Z",
+   "evidence": [
+    {
+     "command": "pnpm test:ui",
+     "result": "pass",
+     "note": "Exactly one active navigation item, >=44px navigation/icon/lesson/audio targets, heading focus restoration, complete lesson tab semantics and zero serious/critical axe findings at mobile and desktop."
+    },
+    {
+     "command": "pnpm --filter @gapos/web build",
+     "result": "pass",
+     "note": "Optimized Next.js production build compiled, typechecked and generated all Arc routes."
+    }
+   ],
+   "notes": "Added accessible UI primitives, adaptive shell/tokens, safe-area handling, packaged Inter, theme-aligned manifest, focus/reduced-motion rules, semantic map links and Arc loading/error/not-found/empty boundaries. Accessibility fixes raised field, answer-option and source-policy contrast and all lesson controls to the 44px target. No migration."
+  },
+  "GAP-035": {
+   "status": "done",
+   "startedAt": "2026-09-12T19:40:00.000Z",
+   "completedAt": "2026-09-12T21:36:00.000Z",
+   "evidence": [
+    {
+     "command": "pnpm vitest run apps/web/src/server/arc-api.test.ts",
+     "result": "pass",
+     "note": "25 targeted tests: exact displayed-kit grading, expiry/owner refusal, provider-failure zero-write retry, confirmed constraints, server-enforced source/general-knowledge consent, terminal compile replay, cross-gap refusal, review ladder and evidence views."
+    },
+    {
+     "command": "pnpm test:ui",
+     "result": "pass",
+     "note": "The browser confirms 25-minute/source-only calibration, source attachment, state-machine definition, compile and published Day 1 without leaving Arc."
+    }
+   ],
+   "notes": "Arc setup supports pasted or text/Markdown/HTML file sources and explicit general knowledge, enforced again on the server. Calibration submission is bound to its displayed kit; failed diagnostic generation persists nothing and same-kit retry creates one gap. Completed compile-key replay cannot regress an active gap. No schema migration; synchronous compile and consent fields are documented in OpenAPI."
+  },
+  "GAP-036": {
+   "status": "done",
+   "startedAt": "2026-09-12T19:50:00.000Z",
+   "completedAt": "2026-09-12T21:36:00.000Z",
+   "evidence": [
+    {
+     "command": "pnpm vitest run apps/web/src/server/arc-api.test.ts",
+     "result": "pass",
+     "note": "25 tests include conventional practice, confidence, cross-gap zero-side-effect refusal, review advance/reset/graduation, preferences, unmet objective evidence, fill transition and content-free capability telemetry."
+    },
+    {
+     "command": "pnpm test:ui",
+     "result": "pass",
+     "note": "Browser journeys show hidden answers, supportive correction/next retrieval, actionable due review, two-session fill and retained capability discovery through search."
+    }
+   ],
+   "notes": "Added conventional retrieval/application practice alongside notebook proofs, stale/empty review recovery, progress-level mastery-needs explanations and server-backed retained capability search. Review completion now uses the existing review ladder instead of restarting the attempt ladder. Mastery thresholds and scheduling policy are unchanged; no migration."
+  },
+  "GAP-037": {
+   "status": "done",
+   "startedAt": "2026-09-12T20:00:00.000Z",
+   "completedAt": "2026-09-12T21:36:00.000Z",
+   "evidence": [
+    {
+     "command": "pnpm test:ui",
+     "result": "pass",
+     "note": "14 passed, 2 viewport-specific skips. Mobile/desktop journey, axe, dark/reduced motion, offline reload/write refusal, owner cache isolation and capability retention all pass."
+    },
+    {
+     "command": "pnpm --filter @gapos/web build",
+     "result": "pass",
+     "note": "Standalone production build passes without sharing .next with the Playwright dev server."
+    },
+    {
+     "command": "pnpm verify",
+     "result": "pass",
+     "note": "Final code gate: 449 passed, 29 explicit skips for Postgres/S3/live-provider suites without their environment variables."
+    },
+    {
+     "command": "Independent gapos-verify review at 35f501e",
+     "result": "pass",
+     "note": "All GAP-033 through GAP-037 acceptance areas and named refusal paths passed. Same-kit failure/retry probe observed 0 gaps/0 calibrations after provider failure and exactly 1 gap/1 calibration after retry. Postgres, S3 and live-provider gates were explicitly not run without their environment."
+    }
+   ],
+   "notes": "Service worker v3 safely falls back for uncached navigation, partitions visited Arc documents by owner, never caches API responses or cross-origin signed audio, and leaves writes network-only. Attempt metrics use stable question type/role labels. Text-only/no-audio, no-practice, all-objectives-cleared, compiling, partial, failed, archived and stale-review states have recovery actions. Manual and automated walkthrough evidence is recorded in docs/ux/core-journey-audit.md. No migration; uncached signed audio remains intentionally network-dependent."
+  },
+  "GAPX-01": {
+   "status": "done",
+   "startedAt": "2026-09-13T19:40:29Z",
+   "completedAt": "2026-09-13T19:40:29Z",
+   "evidence": [
+    {
+     "command": "pnpm test tests/end-to-end/staging-journey.test.ts",
+     "result": "pass",
+     "note": "Queue failure is 503 queue_unavailable; memory restart journey and inline mastery still pass."
+    },
+    {
+     "command": "pnpm test tests/end-to-end/postgres-web-bootstrap.test.ts",
+     "result": "not_run",
+     "note": "Skipped: GAPOS_TEST_DATABASE_URL is unset in this environment."
+    },
+    {
+     "command": "pnpm typecheck",
+     "result": "pass",
+     "note": ""
+    }
+   ],
+   "notes": "Postgres web bootstrap injects createPostgresJobQueue on the same pool. HTTP compile uses queue transport when GAPOS_DATABASE_URL is set. PR #19 is on this branch. PR #15 is parked."
+  },
+  "GAPX-02": {
+   "status": "done",
+   "startedAt": "2026-09-13T19:40:29Z",
+   "completedAt": "2026-09-13T19:40:29Z",
+   "evidence": [
+    {
+     "command": "pnpm test apps/web/src/server/identity",
+     "result": "pass",
+     "note": "Forged header/cookie conflict 409; missing/expired session 401; protected boot without verifier or AUTH_SECRET fails; two owners isolated."
+    },
+    {
+     "command": "pnpm test tests/end-to-end/security.test.ts",
+     "result": "pass",
+     "note": "Identity isolation plus existing injection/tenancy suite."
+    },
+    {
+     "command": "Auth.js GitHub provider integration",
+     "result": "not_run",
+     "note": "No AUTH_SECRET / OAuth credentials in this environment. Adapter is wired; live sign-in is a human gate."
+    }
+   ],
+   "notes": "resolveOwner is the shared port. Demo mode remains default. Protected mode is opt-in."
+  },
+  "GAPX-03": {
+   "status": "done",
+   "startedAt": "2026-09-13T19:40:29Z",
+   "completedAt": "2026-09-13T19:40:29Z",
+   "evidence": [
+    {
+     "command": "pnpm test apps/web/src/server/proof-execution.test.ts",
+     "result": "pass",
+     "note": "Disabled mode returns ProofExecutionUnavailableError and does not call runCell; lesson reads still work."
+    },
+    {
+     "command": "Isolation containment matrix",
+     "result": "not_run",
+     "note": "Recorded in docs/adr/0004-proof-isolation-matrix.md. No sandbox architecture selected."
+    }
+   ],
+   "notes": "Default off in protected mode. Local demo keeps the existing in-process executor."
+  },
+  "GAPX-04": {
+   "status": "done",
+   "startedAt": "2026-09-13T19:40:29Z",
+   "completedAt": "2026-09-13T19:40:29Z",
+   "evidence": [
+    {
+     "command": "pnpm test packages/database/src/repositories/quotas.test.ts",
+     "result": "pass",
+     "note": "Limit, owner isolation, window reset, consumed-on-failure."
+    },
+    {
+     "command": "pnpm test tests/end-to-end/staging-journey.test.ts",
+     "result": "pass",
+     "note": "429 RateLimitedError after one compile; curriculum identity unchanged."
+    },
+    {
+     "command": "Postgres limiter concurrency",
+     "result": "not_run",
+     "note": "Requires GAPOS_TEST_DATABASE_URL. Migration 007 is additive."
+    }
+   ],
+   "notes": "Memory limiter is development-only. Protected mode requires explicit GAPOS_QUOTA_* and Postgres."
+  },
+  "GAPX-05": {
+   "status": "done",
+   "startedAt": "2026-09-13T19:40:29Z",
+   "completedAt": "2026-09-13T19:40:29Z",
+   "evidence": [
+    {
+     "command": "routes / /sign-in /privacy /terms",
+     "result": "pass",
+     "note": "Landing states the gap-to-proof journey; sign-in uses Auth.js GitHub; privacy/terms do not invent policy."
+    }
+   ],
+   "notes": "Human-authored legal copy remains a gate. Invite list is GAPOS_INVITE_SUBJECTS."
+  },
+  "GAPX-06": {
+   "status": "done",
+   "startedAt": "2026-09-13T19:40:29Z",
+   "completedAt": "2026-09-13T19:40:29Z",
+   "evidence": [
+    {
+     "command": "pnpm test tests/end-to-end/staging-journey.test.ts",
+     "result": "pass",
+     "note": "Compile/audio/two-session mastery; queue failure; quota side-effect check."
+    },
+    {
+     "command": "GAPOS_PROVIDER_MODE=live pnpm test tests/evaluation/live-provider.test.ts",
+     "result": "not_run",
+     "note": "No live provider keys. Human gate before flipping to real learners."
+    },
+    {
+     "command": "Hosted staging restart pair",
+     "result": "not_run",
+     "note": "No deployed Postgres+S3 pair in this agent environment."
+    },
+    {
+     "command": "GAPOS_PROVIDER_MODE=fake pnpm verify",
+     "result": "pass",
+     "note": "466 passed, 31 skipped (Postgres/S3/live-provider without env). Format, lint, typecheck green."
+    },
+    {
+     "command": "pnpm --filter @gapos/web build",
+     "result": "pass",
+     "note": "Landing, sign-in, privacy, terms, Auth.js route and Arc pages compile."
+    },
+    {
+     "command": "pnpm tsx scripts/smoke-compile.ts",
+     "result": "pass",
+     "note": "SMOKE OK: published course, 3 lessons, audio/mpeg audio in 0s (fake, in-process)."
+    }
+   ],
+   "notes": "OPERATIONS release gates that need keys or a host stay not_run. Fake-mode quality gate is the local bar."
+  },
+  "GAPX-07": {
+   "status": "done",
+   "startedAt": "2026-09-13T19:40:29Z",
+   "completedAt": "2026-09-13T19:40:29Z",
+   "evidence": [
+    {
+     "command": "pnpm test tests/end-to-end/pilot-rehearsal.test.ts",
+     "result": "pass",
+     "note": "Five synthetic owners fill a gap on evidence; no cross-tenant capability leakage."
+    },
+    {
+     "command": "Recruit five real learners",
+     "result": "not_run",
+     "note": "Human gate. See docs/pilot/M4-RUNBOOK.md. Rehearsal is not a substitute for the M4 cohort."
+    }
+   ],
+   "notes": "Automated rehearsal complete. Real M4 exit evidence remains a human recruitment gate."
   }
  },
  "GAP-014b": {
@@ -633,5 +889,27 @@
   ],
   "notes": "GAP-014b DONE: the first live-model lessons are generated, verified, scored and recorded as baselines. DeepSeek deepseek-v4-flash + Google TTS produce source-grounded audio-first courses that satisfy every evaluation dimension on all nine reference fixtures, resist a prompt-injection attempt (recorded as a finding, never followed), and ask for clarification instead of guessing on an underspecified request. Cost for run 3 well within the $2 cap. Remaining live-gate nicety: the CI-form regression test (tests/evaluation/live-provider.test.ts) can be run with the live env at any time; it re-compiles the pack and compares against these baselines."
  },
- "blockers": []
+ "blockers": [
+  {
+   "id": "M4-real-learners",
+   "task": "GAPX-07",
+   "observed": "Five synthetic owners complete the mastery journey; no real invited learners were recruited.",
+   "reproduction": "docs/pilot/M4-RUNBOOK.md",
+   "attemptedFixes": [
+    "Automated five-owner rehearsal",
+    "Pilot runbook"
+   ],
+   "recommendedDecision": "Human recruits the invited cohort after live-eval and a hosted private instance exist."
+  },
+  {
+   "id": "live-eval-keys",
+   "task": "GAPX-06",
+   "observed": "Live-provider evaluation was not run.",
+   "reproduction": "GAPOS_PROVIDER_MODE=live pnpm test tests/evaluation/live-provider.test.ts",
+   "attemptedFixes": [
+    "Recorded as not_run; did not stub the gate"
+   ],
+   "recommendedDecision": "Human supplies keys for the exact production model before real learners."
+  }
+ ]
 }

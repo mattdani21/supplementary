@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
+import '@fontsource-variable/inter';
 import '../arc.css';
+import '../arc-foundation.css';
 import { ArcNav } from '../../components/arc/arc-nav';
 import { ThemeInit } from '../../components/arc/theme-init';
 import { getServerContext } from '../../server/bootstrap';

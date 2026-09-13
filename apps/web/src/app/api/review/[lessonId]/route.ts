@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { requireOwner, reviewLesson, toHttpError } from '../../../../server/api';
+import { resolveRequestOwner, reviewLesson, toHttpError } from '../../../../server/api';
 import { getServerContext } from '../../../../server/bootstrap';
 
 export const POST = async (
@@ -10,7 +10,7 @@ export const POST = async (
   try {
     const { lessonId } = await params;
     const context = await getServerContext();
-    const owner = requireOwner(request.headers);
+    const owner = await resolveRequestOwner(request);
     return NextResponse.json(await reviewLesson(context, owner, lessonId, await request.json()));
   } catch (error) {
     const mapped = toHttpError(error);

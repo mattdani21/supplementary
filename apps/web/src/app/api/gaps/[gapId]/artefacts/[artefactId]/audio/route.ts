@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { audioUrl, requireOwner, toHttpError } from '../../../../../../../server/api';
+import { audioUrl, resolveRequestOwner, toHttpError } from '../../../../../../../server/api';
 import { getServerContext } from '../../../../../../../server/bootstrap';
 
 export const GET = async (
@@ -10,7 +10,7 @@ export const GET = async (
   try {
     const { gapId, artefactId } = await params;
     const context = await getServerContext();
-    const owner = requireOwner(request.headers);
+    const owner = await resolveRequestOwner(request);
     const result = await audioUrl(context, owner, gapId, artefactId);
     if ('bytes' in result && result.bytes.length > 0) {
       // In-memory storage: stream the bytes so a no-S3 deployment still plays audio.

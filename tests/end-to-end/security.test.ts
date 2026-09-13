@@ -265,6 +265,27 @@ describe('deletion and retention', () => {
   });
 });
 
+describe('GAPX-02 identity isolation', () => {
+  it('does not let a forged owner header select another learner', async () => {
+    const { resolveOwner } = await import('../../apps/web/src/server/identity/resolve-owner.js');
+    const { createFakeIdentityVerifier } =
+      await import('../../apps/web/src/server/identity/fake-verifier.js');
+    const verifier = createFakeIdentityVerifier({
+      alice: {
+        subject: 'alice@example.com',
+        ownerId: ALICE,
+        expiresAt: new Date('2027-01-01T00:00:00Z'),
+      },
+    });
+    await expect(
+      resolveOwner(
+        { headers: new Headers({ authorization: 'Bearer alice', 'x-owner-id': MALLORY }) },
+        { mode: 'protected', verifier },
+      ),
+    ).rejects.toMatchObject({ status: 409, code: 'identity_conflict' });
+  });
+});
+
 describe('what never reaches the logs', () => {
   it('logs no source text, no instruction, and no lesson content', async () => {
     const { records, sink } = createMemorySink();

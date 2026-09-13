@@ -18,30 +18,41 @@ import {
   type OwnerId,
 } from '@gapos/database';
 import { ProviderBudgetError } from '@gapos/provider-adapters';
+import { enqueueCompile } from '../../../worker/src/queue/enqueue.js';
+import type { QuotaOperation } from '@gapos/database';
 import type { ServerContext } from './context.js';
+import { IdentityError } from './identity/errors.js';
+import { resolveOwner } from './identity/resolve-owner.js';
+import { ProofExecutionUnavailableError } from './proof-execution.js';
 import {
   applyTransition,
   compile as compileGap,
+  CompileSetupError,
   createGap as createGapUseCase,
   registerSource,
   type RegisterSourceInput,
 } from './services/gap-service.js';
 import {
+  arcCapabilities,
   arcLesson,
   arcMap,
   arcProfile,
   arcProgress,
+  arcReviews,
   arcSkills,
   arcToday,
   calibrationKit,
+  CalibrationKitUnavailableError,
   getPreferences,
   runCalibration,
   setPreferences,
+  submitArcReview,
   type CalibrationInput,
 } from './services/arc-service.js';
 import {
   assessMastery,
   getToday,
+  QuestionNotInGapError,
   runProofCell,
   submitAttempt,
   submitProof,
@@ -62,9 +73,43 @@ export class ApiError extends Error {
   }
 }
 
+export class RateLimitedError extends Error {
+  constructor(
+    readonly retryAfterSeconds: number,
+    message = 'Too many requests for this owner.',
+  ) {
+    super(message);
+    this.name = 'RateLimitedError';
+  }
+}
+
+export const consumeQuota = async (
+  context: ServerContext,
+  owner: OwnerId,
+  operation: QuotaOperation,
+): Promise<void> => {
+  const admission = await context.limiter.admit(owner, operation, context.now());
+  if (!admission.admitted) {
+    context.metrics.increment('rate_limited_total', { operation });
+    throw new RateLimitedError(admission.retryAfterSeconds);
+  }
+};
+
 export const toHttpError = (error: unknown): { status: number; code: string; message: string } => {
   if (error instanceof ApiError)
     return { status: error.status, code: error.code, message: error.message };
+  if (error instanceof IdentityError)
+    return { status: error.status, code: error.code, message: error.message };
+  if (error instanceof ProofExecutionUnavailableError)
+    return { status: error.status, code: error.code, message: error.message };
+  if (error instanceof RateLimitedError)
+    return { status: 429, code: 'rate_limited', message: error.message };
+  if (error instanceof CalibrationKitUnavailableError)
+    return { status: 409, code: 'calibration_kit_expired', message: error.message };
+  if (error instanceof CompileSetupError)
+    return { status: 409, code: error.code, message: error.message };
+  if (error instanceof QuestionNotInGapError)
+    return { status: 409, code: 'question_not_in_gap', message: error.message };
   if (error instanceof NotFoundError)
     return { status: 404, code: 'not_found', message: error.message };
   if (error instanceof ConcurrentModificationError)
@@ -91,6 +136,9 @@ export const requireOwner = (headers: Headers): OwnerId => {
   if (!owner) throw new ApiError(401, 'owner_required', 'Set the X-Owner-Id header.');
   return owner as OwnerId;
 };
+
+export const resolveRequestOwner = (request: { headers: Headers }): Promise<OwnerId> =>
+  resolveOwner(request);
 
 /* ------------------------------------------------------------------- schemas */
 
@@ -124,6 +172,9 @@ const compileSchema = z.object({
   idempotencyKey: z.string().min(1),
   audioEnabled: z.boolean().optional(),
   concurrency: z.number().int().min(1).max(8).optional(),
+  generalKnowledgeConfirmed: z.boolean().optional(),
+  surface: z.literal('arc_setup').optional(),
+  retry: z.boolean().optional(),
 });
 
 const registerSourceSchema = z.object({
@@ -155,9 +206,13 @@ const preferencesSchema = z
 
 const calibrationSchema = z
   .object({
+    kitId: z.string().min(1),
     subject: z.string().min(1),
     goal: z.string().min(1),
     baselineAnswer: z.string().min(1),
+    dailyMinutes: z.number().int().min(5).max(480).optional(),
+    deadline: z.iso.date().optional(),
+    sourcePolicy: z.enum(['general_knowledge_allowed', 'sources_only']).optional(),
   })
   .strict();
 
@@ -174,6 +229,14 @@ const proofSchema = z
     sessionId: z.string().min(1),
     code: z.string().min(1).max(20_000),
     hintsUsed: z.number().int().min(0).optional(),
+    idempotencyKey: z.string().min(1),
+  })
+  .strict();
+
+const arcReviewSchema = z
+  .object({
+    response: z.string().min(1),
+    confidence: z.enum(['low', 'medium', 'high']).optional(),
     idempotencyKey: z.string().min(1),
   })
   .strict();
@@ -242,14 +305,57 @@ export const compile = async (
   body: unknown,
 ): Promise<{ run: unknown }> => {
   const input = compileSchema.parse(body);
-  const outcome = await compileGap(context, owner, { gapId, ...input });
-  return {
-    run: {
-      runId: outcome.runId,
-      status: outcome.status,
-      ...(outcome.error === undefined ? {} : { error: outcome.error }),
-    },
-  };
+  const { surface, retry = false, ...compileInput } = input;
+  if (surface === 'arc_setup') {
+    if (!retry) context.metrics.increment('arc_setup_completed_total');
+    context.metrics.increment('arc_compile_started_total', { retry: String(retry) });
+    if (retry) context.metrics.increment('arc_compile_retry_total');
+  }
+
+  await consumeQuota(context, owner, 'compile');
+
+  if (context.compileTransport === 'queue') {
+    try {
+      const job = await enqueueCompile(context, owner, { gapId, ...compileInput });
+      if (surface === 'arc_setup') {
+        context.metrics.increment('arc_compile_result_total', { status: 'queued' });
+      }
+      return {
+        run: {
+          runId: job.id,
+          status: 'queued',
+          deduplicated: false,
+          jobId: job.id,
+        },
+      };
+    } catch (error) {
+      if (surface === 'arc_setup') {
+        context.metrics.increment('arc_compile_result_total', { status: 'request_error' });
+      }
+      if (error instanceof CompileSetupError) throw error;
+      throw new ApiError(503, 'queue_unavailable', 'The compile queue could not accept this job.');
+    }
+  }
+
+  try {
+    const outcome = await compileGap(context, owner, { gapId, ...compileInput });
+    if (surface === 'arc_setup') {
+      context.metrics.increment('arc_compile_result_total', { status: outcome.status });
+    }
+    return {
+      run: {
+        runId: outcome.runId,
+        status: outcome.status,
+        deduplicated: outcome.deduplicated ?? false,
+        ...(outcome.error === undefined ? {} : { error: outcome.error }),
+      },
+    };
+  } catch (error) {
+    if (surface === 'arc_setup') {
+      context.metrics.increment('arc_compile_result_total', { status: 'request_error' });
+    }
+    throw error;
+  }
 };
 
 export const registerSourceHandler = async (
@@ -258,6 +364,7 @@ export const registerSourceHandler = async (
   body: unknown,
 ): Promise<{ registration: Awaited<ReturnType<typeof registerSource>> }> => {
   const input = registerSourceSchema.parse(body) as RegisterSourceInput;
+  await consumeQuota(context, owner, 'upload');
   const registration = await registerSource(context, owner, input);
   return { registration };
 };
@@ -564,6 +671,14 @@ export const arcSkillsHandler = async (
   skills: await arcSkills(context, owner),
 });
 
+export const arcCapabilitiesHandler = async (
+  context: ServerContext,
+  owner: OwnerId,
+  query = '',
+): Promise<{ capabilities: Awaited<ReturnType<typeof arcCapabilities>> }> => ({
+  capabilities: await arcCapabilities(context, owner, query),
+});
+
 export const arcCalibrationKitHandler = async (
   context: ServerContext,
   owner: OwnerId,
@@ -620,6 +735,7 @@ export const arcRunCellHandler = async (
   body: unknown,
 ): Promise<{ run: RunCellResult }> => {
   const input = runCellSchema.parse(body);
+  await consumeQuota(context, owner, 'proof');
   return { run: await runProofCell(context, owner, gapId, input.questionId, input.code) };
 };
 
@@ -630,6 +746,7 @@ export const arcSubmitProofHandler = async (
   body: unknown,
 ): Promise<{ proof: Awaited<ReturnType<typeof submitProof>> }> => {
   const input = proofSchema.parse(body);
+  await consumeQuota(context, owner, 'proof');
   return { proof: await submitProof(context, owner, gapId, input) };
 };
 
@@ -638,6 +755,22 @@ export const arcProgressHandler = async (
   owner: OwnerId,
 ): Promise<{ progress: Awaited<ReturnType<typeof arcProgress>> }> => ({
   progress: await arcProgress(context, owner),
+});
+
+export const arcReviewsHandler = async (
+  context: ServerContext,
+  owner: OwnerId,
+): Promise<{ reviews: Awaited<ReturnType<typeof arcReviews>> }> => ({
+  reviews: await arcReviews(context, owner),
+});
+
+export const arcSubmitReviewHandler = async (
+  context: ServerContext,
+  owner: OwnerId,
+  reviewId: string,
+  body: unknown,
+): Promise<{ review: Awaited<ReturnType<typeof submitArcReview>> }> => ({
+  review: await submitArcReview(context, owner, reviewId, arcReviewSchema.parse(body)),
 });
 
 export const arcProfileHandler = async (

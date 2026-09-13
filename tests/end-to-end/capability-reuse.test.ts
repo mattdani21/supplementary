@@ -118,7 +118,11 @@ const compileNewGap = async (context: ServerContext, idempotencyKey: string) => 
     dailyMinutes: 35,
   });
   await applyTransition(context, LEARNER, gap.id, { type: 'define' });
-  const outcome = await compile(context, LEARNER, { gapId: gap.id, idempotencyKey });
+  const outcome = await compile(context, LEARNER, {
+    gapId: gap.id,
+    idempotencyKey,
+    generalKnowledgeConfirmed: true,
+  });
   return { gap, outcome };
 };
 

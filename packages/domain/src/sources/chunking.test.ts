@@ -25,6 +25,12 @@ describe('source screening', () => {
     expect(rejection?.message).toContain('application/pdf');
   });
 
+  it('accepts plain text, Markdown, and HTML source documents', () => {
+    for (const mediaType of ['text/plain', 'text/markdown', 'text/x-markdown', 'text/html']) {
+      expect(screenSource({ ...validUpload, mediaType })).toBeUndefined();
+    }
+  });
+
   it('rejects a file over the size limit', () => {
     expect(screenSource({ ...validUpload, byteSize: MAX_SOURCE_BYTES + 1 })?.code).toBe(
       'file_too_large',

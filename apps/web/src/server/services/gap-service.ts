@@ -25,6 +25,19 @@ export const createGap = async (
   owner: OwnerId,
   input: CreateGapInput,
 ): Promise<Gap> => {
+  const existingUser = await context.uow.users.find(owner);
+  if (!existingUser) {
+    const emailPrefix = String(owner)
+      .toLowerCase()
+      .replace(/[^a-z0-9._-]+/g, '-');
+    await context.uow.users.create({
+      id: owner,
+      email: `${emailPrefix || 'learner'}@local.gapos`,
+      locale: 'en',
+      timezone: 'UTC',
+    });
+  }
+
   const at = context.now();
   return context.uow.gaps.create(owner, {
     id: context.newId('gap'),
@@ -120,6 +133,19 @@ export interface CompileInput {
   readonly idempotencyKey: string;
   readonly audioEnabled?: boolean;
   readonly concurrency?: number;
+  readonly generalKnowledgeConfirmed?: boolean;
+}
+
+export type CompileSetupErrorCode = 'source_required' | 'general_knowledge_confirmation_required';
+
+export class CompileSetupError extends Error {
+  constructor(
+    readonly code: CompileSetupErrorCode,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'CompileSetupError';
+  }
 }
 
 /**
@@ -135,6 +161,24 @@ export const compile = async (
 ): Promise<CompileOutcome> => {
   const gap = await context.uow.gaps.get(owner, input.gapId);
   if (!gap) throw new Error(`Gap ${input.gapId} was not found for this owner.`);
+
+  const sources = await context.uow.sources.listForGap(owner, input.gapId);
+  if (gap.sourcePolicy === 'sources_only' && sources.length === 0) {
+    throw new CompileSetupError(
+      'source_required',
+      'Attach at least one accepted source before compiling this source-only route.',
+    );
+  }
+  if (
+    gap.sourcePolicy === 'general_knowledge_allowed' &&
+    sources.length === 0 &&
+    input.generalKnowledgeConfirmed !== true
+  ) {
+    throw new CompileSetupError(
+      'general_knowledge_confirmation_required',
+      'Confirm that Arc may use labelled general knowledge before compiling without a source.',
+    );
+  }
 
   await beginCompilation(context.uow, owner, input.gapId);
 

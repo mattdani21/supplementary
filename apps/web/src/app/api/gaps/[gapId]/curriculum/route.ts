@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { getCurriculum, requireOwner, toHttpError } from '../../../../../server/api';
+import { getCurriculum, resolveRequestOwner, toHttpError } from '../../../../../server/api';
 import { getServerContext } from '../../../../../server/bootstrap';
 
 export const GET = async (
@@ -10,7 +10,7 @@ export const GET = async (
   try {
     const { gapId } = await params;
     const context = await getServerContext();
-    const owner = requireOwner(request.headers);
+    const owner = await resolveRequestOwner(request);
     return NextResponse.json(await getCurriculum(context, owner, gapId));
   } catch (error) {
     const mapped = toHttpError(error);

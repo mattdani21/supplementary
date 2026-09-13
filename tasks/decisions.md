@@ -3,6 +3,27 @@
 Decisions taken during the build that are smaller than an ADR but would otherwise be invisible.
 Newest first. An entry that reverses architecture belongs in `docs/adr/`, not here.
 
+## 2026-09-13 — Release sprint kickoff (identity, proofs, PR overlap)
+
+Recorded so GAPX-02 and GAPX-03 can proceed without inventing architecture.
+
+- **Identity library:** Auth.js (the `next-auth` package) with one OAuth provider (GitHub)
+  and the existing Postgres pool as the session/owner mapping store. Tests use a fake
+  `IdentityVerifier`. Domain does not sign sessions. Protected mode is opt-in via
+  `GAPOS_IDENTITY_MODE=protected` and refuses to boot without `AUTH_SECRET` and a verifier.
+  Demo mode remains the default for local and CI so Playwright can keep using `gapos_owner`.
+- **Proofs in private beta:** `GAPOS_PROOF_EXECUTION` is `local` in demo mode and `disabled`
+  in protected/shared mode unless explicitly set to `local` on an invited private instance.
+  A real process/container sandbox is not approved; the isolation matrix lives in
+  `docs/adr/0004-proof-isolation-matrix.md` and containment tests stay `not_run`.
+- **PR #15** (`cursor/loop-fix-learner-painpoints-030f`) is parked. The learner surface is
+  Arc. PR #19 (GAP-033–037) is the release-base journey. Do not merge #15 onto the same
+  bootstrap/service files without a rebase against this sprint.
+- **CI MinIO image:** `minio/minio:latest` is no longer pullable on GitHub-hosted runners
+  (`pull access denied`). The migrations job pins `quay.io/minio/minio:RELEASE.2024-10-02T17-50-41Z`.
+
+## 2026-08-02 — Live TTS: self-contained Google endpoint behind an engine interface
+
 ## 2026-08-02 — Live TTS: self-contained Google endpoint behind an engine interface
 
 `createLiveTextToSpeech` wraps a `SpeechSynthesisEngine`; the default engine is a plain-fetch
