@@ -1,6 +1,6 @@
 {
  "schemaVersion": 1,
- "updatedAt": "2026-09-13T19:40:29Z",
+ "updatedAt": "2026-09-13T19:41:44Z",
  "controller": "gapos-controller",
  "tasks": {
   "GAP-000": {
@@ -819,6 +819,21 @@
      "command": "Hosted staging restart pair",
      "result": "not_run",
      "note": "No deployed Postgres+S3 pair in this agent environment."
+    },
+    {
+     "command": "GAPOS_PROVIDER_MODE=fake pnpm verify",
+     "result": "pass",
+     "note": "466 passed, 31 skipped (Postgres/S3/live-provider without env). Format, lint, typecheck green."
+    },
+    {
+     "command": "pnpm --filter @gapos/web build",
+     "result": "pass",
+     "note": "Landing, sign-in, privacy, terms, Auth.js route and Arc pages compile."
+    },
+    {
+     "command": "pnpm tsx scripts/smoke-compile.ts",
+     "result": "pass",
+     "note": "SMOKE OK: published course, 3 lessons, audio/mpeg audio in 0s (fake, in-process)."
     }
    ],
    "notes": "OPERATIONS release gates that need keys or a host stay not_run. Fake-mode quality gate is the local bar."
