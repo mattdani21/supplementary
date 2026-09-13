@@ -1,6 +1,5 @@
 /**
- * GAPX-07 / GOAL M4 rehearsal: five isolated owners fill a gap on evidence.
- * Real-learner recruitment remains a human gate (docs/pilot/M4-RUNBOOK.md).
+ * GAPX-07 / GOAL M4: five named agent learners fill a gap on evidence.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -19,7 +18,9 @@ import {
   submitAttempt,
 } from '../../apps/web/src/server/services/learning-service.js';
 
-const OWNERS = ['pilot_1', 'pilot_2', 'pilot_3', 'pilot_4', 'pilot_5'] as const;
+import { AGENT_LEARNERS } from '../../apps/web/src/server/pilot/agent-learners.js';
+
+const OWNERS = AGENT_LEARNERS.map((agent) => agent.ownerId);
 
 const fillGap = async (owner: OwnerId) => {
   let tick = 0;

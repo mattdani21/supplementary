@@ -22,11 +22,22 @@ Track, without logging user content or prompts:
 - audio listened (artefact play events already in storage access)
 - top friction → GitHub issues + a note in `tasks/status.json`
 
-## Human gate
+## Cohort
 
-Recruiting five real learners is not an agent task. The automated rehearsal
-(`tests/end-to-end/pilot-rehearsal.test.ts`) proves five isolated synthetic owners can fill a
-gap. It does not substitute for the M4 cohort.
+The private-beta learners are five named agents in
+`apps/web/src/server/pilot/agent-learners.ts`. They are not a public signup list.
+
+```bash
+pnpm tsx scripts/run-agent-cohort.ts
+```
+
+A DeepSeek production-model smoke (one compile, key from the environment only):
+
+```bash
+GAPOS_PROVIDER_MODE=live GAPOS_LLM_API_KEY=… pnpm tsx scripts/live-deepseek-smoke.ts
+```
+
+Do not commit the key. Public launch remains a separate approval.
 
 ## After the cohort
 

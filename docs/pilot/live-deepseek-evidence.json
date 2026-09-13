@@ -1,0 +1,9 @@
+{
+  "recordedAt": "2026-09-13T20:07:00Z",
+  "publicLaunch": false,
+  "model": "deepseek-chat",
+  "baseUrl": "https://api.deepseek.com",
+  "command": "GAPOS_PROVIDER_MODE=live GAPOS_LLM_MODEL=deepseek-chat pnpm tsx scripts/live-deepseek-smoke.ts",
+  "result": "pass",
+  "note": "One live compile for agent_nova completed in 96s with status=complete and 7 days. The API key was supplied in the environment and was not written to the repository. The full nine-fixture live-provider pack was not re-run."
+}
