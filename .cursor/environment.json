@@ -1,0 +1,17 @@
+{
+  "name": "GapOS",
+  "install": "corepack enable && corepack prepare pnpm@10.33.0 --activate && CI=true pnpm install --frozen-lockfile",
+  "ports": [{ "name": "web", "port": 3000 }],
+  "terminals": [
+    {
+      "name": "web",
+      "command": "pnpm --filter @gapos/web dev",
+      "description": "Next.js PWA shell + HTTP API on :3000. Runs against in-memory repositories and deterministic fake providers (no database or API keys needed). Set GAPOS_DATABASE_URL to use Postgres."
+    },
+    {
+      "name": "worker",
+      "command": "pnpm --filter @gapos/worker start",
+      "description": "Durable generation worker (compile loop). Runs in fake/in-memory mode by default; set GAPOS_DATABASE_URL and GAPOS_STORAGE for durable Postgres + S3-backed runs."
+    }
+  ]
+}
