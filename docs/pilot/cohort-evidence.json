@@ -1,0 +1,57 @@
+{
+  "recordedAt": "2026-09-13T20:05:21.209Z",
+  "cohort": "private-beta-agent-learners",
+  "publicLaunch": false,
+  "results": [
+    {
+      "name": "Nova Chen",
+      "email": "nova.chen@agents.gapos.local",
+      "ownerId": "agent_nova",
+      "gapId": "agent_nova_gap_1",
+      "compileStatus": "complete",
+      "days": 3,
+      "filled": true,
+      "capabilities": 1
+    },
+    {
+      "name": "Reed Okonkwo",
+      "email": "reed.okonkwo@agents.gapos.local",
+      "ownerId": "agent_reed",
+      "gapId": "agent_reed_gap_1",
+      "compileStatus": "complete",
+      "days": 3,
+      "filled": true,
+      "capabilities": 1
+    },
+    {
+      "name": "Kira Patel",
+      "email": "kira.patel@agents.gapos.local",
+      "ownerId": "agent_kira",
+      "gapId": "agent_kira_gap_1",
+      "compileStatus": "complete",
+      "days": 3,
+      "filled": true,
+      "capabilities": 1
+    },
+    {
+      "name": "Soren Berg",
+      "email": "soren.berg@agents.gapos.local",
+      "ownerId": "agent_soren",
+      "gapId": "agent_soren_gap_1",
+      "compileStatus": "complete",
+      "days": 3,
+      "filled": true,
+      "capabilities": 1
+    },
+    {
+      "name": "Vale Dimitriou",
+      "email": "vale.dimitriou@agents.gapos.local",
+      "ownerId": "agent_vale",
+      "gapId": "agent_vale_gap_1",
+      "compileStatus": "complete",
+      "days": 3,
+      "filled": true,
+      "capabilities": 1
+    }
+  ]
+}
