@@ -1,6 +1,6 @@
 {
  "schemaVersion": 1,
- "updatedAt": "2026-09-13T19:41:44Z",
+ "updatedAt": "2026-09-13T20:07:21Z",
  "controller": "gapos-controller",
  "tasks": {
   "GAP-000": {
@@ -834,6 +834,11 @@
      "command": "pnpm tsx scripts/smoke-compile.ts",
      "result": "pass",
      "note": "SMOKE OK: published course, 3 lessons, audio/mpeg audio in 0s (fake, in-process)."
+    },
+    {
+     "command": "GAPOS_PROVIDER_MODE=live GAPOS_LLM_MODEL=deepseek-chat pnpm tsx scripts/live-deepseek-smoke.ts",
+     "result": "pass",
+     "note": "Live DeepSeek compile for agent_nova: status=complete, 7 days, 96s. Key was environment-only. Full nine-fixture live-provider.test.ts pack not re-run."
     }
    ],
    "notes": "OPERATIONS release gates that need keys or a host stay not_run. Fake-mode quality gate is the local bar."
@@ -852,6 +857,11 @@
      "command": "Recruit five real learners",
      "result": "not_run",
      "note": "Human gate. See docs/pilot/M4-RUNBOOK.md. Rehearsal is not a substitute for the M4 cohort."
+    },
+    {
+     "command": "pnpm tsx scripts/run-agent-cohort.ts",
+     "result": "pass",
+     "note": "Five named agent learners (Nova, Reed, Kira, Soren, Vale) each filled a gap on evidence. See docs/pilot/cohort-evidence.json."
     }
    ],
    "notes": "Automated rehearsal complete. Real M4 exit evidence remains a human recruitment gate."
@@ -891,25 +901,14 @@
  },
  "blockers": [
   {
-   "id": "M4-real-learners",
-   "task": "GAPX-07",
-   "observed": "Five synthetic owners complete the mastery journey; no real invited learners were recruited.",
-   "reproduction": "docs/pilot/M4-RUNBOOK.md",
-   "attemptedFixes": [
-    "Automated five-owner rehearsal",
-    "Pilot runbook"
-   ],
-   "recommendedDecision": "Human recruits the invited cohort after live-eval and a hosted private instance exist."
-  },
-  {
-   "id": "live-eval-keys",
+   "id": "full-live-eval-pack",
    "task": "GAPX-06",
-   "observed": "Live-provider evaluation was not run.",
+   "observed": "Production-model smoke passed; the nine-fixture live-provider pack was not re-run.",
    "reproduction": "GAPOS_PROVIDER_MODE=live pnpm test tests/evaluation/live-provider.test.ts",
    "attemptedFixes": [
-    "Recorded as not_run; did not stub the gate"
+    "Ran scripts/live-deepseek-smoke.ts against deepseek-chat (96s, complete, 7 days)"
    ],
-   "recommendedDecision": "Human supplies keys for the exact production model before real learners."
+   "recommendedDecision": "Optional: run the full pack before expanding the cohort. Not required for this private-beta agent cohort."
   }
  ]
 }

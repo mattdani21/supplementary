@@ -9,7 +9,7 @@ export default function HomePage() {
 
   return (
     <main>
-      <p className="eyebrow">Arc on GapOS</p>
+      <p className="eyebrow">Arc on GapOS — invited private beta</p>
       <h1>Learn the gap. Prove the skill.</h1>
       <p>
         Define a noticed knowledge gap, attach sources, compile a short audio-first course, then

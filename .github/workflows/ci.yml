@@ -104,11 +104,17 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Create the MinIO bucket
+        env:
+          AWS_ACCESS_KEY_ID: gapos
+          AWS_SECRET_ACCESS_KEY: gapos-s3
+          AWS_DEFAULT_REGION: us-east-1
         run: |
-          curl -sSLo mc https://dl.min.io/client/mc/release/linux-amd64/mc
-          chmod +x mc
-          ./mc alias set local http://127.0.0.1:9000 gapos gapos-s3
-          ./mc mb --ignore-existing local/gapos-test
+          # dl.min.io now serves HTTP 410 instead of the `mc` binary (MinIO ended public
+          # client downloads). The ubuntu runner already has the AWS CLI; create the
+          # test bucket over the S3 API with path-style addressing for 127.0.0.1.
+          aws configure set default.s3.addressing_style path
+          aws --endpoint-url http://127.0.0.1:9000 s3api create-bucket --bucket gapos-test
+          aws --endpoint-url http://127.0.0.1:9000 s3api head-bucket --bucket gapos-test
 
       - name: Migrate from an empty database
         run: pnpm db:migrate
