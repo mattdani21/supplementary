@@ -3,6 +3,14 @@
 Decisions taken during the build that are smaller than an ADR but would otherwise be invisible.
 Newest first. An entry that reverses architecture belongs in `docs/adr/`, not here.
 
+## 2026-09-13 — CI creates the MinIO bucket with AWS CLI, not `mc`
+
+`curl https://dl.min.io/client/mc/release/linux-amd64/mc` now writes an HTTP 410
+notice (`The open-source MinIO Server, MinIO Client (mc) and MinIO KES projects
+are…`) instead of a binary. The migrations job already pins the server image to
+`quay.io`. Bucket setup uses the runner's AWS CLI (`s3api create-bucket` +
+`head-bucket`, path-style) so CI does not depend on MinIO's download CDN.
+
 ## 2026-09-13 — Private beta: agent learners, DeepSeek, no public launch
 
 - This release stays an invited private beta. No public signup or public DNS.
