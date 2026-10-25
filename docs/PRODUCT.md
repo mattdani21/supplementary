@@ -85,6 +85,15 @@ Define a new gap → system retrieves relevant completed capabilities → master
 not retaught unless diagnostic evidence shows decay → the new curriculum links into the learner's
 knowledge graph.
 
+### Syllabus placement
+
+Open Catalog → choose a library (for example Machine Learning) or import a structured outline →
+sit a multi-item placement exam → unmet required objectives spawn supplementary courses → clear
+those gaps on mastery evidence → re-sit placement → unlock later modules only when their
+prerequisites are placed. The same Syllabus object backs catalog and imported paths. Free-form
+PDF parsing of university documents is out of scope for this journey; a structured outline is
+the import contract.
+
 ## Information architecture
 
 | Area | Purpose |
@@ -92,6 +101,7 @@ knowledge graph.
 | Gap Inbox | capture, clarify and prioritise gaps |
 | Today | current audio, practice and review queue |
 | Active | curricula in progress and generation status |
+| Catalog | shared syllabi and structured outline import |
 | Capabilities | search completed gaps and retained artefacts |
 | Knowledge Map | prerequisites, strengths, weak areas, due reviews |
 | Settings | profile, providers, retention, accessibility |
@@ -122,6 +132,10 @@ The generation log is user-readable: stages and recoverable errors, never model 
 | GenerationStep | run, name, attempt, status, input version, output version, error |
 | AuditFinding | run, target, severity, category, finding, repair status |
 | KnowledgeEdge | source capability, target capability, relationship, confidence |
+| Syllabus | id, version, title, source (catalog \| imported), modules, objectives |
+| SyllabusEnrollment | owner, syllabus, version snapshot, status, unlocked modules |
+| PlacementAttempt | enrollment, kit, answers, per-objective placed/unmet result |
+| SyllabusRemediation | enrollment, objective, spawned gap, idempotency key |
 
 ### Gap lifecycle
 

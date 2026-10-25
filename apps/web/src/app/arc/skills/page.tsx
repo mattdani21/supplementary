@@ -38,11 +38,19 @@ export default async function ArcSkillsPage() {
         <div className="arc-head-copy">
           <p className="arc-eyebrow">Library</p>
           <h1>Skills</h1>
-          <p>Choose a direction. Every new skill starts with a 3-min AI check.</p>
+          <p>
+            Choose a direction, or open the <Link href="/arc/catalog">catalog</Link> for placement
+            into a syllabus.
+          </p>
         </div>
-        <Link className="arc-icon-button" href="/arc/calibrate" aria-label="Add a skill">
-          +
-        </Link>
+        <div className="arc-head-actions">
+          <Link className="arc-icon-button" href="/arc/catalog" aria-label="Open catalog">
+            ⌕
+          </Link>
+          <Link className="arc-icon-button" href="/arc/calibrate" aria-label="Add a skill">
+            +
+          </Link>
+        </div>
       </div>
       <SkillsLibrary
         skills={skills}

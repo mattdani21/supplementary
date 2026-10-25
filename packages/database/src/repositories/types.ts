@@ -7,7 +7,15 @@
  */
 
 import type { CurriculumPlan, LessonPackage, Question } from '@gapos/ai-contracts';
-import type { GapStatus, GenerationStatus, StepState } from '@gapos/domain';
+import type {
+  GapStatus,
+  GenerationStatus,
+  PlacementAnswer,
+  PlacementResult,
+  StepState,
+  Syllabus,
+  SyllabusSource,
+} from '@gapos/domain';
 
 /** A branded id, so an owner cannot be passed where a gap id is expected. */
 export type OwnerId = string & { readonly __brand?: 'OwnerId' };
@@ -245,6 +253,54 @@ export interface ArcCalibration {
   readonly createdAt: Date;
 }
 
+export type SyllabusEnrollmentStatus =
+  'enrolled' | 'placing' | 'remediating' | 'placed' | 'completed';
+
+/** Learner-imported syllabus; catalog libraries stay as code fixtures. */
+export interface ImportedSyllabusRecord {
+  readonly id: string;
+  readonly ownerId: OwnerId;
+  readonly version: number;
+  readonly title: string;
+  readonly description: string;
+  readonly syllabus: Syllabus;
+  readonly createdAt: Date;
+}
+
+export interface SyllabusEnrollment {
+  readonly id: string;
+  readonly ownerId: OwnerId;
+  readonly syllabusId: string;
+  readonly syllabusVersion: number;
+  readonly syllabusSource: SyllabusSource;
+  readonly syllabusSnapshot: Syllabus;
+  readonly status: SyllabusEnrollmentStatus;
+  readonly unlockedModuleIds: readonly string[];
+  readonly createdAt: Date;
+  readonly updatedAt: Date;
+}
+
+export interface PlacementAttemptRecord {
+  readonly id: string;
+  readonly ownerId: OwnerId;
+  readonly enrollmentId: string;
+  readonly kitId: string;
+  readonly answers: readonly PlacementAnswer[];
+  readonly result: PlacementResult;
+  readonly createdAt: Date;
+}
+
+export interface SyllabusRemediationRecord {
+  readonly id: string;
+  readonly ownerId: OwnerId;
+  readonly enrollmentId: string;
+  readonly placementAttemptId: string;
+  readonly objectiveId: string;
+  readonly gapId: string;
+  readonly idempotencyKey: string;
+  readonly createdAt: Date;
+}
+
 /* ------------------------------------------------------------------- repositories */
 
 export interface UserRepository {
@@ -411,6 +467,47 @@ export interface CalibrationRepository {
   listForOwner(owner: OwnerId): Promise<ArcCalibration[]>;
 }
 
+export interface SyllabusRepository {
+  createImported(
+    owner: OwnerId,
+    record: Omit<ImportedSyllabusRecord, 'ownerId'>,
+  ): Promise<ImportedSyllabusRecord>;
+  getImported(owner: OwnerId, id: string): Promise<ImportedSyllabusRecord | undefined>;
+  listImported(owner: OwnerId): Promise<ImportedSyllabusRecord[]>;
+
+  createEnrollment(
+    owner: OwnerId,
+    enrollment: Omit<SyllabusEnrollment, 'ownerId'>,
+  ): Promise<SyllabusEnrollment>;
+  getEnrollment(owner: OwnerId, id: string): Promise<SyllabusEnrollment | undefined>;
+  listEnrollments(owner: OwnerId): Promise<SyllabusEnrollment[]>;
+  updateEnrollment(
+    owner: OwnerId,
+    id: string,
+    patch: Partial<Pick<SyllabusEnrollment, 'status' | 'unlockedModuleIds' | 'updatedAt'>>,
+  ): Promise<SyllabusEnrollment>;
+
+  createPlacementAttempt(
+    owner: OwnerId,
+    attempt: Omit<PlacementAttemptRecord, 'ownerId'>,
+  ): Promise<PlacementAttemptRecord>;
+  listPlacementAttempts(owner: OwnerId, enrollmentId: string): Promise<PlacementAttemptRecord[]>;
+
+  /**
+   * Idempotent by (owner, idempotencyKey): a repeated key returns the original row without
+   * creating a second remediation gap link.
+   */
+  createRemediation(
+    owner: OwnerId,
+    remediation: Omit<SyllabusRemediationRecord, 'ownerId'>,
+  ): Promise<{ remediation: SyllabusRemediationRecord; created: boolean }>;
+  listRemediations(owner: OwnerId, enrollmentId: string): Promise<SyllabusRemediationRecord[]>;
+  findRemediationByKey(
+    owner: OwnerId,
+    idempotencyKey: string,
+  ): Promise<SyllabusRemediationRecord | undefined>;
+}
+
 /* --------------------------------------------------------------------- job queue */
 
 export type JobKind = 'compile';
@@ -482,6 +579,7 @@ export interface UnitOfWork {
   readonly knowledge: KnowledgeRepository;
   readonly preferences: PreferencesRepository;
   readonly calibrations: CalibrationRepository;
+  readonly syllabi: SyllabusRepository;
 }
 
 /** Thrown when a write targets a row the caller does not own or that does not exist. */

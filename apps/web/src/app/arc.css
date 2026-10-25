@@ -1954,6 +1954,157 @@ html[data-theme='dark'] .arc-toast strong {
   color: #27339b;
 }
 
+/* --------------------------------------------------------- syllabus placement */
+
+.arc-stack {
+  display: grid;
+  gap: 16px;
+}
+
+.arc-panel {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  background: var(--surface);
+}
+
+.arc-panel h2 {
+  margin: 4px 0 8px;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+}
+
+.arc-muted {
+  color: var(--ink-faint);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.arc-skill-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 13px;
+  background: var(--paper, var(--surface));
+}
+
+.arc-skill-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.arc-skill-copy strong {
+  font-size: 14px;
+}
+
+.arc-skill-copy p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ink-soft, var(--ink-faint));
+}
+
+.arc-form-stack {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.arc-form-stack textarea,
+.arc-text-input {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--paper, var(--surface));
+  color: var(--ink);
+  font: inherit;
+}
+
+.arc-form-stack textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+.arc-head-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.arc-placement-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: none;
+}
+
+.arc-module-list,
+.arc-objective-list {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.arc-module-list li,
+.arc-objective-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
+.arc-module-list li.is-locked {
+  opacity: 0.72;
+}
+
+.arc-tag {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 99px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.arc-tag-mint {
+  color: #0f5c4c;
+  background: rgba(61, 214, 174, 0.18);
+}
+
+.arc-tag-amber {
+  color: #8a5a00;
+  background: rgba(255, 196, 87, 0.22);
+}
+
+html[data-theme='dark'] .arc-tag-mint {
+  color: #9af0d8;
+}
+
+html[data-theme='dark'] .arc-tag-amber {
+  color: #ffd27a;
+}
+
+a.arc-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
 /* -------------------------------------------------------------------- reduced */
 
 @media (prefers-reduced-motion: reduce) {

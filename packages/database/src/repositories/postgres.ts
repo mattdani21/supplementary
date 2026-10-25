@@ -16,7 +16,13 @@
 
 import type { Pool, PoolClient, QueryResultRow } from 'pg';
 import type { CurriculumPlan, LessonPackage, Question } from '@gapos/ai-contracts';
-import type { GapStatus, GenerationStatus, StepState } from '@gapos/domain';
+import type {
+  GapStatus,
+  GenerationStatus,
+  PlacementResult,
+  StepState,
+  Syllabus,
+} from '@gapos/domain';
 import {
   ConcurrentModificationError,
   NotFoundError,
@@ -33,18 +39,23 @@ import {
   type GenerationRepository,
   type GenerationRun,
   type GenerationStepRecord,
+  type ImportedSyllabusRecord,
   type KnowledgeEdge,
   type KnowledgeRepository,
   type LearnerPreferences,
   type Lesson,
   type MasteryEvidenceRecord,
   type MasteryRepository,
+  type PlacementAttemptRecord,
   type PreferencesRepository,
   type ReviewItem,
   type Source,
   type SourceChunk,
   type SourceRepository,
   type StoredQuestion,
+  type SyllabusEnrollment,
+  type SyllabusRemediationRecord,
+  type SyllabusRepository,
   type UnitOfWork,
   type User,
   type UserRepository,
@@ -302,6 +313,50 @@ const toCalibration = (row: any): ArcCalibration => ({
   baselineCorrect: row.baseline_correct,
   gapsIdentified: row.gaps_identified,
   startingDifficulty: row.starting_difficulty,
+  createdAt: row.created_at,
+});
+
+const toImportedSyllabus = (row: any): ImportedSyllabusRecord => ({
+  id: row.id,
+  ownerId: row.owner_id,
+  version: row.version,
+  title: row.title,
+  description: row.description,
+  syllabus: row.syllabus as Syllabus,
+  createdAt: row.created_at,
+});
+
+const toSyllabusEnrollment = (row: any): SyllabusEnrollment => ({
+  id: row.id,
+  ownerId: row.owner_id,
+  syllabusId: row.syllabus_id,
+  syllabusVersion: row.syllabus_version,
+  syllabusSource: row.syllabus_source,
+  syllabusSnapshot: row.syllabus_snapshot as Syllabus,
+  status: row.status,
+  unlockedModuleIds: row.unlocked_modules ?? [],
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
+
+const toPlacementAttempt = (row: any): PlacementAttemptRecord => ({
+  id: row.id,
+  ownerId: row.owner_id,
+  enrollmentId: row.enrollment_id,
+  kitId: row.kit_id,
+  answers: row.answers ?? [],
+  result: row.result as PlacementResult,
+  createdAt: row.created_at,
+});
+
+const toSyllabusRemediation = (row: any): SyllabusRemediationRecord => ({
+  id: row.id,
+  ownerId: row.owner_id,
+  enrollmentId: row.enrollment_id,
+  placementAttemptId: row.placement_attempt_id,
+  objectiveId: row.objective_id,
+  gapId: row.gap_id,
+  idempotencyKey: row.idempotency_key,
   createdAt: row.created_at,
 });
 
@@ -1183,6 +1238,159 @@ export const createPostgresUnitOfWork = (pool: Pool): UnitOfWork => {
     },
   };
 
+  const syllabi: SyllabusRepository = {
+    async createImported(owner, record) {
+      const { rows } = await db.query(
+        `INSERT INTO imported_syllabi (id, owner_id, version, title, description, syllabus, created_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)
+         RETURNING *`,
+        [
+          record.id,
+          owner,
+          record.version,
+          record.title,
+          record.description,
+          JSON.stringify(record.syllabus),
+          record.createdAt,
+        ],
+      );
+      return toImportedSyllabus(rows[0]);
+    },
+    async getImported(owner, id) {
+      const { rows } = await db.query(
+        'SELECT * FROM imported_syllabi WHERE id = $1 AND owner_id = $2',
+        [id, owner],
+      );
+      return one(rows, toImportedSyllabus);
+    },
+    async listImported(owner) {
+      const { rows } = await db.query(
+        'SELECT * FROM imported_syllabi WHERE owner_id = $1 ORDER BY created_at DESC, id',
+        [owner],
+      );
+      return rows.map(toImportedSyllabus);
+    },
+    async createEnrollment(owner, enrollment) {
+      const { rows } = await db.query(
+        `INSERT INTO syllabus_enrollments (
+           id, owner_id, syllabus_id, syllabus_version, syllabus_source, syllabus_snapshot,
+           status, unlocked_modules, created_at, updated_at
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+         RETURNING *`,
+        [
+          enrollment.id,
+          owner,
+          enrollment.syllabusId,
+          enrollment.syllabusVersion,
+          enrollment.syllabusSource,
+          JSON.stringify(enrollment.syllabusSnapshot),
+          enrollment.status,
+          JSON.stringify(enrollment.unlockedModuleIds),
+          enrollment.createdAt,
+          enrollment.updatedAt,
+        ],
+      );
+      return toSyllabusEnrollment(rows[0]);
+    },
+    async getEnrollment(owner, id) {
+      const { rows } = await db.query(
+        'SELECT * FROM syllabus_enrollments WHERE id = $1 AND owner_id = $2',
+        [id, owner],
+      );
+      return one(rows, toSyllabusEnrollment);
+    },
+    async listEnrollments(owner) {
+      const { rows } = await db.query(
+        'SELECT * FROM syllabus_enrollments WHERE owner_id = $1 ORDER BY created_at DESC, id',
+        [owner],
+      );
+      return rows.map(toSyllabusEnrollment);
+    },
+    async updateEnrollment(owner, id, patch) {
+      const current = require_(await syllabi.getEnrollment(owner, id), 'syllabus_enrollment', id);
+      const next = { ...current, ...patch };
+      const { rows } = await db.query(
+        `UPDATE syllabus_enrollments
+            SET status = $3, unlocked_modules = $4, updated_at = $5
+          WHERE id = $1 AND owner_id = $2
+          RETURNING *`,
+        [id, owner, next.status, JSON.stringify(next.unlockedModuleIds), next.updatedAt],
+      );
+      return toSyllabusEnrollment(rows[0]);
+    },
+    async createPlacementAttempt(owner, attempt) {
+      const { rows } = await db.query(
+        `INSERT INTO placement_attempts (
+           id, owner_id, enrollment_id, kit_id, answers, result, created_at
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7)
+         RETURNING *`,
+        [
+          attempt.id,
+          owner,
+          attempt.enrollmentId,
+          attempt.kitId,
+          JSON.stringify(attempt.answers),
+          JSON.stringify(attempt.result),
+          attempt.createdAt,
+        ],
+      );
+      return toPlacementAttempt(rows[0]);
+    },
+    async listPlacementAttempts(owner, enrollmentId) {
+      const { rows } = await db.query(
+        `SELECT * FROM placement_attempts
+          WHERE owner_id = $1 AND enrollment_id = $2
+          ORDER BY created_at DESC, id`,
+        [owner, enrollmentId],
+      );
+      return rows.map(toPlacementAttempt);
+    },
+    async createRemediation(owner, remediation) {
+      const existing = await syllabi.findRemediationByKey(owner, remediation.idempotencyKey);
+      if (existing) return { remediation: existing, created: false };
+      const { rows } = await db.query(
+        `INSERT INTO syllabus_remediations (
+           id, owner_id, enrollment_id, placement_attempt_id, objective_id, gap_id,
+           idempotency_key, created_at
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+         ON CONFLICT (owner_id, idempotency_key) DO NOTHING
+         RETURNING *`,
+        [
+          remediation.id,
+          owner,
+          remediation.enrollmentId,
+          remediation.placementAttemptId,
+          remediation.objectiveId,
+          remediation.gapId,
+          remediation.idempotencyKey,
+          remediation.createdAt,
+        ],
+      );
+      if (rows.length === 0) {
+        const raced = await syllabi.findRemediationByKey(owner, remediation.idempotencyKey);
+        return { remediation: raced!, created: false };
+      }
+      return { remediation: toSyllabusRemediation(rows[0]), created: true };
+    },
+    async listRemediations(owner, enrollmentId) {
+      const { rows } = await db.query(
+        `SELECT * FROM syllabus_remediations
+          WHERE owner_id = $1 AND enrollment_id = $2
+          ORDER BY created_at, id`,
+        [owner, enrollmentId],
+      );
+      return rows.map(toSyllabusRemediation);
+    },
+    async findRemediationByKey(owner, idempotencyKey) {
+      const { rows } = await db.query(
+        `SELECT * FROM syllabus_remediations
+          WHERE owner_id = $1 AND idempotency_key = $2`,
+        [owner, idempotencyKey],
+      );
+      return one(rows, toSyllabusRemediation);
+    },
+  };
+
   return {
     users,
     gaps,
@@ -1194,6 +1402,7 @@ export const createPostgresUnitOfWork = (pool: Pool): UnitOfWork => {
     knowledge,
     preferences,
     calibrations,
+    syllabi,
   };
 };
 
@@ -1203,7 +1412,8 @@ export const truncateAll = async (pool: Pool): Promise<void> => {
     TRUNCATE users, gaps, sources, source_chunks, diagnostics, curricula, objectives, lessons,
              artefacts, questions, attempts, mastery_evidence, review_items, generation_runs,
              generation_steps, audit_findings, knowledge_edges, jobs, provider_usage, audit_log,
-             learner_profiles, learner_preferences, arc_calibrations, request_quotas
+             learner_profiles, learner_preferences, arc_calibrations, request_quotas,
+             imported_syllabi, syllabus_enrollments, placement_attempts, syllabus_remediations
     RESTART IDENTITY CASCADE
   `);
 };

@@ -8,3 +8,7 @@ export * from './curriculum/plan-validation.js';
 export * from './sources/chunking.js';
 export * from './verification/verifier.js';
 export * from './audio/segmentation.js';
+export * from './syllabus/syllabus.js';
+export * from './syllabus/placement.js';
+export * from './syllabus/spawn.js';
+export * from './syllabus/catalog.js';

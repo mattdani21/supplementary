@@ -18,7 +18,13 @@ export function ArcNav() {
         const active =
           tab.href === '/arc'
             ? pathname === tab.href || pathname.startsWith('/arc/reviews')
-            : pathname === tab.href || pathname.startsWith(`${tab.href}/`);
+            : tab.href === '/arc/skills'
+              ? pathname === tab.href ||
+                pathname.startsWith(`${tab.href}/`) ||
+                pathname.startsWith('/arc/catalog') ||
+                pathname.startsWith('/arc/enrollments') ||
+                pathname.startsWith('/arc/calibrate')
+              : pathname === tab.href || pathname.startsWith(`${tab.href}/`);
         return (
           <Link
             key={tab.href}

@@ -434,6 +434,174 @@ paths:
                     items: { $ref: '#/components/schemas/ArcCapability' }
         '401': { $ref: '#/components/responses/Unauthorised' }
 
+  /arc/catalog:
+    get:
+      tags: [arc]
+      operationId: arcCatalog
+      summary: Catalog syllabi available for placement
+      responses:
+        '200':
+          description: Built-in libraries such as Machine Learning.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [syllabi]
+                properties:
+                  syllabi:
+                    type: array
+                    items: { $ref: '#/components/schemas/CatalogSyllabusSummary' }
+        '401': { $ref: '#/components/responses/Unauthorised' }
+
+  /arc/syllabi/import:
+    post:
+      tags: [arc]
+      operationId: arcImportSyllabus
+      summary: Import a structured outline as a Syllabus
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SyllabusOutlineImport' }
+      responses:
+        '200':
+          description: The validated imported syllabus.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [syllabus]
+                properties:
+                  syllabus: { $ref: '#/components/schemas/Syllabus' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorised' }
+
+  /arc/syllabi/{syllabusId}/enroll:
+    parameters:
+      - name: syllabusId
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      tags: [arc]
+      operationId: arcEnrollSyllabus
+      summary: Enroll in a catalog or imported syllabus
+      responses:
+        '200':
+          description: The new enrollment.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [enrollment]
+                properties:
+                  enrollment: { $ref: '#/components/schemas/SyllabusEnrollment' }
+        '401': { $ref: '#/components/responses/Unauthorised' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /arc/enrollments/{enrollmentId}:
+    parameters:
+      - name: enrollmentId
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [arc]
+      operationId: arcEnrollment
+      summary: Enrollment status, unlocked modules, and spawned remediations
+      responses:
+        '200':
+          description: Enrollment projection for the Arc screens.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [enrollment]
+                properties:
+                  enrollment: { $ref: '#/components/schemas/SyllabusEnrollmentView' }
+        '401': { $ref: '#/components/responses/Unauthorised' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /arc/enrollments/{enrollmentId}/placement:
+    parameters:
+      - name: enrollmentId
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [arc]
+      operationId: arcPlacementKit
+      summary: Issue a placement kit (answer key withheld)
+      responses:
+        '200':
+          description: Placement items without answers.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [placement]
+                properties:
+                  placement: { $ref: '#/components/schemas/PlacementKitView' }
+        '401': { $ref: '#/components/responses/Unauthorised' }
+        '409':
+          description: Re-sit blocked while remediations are unfinished, or kit unavailable.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    post:
+      tags: [arc]
+      operationId: arcSubmitPlacement
+      summary: Grade placement and spawn unmet supplementary courses
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PlacementSubmitRequest' }
+      responses:
+        '200':
+          description: Graded result and spawned gap ids.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [placement]
+                properties:
+                  placement: { $ref: '#/components/schemas/PlacementSubmitResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorised' }
+        '409':
+          description: Placement kit expired.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /arc/enrollments/{enrollmentId}/resit:
+    parameters:
+      - name: enrollmentId
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      tags: [arc]
+      operationId: arcResitPlacement
+      summary: Request a new placement kit after remediations are filled
+      responses:
+        '200':
+          description: A fresh placement kit.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [placement]
+                properties:
+                  placement: { $ref: '#/components/schemas/PlacementKitView' }
+        '401': { $ref: '#/components/responses/Unauthorised' }
+        '409':
+          description: Re-sit blocked while remediations are unfinished.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
   /arc/calibration:
     get:
       tags: [arc]
@@ -1506,3 +1674,204 @@ components:
               gapId: { type: string }
               objectiveId: { type: string }
               dueAt: { type: string, format: date-time }
+
+    CatalogSyllabusSummary:
+      type: object
+      required: [id, version, title, description, moduleCount, objectiveCount]
+      properties:
+        id: { type: string }
+        version: { type: integer }
+        title: { type: string }
+        description: { type: string }
+        moduleCount: { type: integer }
+        objectiveCount: { type: integer }
+
+    SyllabusOutlineImport:
+      type: object
+      required: [title, modules]
+      properties:
+        title: { type: string, minLength: 1 }
+        description: { type: string }
+        modules:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [title, outcomes]
+            properties:
+              title: { type: string, minLength: 1 }
+              outcomes:
+                type: array
+                minItems: 1
+                items: { type: string }
+
+    Syllabus:
+      type: object
+      required: [id, version, title, description, source, modules, objectives]
+      properties:
+        id: { type: string }
+        version: { type: integer, minimum: 1 }
+        title: { type: string }
+        description: { type: string }
+        source: { type: string, enum: [catalog, imported] }
+        modules:
+          type: array
+          items:
+            type: object
+            required: [id, title, order, objectiveIds]
+            properties:
+              id: { type: string }
+              title: { type: string }
+              order: { type: integer }
+              objectiveIds:
+                type: array
+                items: { type: string }
+        objectives:
+          type: array
+          items:
+            type: object
+            required: [id, statement, required, prerequisiteObjectiveIds]
+            properties:
+              id: { type: string }
+              statement: { type: string }
+              required: { type: boolean }
+              prerequisiteObjectiveIds:
+                type: array
+                items: { type: string }
+
+    SyllabusEnrollment:
+      type: object
+      required: [id, syllabusId, syllabusVersion, syllabusSource, status, unlockedModuleIds]
+      properties:
+        id: { type: string }
+        syllabusId: { type: string }
+        syllabusVersion: { type: integer }
+        syllabusSource: { type: string, enum: [catalog, imported] }
+        status:
+          type: string
+          enum: [enrolled, placing, remediating, placed, completed]
+        unlockedModuleIds:
+          type: array
+          items: { type: string }
+
+    SyllabusEnrollmentView:
+      allOf:
+        - $ref: '#/components/schemas/SyllabusEnrollment'
+        - type: object
+          required: [title, description, modules, objectives, remediations, canResit]
+          properties:
+            title: { type: string }
+            description: { type: string }
+            modules:
+              type: array
+              items:
+                type: object
+                required: [id, title, order, unlocked, objectiveIds]
+                properties:
+                  id: { type: string }
+                  title: { type: string }
+                  order: { type: integer }
+                  unlocked: { type: boolean }
+                  objectiveIds:
+                    type: array
+                    items: { type: string }
+            objectives:
+              type: array
+              items:
+                type: object
+                required: [id, statement, required]
+                properties:
+                  id: { type: string }
+                  statement: { type: string }
+                  required: { type: boolean }
+                  placement: { type: string, enum: [placed, unmet] }
+            remediations:
+              type: array
+              items:
+                type: object
+                required: [objectiveId, gapId, gapStatus, title]
+                properties:
+                  objectiveId: { type: string }
+                  gapId: { type: string }
+                  gapStatus: { $ref: '#/components/schemas/GapStatus' }
+                  title: { type: string }
+            canResit: { type: boolean }
+
+    PlacementKitView:
+      type: object
+      required: [kitId, syllabusId, syllabusVersion, title, items]
+      properties:
+        kitId: { type: string }
+        syllabusId: { type: string }
+        syllabusVersion: { type: integer }
+        title: { type: string }
+        items:
+          type: array
+          items:
+            type: object
+            required: [id, objectiveId, type, prompt]
+            properties:
+              id: { type: string }
+              objectiveId: { type: string }
+              type: { type: string, enum: [multiple_choice, short_answer] }
+              prompt: { type: string }
+              options:
+                type: array
+                items: { type: string }
+
+    PlacementSubmitRequest:
+      type: object
+      required: [kitId, answers]
+      properties:
+        kitId: { type: string, minLength: 1 }
+        answers:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [itemId, response]
+            properties:
+              itemId: { type: string }
+              response: { type: string }
+
+    PlacementSubmitResult:
+      type: object
+      required:
+        [
+          attemptId,
+          placedObjectiveIds,
+          unmetObjectiveIds,
+          unlockedModuleIds,
+          objectiveResults,
+          spawnedGaps,
+        ]
+      properties:
+        attemptId: { type: string }
+        placedObjectiveIds:
+          type: array
+          items: { type: string }
+        unmetObjectiveIds:
+          type: array
+          items: { type: string }
+        unlockedModuleIds:
+          type: array
+          items: { type: string }
+        objectiveResults:
+          type: array
+          items:
+            type: object
+            required: [objectiveId, status, score, itemCount]
+            properties:
+              objectiveId: { type: string }
+              status: { type: string, enum: [placed, unmet] }
+              score: { type: number }
+              itemCount: { type: integer }
+        spawnedGaps:
+          type: array
+          items:
+            type: object
+            required: [objectiveId, gapId, created]
+            properties:
+              objectiveId: { type: string }
+              gapId: { type: string }
+              created: { type: boolean }
