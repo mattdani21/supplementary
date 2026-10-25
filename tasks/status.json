@@ -865,6 +865,34 @@
     }
    ],
    "notes": "Automated rehearsal complete. Real M4 exit evidence remains a human recruitment gate."
+  },
+  "GAP-038": {
+   "status": "done",
+   "startedAt": "2026-10-25T19:18:00.000Z",
+   "completedAt": "2026-10-25T19:32:00.000Z",
+   "evidence": [
+    {
+     "command": "pnpm test packages/domain/src/syllabus",
+     "result": "pass",
+     "note": "12 domain tests: syllabus validation, outline import, placement grading, module unlock, spawn idempotency, re-sit gate."
+    },
+    {
+     "command": "pnpm test apps/web/src/server/syllabus-service.test.ts",
+     "result": "pass",
+     "note": "Catalog ML listing; wrong placement spawns gaps; re-sit blocked until filled; correct re-sit unlocks modules; outline import loop; duplicate spawn refused."
+    },
+    {
+     "command": "GAPOS_PROVIDER_MODE=fake pnpm verify",
+     "result": "pass",
+     "note": "484 passed, 31 skipped (Postgres/S3/live-provider env gates). Format, lint, typecheck green."
+    },
+    {
+     "command": "pnpm --filter @gapos/web build",
+     "result": "pass",
+     "note": "Catalog, enrollment, and placement routes compile."
+    }
+   ],
+   "notes": "Syllabus placement loop shipped: catalog Machine Learning fixture, server-side placement kits, idempotent remediation gaps, re-sit gate, structured outline import, Arc screens. Diagrams/3D and PDF parsing remain out of scope."
   }
  },
  "GAP-014b": {

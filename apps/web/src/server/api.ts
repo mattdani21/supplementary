@@ -59,6 +59,18 @@ import {
   type RunCellResult,
   type SubmitAttemptInput,
 } from './services/learning-service.js';
+import {
+  enrollInSyllabus,
+  getEnrollmentView,
+  importSyllabusOutline,
+  isDomainSyllabusError,
+  issuePlacementKit,
+  listCatalog,
+  PlacementKitUnavailableError,
+  PlacementResitBlockedError,
+  requestResit,
+  submitPlacement,
+} from './services/syllabus-service.js';
 
 /* ------------------------------------------------------------------- errors */
 
@@ -106,6 +118,16 @@ export const toHttpError = (error: unknown): { status: number; code: string; mes
     return { status: 429, code: 'rate_limited', message: error.message };
   if (error instanceof CalibrationKitUnavailableError)
     return { status: 409, code: 'calibration_kit_expired', message: error.message };
+  if (error instanceof PlacementKitUnavailableError)
+    return { status: 409, code: 'placement_kit_expired', message: error.message };
+  if (error instanceof PlacementResitBlockedError)
+    return {
+      status: 409,
+      code: 'placement_resit_blocked',
+      message: error.message,
+    };
+  if (isDomainSyllabusError(error))
+    return { status: 400, code: error.code, message: error.message };
   if (error instanceof CompileSetupError)
     return { status: 409, code: error.code, message: error.message };
   if (error instanceof QuestionNotInGapError)
@@ -795,3 +817,84 @@ export const arcSetPreferencesHandler = async (
   const values = preferencesSchema.parse(body);
   return { preferences: await setPreferences(context, owner, values) };
 };
+
+/* ----------------------------------------------------------- syllabus placement */
+
+const outlineSchema = z.object({
+  title: z.string().min(1),
+  description: z.string().optional(),
+  modules: z
+    .array(
+      z.object({
+        title: z.string().min(1),
+        outcomes: z.array(z.string()).min(1),
+      }),
+    )
+    .min(1),
+});
+
+const enrollSchema = z.object({
+  syllabusId: z.string().min(1),
+});
+
+const placementSubmitSchema = z.object({
+  kitId: z.string().min(1),
+  answers: z
+    .array(
+      z.object({
+        itemId: z.string().min(1),
+        response: z.string(),
+      }),
+    )
+    .min(1),
+});
+
+export const arcCatalogHandler = (): ReturnType<typeof listCatalog> => listCatalog();
+
+export const arcImportSyllabusHandler = async (
+  context: ServerContext,
+  owner: OwnerId,
+  body: unknown,
+): Promise<Awaited<ReturnType<typeof importSyllabusOutline>>> => {
+  const input = outlineSchema.parse(body);
+  return importSyllabusOutline(context, owner, input);
+};
+
+export const arcEnrollSyllabusHandler = async (
+  context: ServerContext,
+  owner: OwnerId,
+  syllabusId: string,
+): Promise<Awaited<ReturnType<typeof enrollInSyllabus>>> => {
+  const parsed = enrollSchema.parse({ syllabusId });
+  return enrollInSyllabus(context, owner, parsed.syllabusId);
+};
+
+export const arcEnrollmentHandler = async (
+  context: ServerContext,
+  owner: OwnerId,
+  enrollmentId: string,
+): Promise<Awaited<ReturnType<typeof getEnrollmentView>>> =>
+  getEnrollmentView(context, owner, enrollmentId);
+
+export const arcPlacementKitHandler = async (
+  context: ServerContext,
+  owner: OwnerId,
+  enrollmentId: string,
+): Promise<Awaited<ReturnType<typeof issuePlacementKit>>> =>
+  issuePlacementKit(context, owner, enrollmentId);
+
+export const arcSubmitPlacementHandler = async (
+  context: ServerContext,
+  owner: OwnerId,
+  enrollmentId: string,
+  body: unknown,
+): Promise<Awaited<ReturnType<typeof submitPlacement>>> => {
+  const input = placementSubmitSchema.parse(body);
+  return submitPlacement(context, owner, enrollmentId, input);
+};
+
+export const arcResitPlacementHandler = async (
+  context: ServerContext,
+  owner: OwnerId,
+  enrollmentId: string,
+): Promise<Awaited<ReturnType<typeof requestResit>>> => requestResit(context, owner, enrollmentId);

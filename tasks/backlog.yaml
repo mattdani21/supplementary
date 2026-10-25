@@ -1095,3 +1095,42 @@ tasks:
       - pnpm test tests/end-to-end/pilot-rehearsal.test.ts
     risk: medium
     human_gate: true
+
+  - id: E23
+    title: Syllabus placement and catalog
+    priority: P0
+    goal: Catalog and imported syllabi place learners, spawn gap-filling courses, and re-sit before later modules unlock.
+
+  - id: GAP-038
+    title: 'Syllabus placement loop — catalog, exam, spawn, re-sit'
+    epic: E23
+    priority: P0
+    status: done
+    goal: 'A learner places into a syllabus (catalog or imported), gets supplementary courses for unmet objectives, and re-sits only after those gaps are filled.'
+    scope:
+      - 'Syllabus domain object with validation; Machine Learning catalog fixture'
+      - 'Multi-item placement exam graded server-side; answer key never sent to the client'
+      - 'Idempotent spawn of supplementary gaps for unmet required objectives'
+      - 'Re-sit blocked until spawned gaps are filled'
+      - 'Structured outline import into the same Syllabus shape'
+      - 'Arc catalog, placement, spawn, and re-sit screens on the existing design system'
+      - 'OpenAPI + specs/syllabus-placement.md + PRODUCT journey'
+    out_of_scope:
+      - 'Diagram or 3D artefacts'
+      - 'Arbitrary PDF syllabus parsing'
+      - 'Public signup or visual redesign of legacy /gaps'
+      - 'Changing mastery thresholds'
+    dependencies: [GAP-037]
+    acceptance:
+      - 'Machine Learning catalog syllabus validates and appears in GET /arc/catalog'
+      - 'Placement grades server-side; unmet required objectives spawn gaps idempotently'
+      - 'Re-sit is refused while any spawned gap is not filled; after all are filled a new kit issues'
+      - 'Structured outline import validates into the same Syllabus shape and supports the loop'
+      - 'Arc screens cover catalog, placement, spawned gaps, and re-sit'
+      - 'pnpm verify green; domain tests cover validation, grading, spawn idempotency, and the re-sit gate'
+    verification:
+      - pnpm test packages/domain/src/syllabus
+      - pnpm test apps/web/src/server/syllabus
+      - pnpm verify
+    risk: high
+    human_gate: false

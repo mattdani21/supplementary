@@ -40,6 +40,10 @@ export const METRICS = [
   'proof_execution_refused_total',
   'identity_rejected_total',
   'pilot_learner_filled_total',
+  // Syllabus placement (GAP-038).
+  'syllabus_import_total',
+  'syllabus_enroll_total',
+  'syllabus_placement_total',
 ] as const;
 
 export type MetricName = (typeof METRICS)[number];

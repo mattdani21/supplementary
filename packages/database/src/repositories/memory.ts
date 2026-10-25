@@ -25,6 +25,7 @@ import {
   type GenerationRepository,
   type GenerationRun,
   type GenerationStepRecord,
+  type ImportedSyllabusRecord,
   type KnowledgeEdge,
   type KnowledgeRepository,
   type LearnerPreferences,
@@ -32,12 +33,16 @@ import {
   type MasteryEvidenceRecord,
   type MasteryRepository,
   type OwnerId,
+  type PlacementAttemptRecord,
   type PreferencesRepository,
   type ReviewItem,
   type Source,
   type SourceChunk,
   type SourceRepository,
   type StoredQuestion,
+  type SyllabusEnrollment,
+  type SyllabusRemediationRecord,
+  type SyllabusRepository,
   type UnitOfWork,
   type User,
   type UserRepository,
@@ -101,6 +106,10 @@ export interface MemoryStore {
   readonly edges: OwnedTable<KnowledgeEdge>;
   readonly preferences: Map<string, LearnerPreferences>;
   readonly calibrations: OwnedTable<ArcCalibration>;
+  readonly importedSyllabi: OwnedTable<ImportedSyllabusRecord>;
+  readonly syllabusEnrollments: OwnedTable<SyllabusEnrollment>;
+  readonly placementAttempts: OwnedTable<PlacementAttemptRecord>;
+  readonly syllabusRemediations: OwnedTable<SyllabusRemediationRecord>;
   readonly auditLog: { ownerId?: OwnerId; action: string; target: string }[];
 }
 
@@ -137,6 +146,10 @@ export const createMemoryStore = (): MemoryStore => ({
   edges: new OwnedTable(),
   preferences: new Map(),
   calibrations: new OwnedTable(),
+  importedSyllabi: new OwnedTable(),
+  syllabusEnrollments: new OwnedTable(),
+  placementAttempts: new OwnedTable(),
+  syllabusRemediations: new OwnedTable(),
   auditLog: [],
 });
 
@@ -169,6 +182,10 @@ export const createMemoryUnitOfWork = (store: MemoryStore = createMemoryStore())
         store.findings,
         store.edges,
         store.calibrations,
+        store.importedSyllabi,
+        store.syllabusEnrollments,
+        store.placementAttempts,
+        store.syllabusRemediations,
       ]) {
         table.deleteOwnedBy(id);
       }
@@ -493,6 +510,63 @@ export const createMemoryUnitOfWork = (store: MemoryStore = createMemoryStore())
     },
   };
 
+  const syllabi: SyllabusRepository = {
+    async createImported(owner, record) {
+      return store.importedSyllabi.insert({ ...record, ownerId: owner });
+    },
+    async getImported(owner, id) {
+      return store.importedSyllabi.get(owner, id);
+    },
+    async listImported(owner) {
+      return store.importedSyllabi
+        .where(owner)
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    },
+    async createEnrollment(owner, enrollment) {
+      return store.syllabusEnrollments.insert({ ...enrollment, ownerId: owner });
+    },
+    async getEnrollment(owner, id) {
+      return store.syllabusEnrollments.get(owner, id);
+    },
+    async listEnrollments(owner) {
+      return store.syllabusEnrollments
+        .where(owner)
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    },
+    async updateEnrollment(owner, id, patch) {
+      const current = store.syllabusEnrollments.require('syllabus_enrollment', owner, id);
+      return store.syllabusEnrollments.replace({ ...current, ...patch });
+    },
+    async createPlacementAttempt(owner, attempt) {
+      return store.placementAttempts.insert({ ...attempt, ownerId: owner });
+    },
+    async listPlacementAttempts(owner, enrollmentId) {
+      return store.placementAttempts
+        .where(owner, (row) => row.enrollmentId === enrollmentId)
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    },
+    async createRemediation(owner, remediation) {
+      const existing = store.syllabusRemediations
+        .where(owner, (row) => row.idempotencyKey === remediation.idempotencyKey)
+        .at(0);
+      if (existing) return { remediation: existing, created: false };
+      return {
+        remediation: store.syllabusRemediations.insert({ ...remediation, ownerId: owner }),
+        created: true,
+      };
+    },
+    async listRemediations(owner, enrollmentId) {
+      return store.syllabusRemediations
+        .where(owner, (row) => row.enrollmentId === enrollmentId)
+        .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    },
+    async findRemediationByKey(owner, idempotencyKey) {
+      return store.syllabusRemediations
+        .where(owner, (row) => row.idempotencyKey === idempotencyKey)
+        .at(0);
+    },
+  };
+
   return {
     users,
     gaps,
@@ -504,5 +578,6 @@ export const createMemoryUnitOfWork = (store: MemoryStore = createMemoryStore())
     knowledge,
     preferences,
     calibrations,
+    syllabi,
   };
 };

@@ -20,6 +20,7 @@ import {
 } from '@gapos/database';
 import type { ProofExecutionMode } from './proof-execution.js';
 import type { Calibration } from '@gapos/ai-contracts';
+import type { PlacementItem } from '@gapos/domain';
 import {
   CostAccountant,
   createLogger,
@@ -40,6 +41,11 @@ export interface CalibrationKitStore {
   get(owner: OwnerId, kitId: string, subject: string): Calibration | undefined;
 }
 
+export interface PlacementKitStore {
+  issue(owner: OwnerId, enrollmentId: string, items: readonly PlacementItem[]): string;
+  get(owner: OwnerId, kitId: string, enrollmentId: string): readonly PlacementItem[] | undefined;
+}
+
 export interface ServerContext {
   readonly uow: UnitOfWork;
   readonly storage: ObjectStore;
@@ -49,6 +55,7 @@ export interface ServerContext {
   readonly costAccountant: CostAccountant;
   readonly logger: Logger;
   readonly calibrationKits: CalibrationKitStore;
+  readonly placementKits: PlacementKitStore;
   readonly compileTransport: 'inline' | 'queue';
   readonly proofExecution: ProofExecutionMode;
   readonly limiter: RequestLimiter;
@@ -84,6 +91,7 @@ export interface ContextOptions {
   /** Durable job queue. Defaults to the in-memory queue; the worker uses the Postgres one. */
   readonly queue?: JobQueue;
   readonly calibrationKits?: CalibrationKitStore;
+  readonly placementKits?: PlacementKitStore;
   readonly compileTransport?: 'inline' | 'queue';
   readonly proofExecution?: ProofExecutionMode;
   readonly limiter?: RequestLimiter;
@@ -124,6 +132,42 @@ export const createServerContext = (options: ContextOptions = {}): ServerContext
     },
   };
 
+  const pendingPlacementKits = new Map<
+    string,
+    { owner: OwnerId; enrollmentId: string; items: readonly PlacementItem[]; expiresAt: number }
+  >();
+  const placementKits: PlacementKitStore = options.placementKits ?? {
+    issue(owner, enrollmentId, items) {
+      const at = now().getTime();
+      for (const [id, pending] of pendingPlacementKits) {
+        if (pending.expiresAt <= at) pendingPlacementKits.delete(id);
+      }
+      const id = newId('place-kit');
+      pendingPlacementKits.set(id, {
+        owner,
+        enrollmentId,
+        items,
+        expiresAt: at + 15 * 60_000,
+      });
+      return id;
+    },
+    get(owner, kitId, enrollmentId) {
+      const pending = pendingPlacementKits.get(kitId);
+      if (
+        !pending ||
+        pending.owner !== owner ||
+        pending.enrollmentId !== enrollmentId ||
+        pending.expiresAt <= now().getTime()
+      ) {
+        if (pending?.expiresAt && pending.expiresAt <= now().getTime()) {
+          pendingPlacementKits.delete(kitId);
+        }
+        return undefined;
+      }
+      return pending.items;
+    },
+  };
+
   return {
     uow: options.uow ?? createMemoryUnitOfWork(),
     storage: options.storage ?? createMemoryObjectStore(options.now),
@@ -141,6 +185,7 @@ export const createServerContext = (options: ContextOptions = {}): ServerContext
     costAccountant,
     logger,
     calibrationKits,
+    placementKits,
     compileTransport: options.compileTransport ?? 'inline',
     proofExecution: options.proofExecution ?? 'local',
     limiter:
